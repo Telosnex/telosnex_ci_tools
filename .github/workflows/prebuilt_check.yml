@@ -1,5 +1,5 @@
 # Reusable workflow. Checks the source key and every native and model URL
-# of a native_prebuilt package (`dart run native_prebuilt:check`). The caller
+# of a package (`dart run <package>:check`). The caller
 # sets the triggers, usually the pull requests that change the manifest and a
 # daily schedule.
 name: Prebuilt check
@@ -7,6 +7,10 @@ name: Prebuilt check
 on:
   workflow_call:
     inputs:
+      package:
+        description: The Dart package of the prebuilt tool.
+        type: string
+        default: native_prebuilt
       flutter-version:
         description: Empty for the version of setup-flutter.
         type: string
@@ -30,4 +34,5 @@ jobs:
       - name: Check the source key and every native and model URL
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: dart run native_prebuilt:check
+          PACKAGE: ${{ inputs.package }}
+        run: dart run "$PACKAGE:check"

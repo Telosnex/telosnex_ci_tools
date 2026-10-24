@@ -1,11 +1,15 @@
-name: Build a native target
+name: Build the prebuilt files of a target
 description: >-
-  Describes the toolchain, then runs `dart run native_prebuilt:build` for one
+  Describes the toolchain, then runs `dart run <package>:build` for one
   target. The files go to <out>/out/<target>.
 
 inputs:
+  package:
+    description: The Dart package of the prebuilt tool.
+    required: false
+    default: native_prebuilt
   target:
-    description: A native_prebuilt target, for example windows-x64.
+    description: A target, for example windows-x64.
     required: true
   runner:
     description: The runner label. It goes into target.json.
@@ -20,7 +24,7 @@ inputs:
   build-args:
     description: >-
       JSON. A target pattern (`*` matches any text) to a list of more
-      arguments for native_prebuilt:build. ${NAME} in an argument expands to
+      arguments for the build command. ${NAME} in an argument expands to
       the environment variable NAME.
     required: false
     default: '{}'
@@ -43,6 +47,7 @@ runs:
       id: build
       shell: bash
       env:
+        PACKAGE: ${{ inputs.package }}
         TARGET: ${{ inputs.target }}
         RUNNER: ${{ inputs.runner }}
         OUT: ${{ inputs.out }}
@@ -50,4 +55,4 @@ runs:
         BUILD_ARGS: ${{ inputs.build-args }}
         TOOLCHAIN_EXTRA: ${{ inputs.toolchain-extra }}
       # The script uses only dart:io and dart:convert, so it needs no pub get.
-      run: dart "$GITHUB_ACTION_PATH/native_build.dart"
+      run: dart "$GITHUB_ACTION_PATH/prebuilt_build.dart"

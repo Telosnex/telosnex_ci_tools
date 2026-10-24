@@ -1,13 +1,14 @@
-// Runs `dart run native_prebuilt:build` for one target. actions/native-build
+// Runs `dart run <package>:build` for one target. actions/prebuilt-build
 // runs this file with the environment variables of its action.yml.
 //
 // This file uses only dart:io and dart:convert: the action runs it without a
-// pub get. test/native_build_test.dart imports it.
+// pub get. test/prebuilt_build_test.dart imports it.
 import 'dart:convert';
 import 'dart:io';
 
 Future<void> main() async {
   final env = Platform.environment;
+  final package = _require(env, 'PACKAGE');
   final target = _require(env, 'TARGET');
   final out = _require(env, 'OUT');
   final runner = _require(env, 'RUNNER');
@@ -37,7 +38,7 @@ Future<void> main() async {
   final targetOut = '$out/out/$target';
   final args = [
     'run',
-    'native_prebuilt:build',
+    '$package:build',
     '--target',
     target,
     '--out',

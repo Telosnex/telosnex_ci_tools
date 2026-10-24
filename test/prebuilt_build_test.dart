@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import '../actions/native-build/native_build.dart';
+import '../actions/prebuilt-build/prebuilt_build.dart';
 
 void main() {
   test('matchesTarget', () {

@@ -8,9 +8,9 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 |---|---|---|
 | `actions/setup-flutter` | Composite action | Installs Flutter from a shallow clone of its tag. The default version is in `flutter_version.txt`. |
 | `actions/check-clean-tree` | Composite action | Fails if the checkout has untracked or changed files. |
-| `actions/native-build` | Composite action | Describes the toolchain and runs `native_prebuilt:build` for one target. |
-| `.github/workflows/native_release.yml` | Reusable workflow | Builds, tests and publishes the native and web files of a `native_prebuilt` package. |
-| `.github/workflows/prebuilt_check.yml` | Reusable workflow | Runs `native_prebuilt:check`. |
+| `actions/prebuilt-build` | Composite action | Describes the toolchain and runs `<package>:build` for one target. |
+| `.github/workflows/prebuilt_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a package. |
+| `.github/workflows/prebuilt_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
 | `default.json` | Renovate preset | Keeps the pinned actions current. |
@@ -32,11 +32,11 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 
 ## Call a shared workflow
 
-The caller has the triggers, the `run-name` and the package-specific values. The shared workflow has the jobs. This is the native release of fonnx:
+The caller has the triggers, the `run-name` and the package-specific values. The shared workflow has the jobs. This is the prebuilt release of fonnx, `.github/workflows/prebuilt_release.yml`:
 
 ```yaml
-name: Native release
-run-name: Native release / ${{ (github.ref_name == 'native-release-dry' || inputs.dry_run) && 'build only' || 'publish' }}
+name: Prebuilt release
+run-name: Prebuilt release / ${{ (github.ref_name == 'prebuilt-release-dry' || inputs.dry_run) && 'build only' || 'publish' }}
 
 on:
   workflow_dispatch:
@@ -46,14 +46,14 @@ on:
         type: boolean
         default: false
   push:
-    branches: [native-release, native-release-dry]
+    branches: [prebuilt-release, prebuilt-release-dry]
 
 permissions:
   contents: read
 
 jobs:
-  native-release:
-    uses: Telosnex/telosnex_ci_tools/.github/workflows/native_release.yml@<sha> # v0.1.0
+  prebuilt-release:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/prebuilt_release.yml@<sha> # v0.1.0
     permissions:
       contents: write
     with:
@@ -86,7 +86,19 @@ jobs:
       release-command: dart run tool/release_native.dart
 ```
 
-`native_release.yml` describes each input.
+`prebuilt_release.yml` describes each input.
+
+### Names
+
+| Thing | Name |
+|---|---|
+| Workflow file and name | `prebuilt_release.yml`, `Prebuilt release` |
+| Trigger branches | `prebuilt-release`, `prebuilt-release-dry` (a dry run) |
+| Artifacts | `prebuilt-<target>`, `prebuilt-web`, `manifest`, `debug-symbols-<target>` |
+| Manifest branch | `prebuilt-manifest/<tag>` |
+| Release tag | `native-<16 characters of the source key>`. The package sets it. |
+
+The `package` input is the Dart package of the tool, `native_prebuilt` by default. When that package is renamed, only the default changes.
 
 ## Change this repository
 

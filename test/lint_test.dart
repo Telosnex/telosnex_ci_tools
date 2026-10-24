@@ -106,8 +106,8 @@ permissions:
 concurrency:
   group: native-release
 jobs:
-  native-release:
-    uses: $selfRepository/.github/workflows/native_release.yml@3d3c42e5aac5ba805825da76410c181273ba90b1 # v1.0.0
+  prebuilt-release:
+    uses: $selfRepository/.github/workflows/prebuilt_release.yml@3d3c42e5aac5ba805825da76410c181273ba90b1 # v1.0.0
 ''';
     expect(_rules('native_release.yml', text), ['shared-concurrency']);
   });
