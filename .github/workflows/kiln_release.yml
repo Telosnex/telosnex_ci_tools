@@ -80,6 +80,10 @@ on:
         description: The container image of the web build, for example emsdk.
         type: string
         default: ''
+      web-test-runner:
+        description: The runner of tool/kiln/test_web.dart.
+        type: string
+        default: ubuntu-24.04
 
 concurrency:
   group: kiln-release
@@ -286,7 +290,7 @@ jobs:
   web-test:
     needs: web
     if: needs.web.outputs.built == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.web-test-runner }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -323,6 +327,8 @@ jobs:
         run: dart run "$PACKAGE:web" install-dev --from "$RUNNER_TEMP/web-artifact/web"
       - name: Test (tool/kiln/test_web.dart)
         if: steps.find.outputs.found == 'true'
+        env:
+          KILN_WEB_FILES: ${{ runner.temp }}/web-artifact/web
         run: dart run tool/kiln/test_web.dart
 
   release:

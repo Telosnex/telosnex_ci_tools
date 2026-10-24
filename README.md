@@ -81,10 +81,10 @@ A package changes the steps with optional files in `tool/kiln/`. The workflow ru
 | `prepare.dart` | Before each native build. Installs tools. It runs as a copy outside the package, in `$RUNNER_TEMP`, so it can import only `dart:` libraries: `dart run` of a package script first runs the package's build hook, which needs those tools. The checkout is `$GITHUB_WORKSPACE`. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN` replaces the toolchain description; `KILN_TOOLCHAIN_EXTRA` goes at its end. |
 | `test_build.dart` | After each native build. Tests the files in `$OUT/out/$TARGET`. It runs like `prepare.dart`. | Environment: `TARGET`, `OUT`. |
 | `build_web.dart` | In the web job. Without it, the package has no web files. | `--out <dir> --toolchain-file <file>`: writes the web files to `<dir>` and a description of its toolchain to `<file>`. |
-| `test_web.dart` | After `<package>:web install-dev` of the built web files. | None. |
+| `test_web.dart` | After `<package>:web install-dev` of the built web files, on `web-test-runner`. | Environment: `KILN_WEB_FILES`, the directory of the built web files. |
 | `release.dart` | Instead of `<package>:release`. | The same arguments. |
 
-The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `runners` and `web-container`.
+The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `runners`, `web-container` and `web-test-runner`.
 
 A target in `runners` builds on its runner, and in its container image if it has one. Before the checkout, the job installs git, curl, unzip and xz with apt-get, if the image has apt-get. The runner description in `target.json` is `local` there: pass `--runner` in `build-args`.
 
