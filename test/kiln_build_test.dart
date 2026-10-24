@@ -42,18 +42,13 @@ void main() {
     );
   });
 
-  test('extrasFor', () {
-    expect(
-      extrasFor(
-        '{"windows-x64": "Vulkan SDK \${V}", "linux-*": "clang"}',
-        'windows-x64',
-        {'V': '1.4'},
-      ),
-      ['Vulkan SDK 1.4'],
-    );
-    expect(
-      () => extrasFor('{"*": ["a"]}', 'linux-x64', {}),
-      throwsFormatException,
-    );
+  test('androidDefines', () {
+    final env = {'ANDROID_NDK_HOME': '/ndk'};
+    expect(androidDefines('android-arm64', env), [
+      '--define',
+      'android_ndk_home=/ndk',
+    ]);
+    expect(androidDefines('linux-x64', env), isNull);
+    expect(androidDefines('android-arm64', {}), isNull);
   });
 }

@@ -11,9 +11,6 @@ inputs:
   target:
     description: A target, for example windows-x64.
     required: true
-  runner:
-    description: The runner label. It goes into target.json.
-    required: true
   out:
     description: The output directory.
     required: true
@@ -24,14 +21,8 @@ inputs:
   build-args:
     description: >-
       JSON. A target pattern (`*` matches any text) to a list of more
-      arguments for the build command. ${NAME} in an argument expands to
-      the environment variable NAME.
-    required: false
-    default: '{}'
-  toolchain-extra:
-    description: >-
-      JSON. A target pattern to a text that the action adds to the toolchain
-      description. ${NAME} expands as in build-args.
+      arguments for the build command. ${NAME} in an argument expands to the
+      environment variable NAME.
     required: false
     default: '{}'
 
@@ -40,6 +31,9 @@ outputs:
     description: The toolchain description in target.json.
     value: ${{ steps.build.outputs.toolchain }}
 
+# Android targets get the user define android_ndk_home=$ANDROID_NDK_HOME.
+# KILN_TOOLCHAIN_EXTRA in the environment goes at the end of the toolchain
+# description. kiln:build records the runner image (ImageOS, ImageVersion).
 runs:
   using: composite
   steps:
@@ -49,10 +43,8 @@ runs:
       env:
         PACKAGE: ${{ inputs.package }}
         TARGET: ${{ inputs.target }}
-        RUNNER: ${{ inputs.runner }}
         OUT: ${{ inputs.out }}
         NDK_VERSION: ${{ inputs.ndk-version }}
         BUILD_ARGS: ${{ inputs.build-args }}
-        TOOLCHAIN_EXTRA: ${{ inputs.toolchain-extra }}
       # The script uses only dart:io and dart:convert, so it needs no pub get.
       run: dart "$GITHUB_ACTION_PATH/kiln_build.dart"

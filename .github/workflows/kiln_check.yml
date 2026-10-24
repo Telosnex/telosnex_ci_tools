@@ -1,7 +1,7 @@
 # Reusable workflow. Checks the source key and every native and model URL
-# of a package (`dart run <package>:check`). The caller
-# sets the triggers, usually the pull requests that change the manifest and a
-# daily schedule.
+# of a kiln package (`dart run <package>:check`). The caller sets the
+# triggers: the pull requests that change the manifests, and a daily
+# schedule.
 name: Kiln check
 
 on:
@@ -11,10 +11,6 @@ on:
         description: The Dart package of kiln. native_prebuilt before its rename.
         type: string
         default: kiln
-      flutter-version:
-        description: Empty for the version of setup-flutter.
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -28,8 +24,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-        with:
-          version: ${{ inputs.flutter-version }}
       - run: flutter pub get --no-example
       - name: Check the source key and every native and model URL
         env:

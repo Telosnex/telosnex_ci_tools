@@ -1,147 +1,72 @@
-# Reusable workflow. Builds the prebuilt files of a package with kiln for every native
-# target, and the web runtime files if the package has them. Then publishes
-# the files as a GitHub release (kiln ADR 001 D5, D6, D8; ADR 002
-# D3, D10). On success it pushes the branch kiln-manifest/<tag> with the
-# manifest files. Merge that branch to use the release.
+# Reusable workflow. Builds the prebuilt files of a kiln package for every
+# native target and for the web, and publishes them as a GitHub release (kiln
+# ADR 001 D5, D6, D8; ADR 002 D3, D10). On success it pushes the branch
+# kiln-manifest/<tag> with the manifest files. Merge that branch to use the
+# release.
 #
 # The caller sets the triggers and passes `dry-run`. A push to the branch
-# kiln-release-dry is a dry run too. Only `publisher` can publish, and
-# only from a repository of the Telosnex organization.
+# kiln-release-dry is a dry run too. Only jpohhhh can publish, and only from a
+# repository of the Telosnex organization.
 #
-# The `package` input is the Dart package of kiln. A package that still
-# uses native_prebuilt passes `package: native_prebuilt`. Kiln names the
-# release tags.
+# A package changes the steps with files in tool/kiln/. Each file is
+# optional. The workflow runs each one with `dart run`, in the root of the
+# checkout:
 #
-# Package-specific steps go into the *-command inputs. Each command runs in
-# bash with `eval`, in the root of the checkout.
+#   prepare.dart    Before each native build. Installs tools. Gets TARGET,
+#                   OUT and ANDROID_NDK_HOME. It can write to GITHUB_ENV and
+#                   GITHUB_PATH. KILN_TOOLCHAIN_EXTRA goes at the end of the
+#                   toolchain description.
+#   build_web.dart  Gets `--out <dir> --toolchain-file <file>`. Writes the web
+#                   runtime files to <dir> and a description of its toolchain
+#                   to <file>. Without this file the package has no web files.
+#   test_web.dart   Tests the web files after `<package>:web install-dev`.
+#   release.dart    Replaces `<package>:release`, with the same arguments.
 name: Kiln release
 
 on:
   workflow_call:
     inputs:
       targets:
-        description: >-
-          JSON list of {"target": ..., "runner": ...}, the matrix of the
-          build job.
+        description: JSON list of the native targets.
         type: string
-        required: true
-      package:
-        description: The Dart package of kiln. native_prebuilt before its rename.
-        type: string
-        default: kiln
+        default: >-
+          ["windows-x64", "windows-arm64", "linux-x64", "linux-arm64",
+          "macos-arm64", "ios-arm64-iphoneos", "ios-arm64-iphonesimulator",
+          "android-arm", "android-arm64", "android-x64"]
       dry-run:
         description: Build only, upload nothing.
         type: boolean
         default: false
-      publisher:
-        description: The GitHub user that can publish.
+      package:
+        description: The Dart package of kiln. native_prebuilt before its rename.
         type: string
-        default: jpohhhh
-      flutter-version:
-        description: Empty for the version of setup-flutter.
-        type: string
-        default: ''
-      ndk-version:
-        type: string
-        default: 28.2.13676358
-      build-timeout-minutes:
-        type: number
-        default: 90
-      prepare-command:
-        description: >-
-          Runs in each build job before `flutter pub get`, with TARGET,
-          RUNNER, OUT and NDK_VERSION. It can install tools and write to
-          GITHUB_ENV.
-        type: string
-        default: ''
+        default: kiln
       build-args:
         description: >-
           JSON. A target pattern (`*` matches any text) to a list of more
-          arguments for the build command. ${NAME} expands to the
-          environment variable NAME.
-        type: string
-        default: '{}'
-      toolchain-extra:
-        description: >-
-          JSON. A target pattern to a text that goes after the default
-          toolchain description.
+          arguments for `<package>:build`, for example
+          {"*": ["--ios-version", "15"]}. ${NAME} expands to the environment
+          variable NAME.
         type: string
         default: '{}'
       input-artifact:
         description: >-
-          An artifact of the caller run that each build job downloads into
-          $OUT/<input-artifact-dir>. It goes into the kiln-<target> artifact.
-        type: string
-        default: ''
-      input-artifact-dir:
-        description: Empty for the name of the artifact.
+          An artifact of the caller run. Each build job downloads it into
+          $OUT/<input-artifact>, so it goes into the release artifacts too.
         type: string
         default: ''
       debug-symbols-path:
         description: >-
-          Android targets upload the files at this path as the artifact
-          debug-symbols-<target>.
-        type: string
-        default: ''
-      web-build-command:
-        description: >-
-          Writes the web runtime files to $OUT/web. Empty: the package has
-          no web files and the web jobs do not run. WEB_CONTAINER is the
-          container image.
-        type: string
-        default: ''
-      web-toolchain-command:
-        description: Writes the web toolchain description to stdout.
-        type: string
-        default: ''
-      web-runner:
-        type: string
-        default: ubuntu-24.04
-      web-container:
-        description: A container image for the web build job. Empty for none.
-        type: string
-        default: ''
-      web-sdk:
-        description: >-
-          `flutter` installs Flutter, runs `flutter pub get` and writes the
-          source key. `dart` installs only the Dart SDK of web-dart-version,
-          for a web build that uses only dart:io.
-        type: string
-        default: flutter
-      web-dart-version:
-        type: string
-        default: ''
-      web-test-command:
-        description: >-
-          Tests the web files after `<package>:web install-dev`. Empty:
-          no test.
+          Android builds upload the files at this path as the artifact
+          debug-symbols-<target>, for crash symbolication.
         type: string
         default: ''
       web-test-cache-path:
-        description: A path that the web test job caches, for example models.
-        type: string
-        default: ''
-      web-test-cache-hash-files:
-        description: The hashFiles pattern for the key of the cache.
-        type: string
-        default: ''
-      release-check-command:
         description: >-
-          Runs in the release job before the release, with ARTIFACTS, the
-          merged kiln-* artifacts.
+          A path that the web test caches between runs, for example
+          downloaded models. The key is the hash of tool/kiln/test_web.dart.
         type: string
         default: ''
-      release-command:
-        description: >-
-          Gets the release arguments. Empty: dart run <package>:release.
-        type: string
-        default: ''
-      manifest-files:
-        description: The files of the manifest branch, separated by spaces.
-        type: string
-        default: >-
-          native_artifacts/prebuilt.json native_artifacts/web.json
-          lib/src/web_runtime.g.dart
 
 concurrency:
   group: kiln-release
@@ -154,20 +79,28 @@ defaults:
   run:
     shell: bash
 
+env:
+  NDK_VERSION: 28.2.13676358
+  PACKAGE: ${{ inputs.package }}
+  WEB_RUNNER: ubuntu-24.04
+
 jobs:
   build:
     name: ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: ${{ inputs.build-timeout-minutes }}
+    # Linux builds use Ubuntu 22.04 for its older glibc.
+    runs-on: >-
+      ${{ matrix.target == 'windows-arm64' && 'windows-11-arm' ||
+      startsWith(matrix.target, 'windows-') && 'windows-2022' ||
+      matrix.target == 'linux-arm64' && 'ubuntu-22.04-arm' ||
+      (startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'ios-')) && 'macos-15' ||
+      'ubuntu-22.04' }}
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.targets) }}
+        target: ${{ fromJSON(inputs.targets) }}
     env:
       TARGET: ${{ matrix.target }}
-      RUNNER: ${{ matrix.runner }}
-      NDK_VERSION: ${{ inputs.ndk-version }}
-      PACKAGE: ${{ inputs.package }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -175,9 +108,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-        with:
-          version: ${{ inputs.flutter-version }}
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
 
       # Files go to $RUNNER_TEMP: untracked files in the checkout count in
       # the source key.
@@ -193,23 +124,21 @@ jobs:
           test -d "$ndk"
           echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
 
-      - name: Prepare
-        if: inputs.prepare-command != ''
-        env:
-          COMMAND: ${{ inputs.prepare-command }}
-        run: eval "$COMMAND"
-
       # flutter pub get also downloads sky_engine, which dart pub get needs.
       - run: flutter pub get --no-example
+
+      - name: Prepare (tool/kiln/prepare.dart)
+        if: hashFiles('tool/kiln/prepare.dart') != ''
+        run: dart run tool/kiln/prepare.dart
 
       - name: Download ${{ inputs.input-artifact }}
         if: inputs.input-artifact != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ inputs.input-artifact }}
-          path: ${{ runner.temp }}/kiln/${{ inputs.input-artifact-dir || inputs.input-artifact }}
+          path: ${{ runner.temp }}/kiln/${{ inputs.input-artifact }}
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
 
       - name: Source key
         run: |
@@ -217,20 +146,18 @@ jobs:
           dart run "$PACKAGE:key" --list > "$OUT/key/$TARGET.txt"
           tail -1 "$OUT/key/$TARGET.txt"
 
-      - uses: Telosnex/telosnex_ci_tools/actions/kiln-build@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
+      - uses: Telosnex/telosnex_ci_tools/actions/kiln-build@main
         with:
           package: ${{ inputs.package }}
           target: ${{ matrix.target }}
-          runner: ${{ matrix.runner }}
           out: ${{ runner.temp }}/kiln
-          ndk-version: ${{ inputs.ndk-version }}
+          ndk-version: ${{ env.NDK_VERSION }}
           build-args: ${{ inputs.build-args }}
-          toolchain-extra: ${{ inputs.toolchain-extra }}
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
 
-      # The unstripped libraries, for crash symbolication. The kiln-*
-      # artifact has only the stripped release copies.
+      # The unstripped libraries. The kiln-* artifact has only the stripped
+      # release copies.
       - name: Save the Android debug symbols
         if: startsWith(matrix.target, 'android-') && inputs.debug-symbols-path != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -248,131 +175,124 @@ jobs:
           retention-days: 90
 
   web:
-    if: inputs.web-build-command != ''
-    runs-on: ${{ inputs.web-runner }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
-    # An empty image runs the job on the runner itself.
-    container: ${{ inputs.web-container }}
-    env:
-      WEB_CONTAINER: ${{ inputs.web-container }}
-      PACKAGE: ${{ inputs.package }}
+    outputs:
+      built: ${{ steps.find.outputs.built }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
-      - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-        with:
-          version: ${{ inputs.flutter-version }}
-      - if: inputs.web-sdk == 'dart'
-        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-        with:
-          sdk: ${{ inputs.web-dart-version }}
-      - if: inputs.web-sdk == 'flutter'
+      - name: Find tool/kiln/build_web.dart
+        id: find
+        run: |
+          if [[ -f tool/kiln/build_web.dart ]]; then built=true; else built=false; fi
+          echo "built=$built" >> "$GITHUB_OUTPUT"
+          echo "Web files: $built"
+      - if: steps.find.outputs.built == 'true'
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+      - if: steps.find.outputs.built == 'true'
         run: flutter pub get --no-example
       - name: Set paths
         run: echo "OUT=$RUNNER_TEMP/kiln" >> "$GITHUB_ENV"
-      - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
+      - if: steps.find.outputs.built == 'true'
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
       - name: Source key
-        if: inputs.web-sdk == 'flutter'
+        if: steps.find.outputs.built == 'true'
         run: |
           mkdir -p "$OUT/key"
           dart run "$PACKAGE:key" --list > "$OUT/key/web.txt"
           tail -1 "$OUT/key/web.txt"
-      - name: Build
-        env:
-          COMMAND: ${{ inputs.web-build-command }}
-        run: |
-          start=$SECONDS
-          eval "$COMMAND"
-          echo "Web build: $((SECONDS - start)) s"
-      - name: Describe the toolchain
-        env:
-          COMMAND: ${{ inputs.web-toolchain-command }}
-          WEB_RUNNER: ${{ inputs.web-runner }}
+      - name: Build (tool/kiln/build_web.dart)
+        if: steps.find.outputs.built == 'true'
         run: |
           mkdir -p "$OUT/web-meta"
-          echo "$WEB_RUNNER${WEB_CONTAINER:+, $WEB_CONTAINER}" > "$OUT/web-meta/runner.txt"
-          eval "$COMMAND" > "$OUT/web-meta/toolchain.txt"
-          cat "$OUT/web-meta/runner.txt" "$OUT/web-meta/toolchain.txt"
+          echo "$WEB_RUNNER" > "$OUT/web-meta/runner.txt"
+          start=$SECONDS
+          dart run tool/kiln/build_web.dart \
+            --out "$OUT/web" --toolchain-file "$OUT/web-meta/toolchain.txt"
+          echo "Web build: $((SECONDS - start)) s"
           if [[ ! -s "$OUT/web-meta/toolchain.txt" ]]; then
-            echo "::error::web-toolchain-command wrote nothing."
+            echo "::error::tool/kiln/build_web.dart wrote no --toolchain-file."
             exit 1
           fi
-      - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+          cat "$OUT/web-meta/toolchain.txt"
+      - if: steps.find.outputs.built == 'true'
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+      - if: steps.find.outputs.built == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kiln-web
           path: ${{ runner.temp }}/kiln/
           if-no-files-found: error
           retention-days: 90
 
-  # The browser test on the files of the web job (ADR 002 D10, D13).
+  # The test of the files of the web job (ADR 002 D10, D13).
   web-test:
     needs: web
-    if: inputs.web-test-command != ''
-    runs-on: ${{ inputs.web-runner }}
-    timeout-minutes: 30
+    if: needs.web.outputs.built == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-        with:
-          version: ${{ inputs.flutter-version }}
-      - run: flutter pub get --no-example
+      - name: Find tool/kiln/test_web.dart
+        id: find
+        run: |
+          if [[ -f tool/kiln/test_web.dart ]]; then found=true; else found=false; fi
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+          if [[ $found == false ]]; then
+            echo "::warning::The web files have no test: add tool/kiln/test_web.dart."
+          fi
+      - if: steps.find.outputs.found == 'true'
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+      - if: steps.find.outputs.found == 'true'
+        run: flutter pub get --no-example
       - name: Cache the test files
-        if: inputs.web-test-cache-path != ''
+        if: steps.find.outputs.found == 'true' && inputs.web-test-cache-path != ''
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ inputs.web-test-cache-path }}
-          key: web-test-${{ runner.os }}-${{ hashFiles(inputs.web-test-cache-hash-files) }}
-          restore-keys: web-test-${{ runner.os }}-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+          key: kiln-web-test-${{ hashFiles('tool/kiln/test_web.dart') }}
+          restore-keys: kiln-web-test-
+      - if: steps.find.outputs.found == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: kiln-web
           path: ${{ runner.temp }}/web-artifact
       - name: Install the web files into lib/web
-        env:
-          PACKAGE: ${{ inputs.package }}
+        if: steps.find.outputs.found == 'true'
         run: dart run "$PACKAGE:web" install-dev --from "$RUNNER_TEMP/web-artifact/web"
-      - name: Test
-        env:
-          COMMAND: ${{ inputs.web-test-command }}
-        run: eval "$COMMAND"
+      - name: Test (tool/kiln/test_web.dart)
+        if: steps.find.outputs.found == 'true'
+        run: dart run tool/kiln/test_web.dart
 
   release:
     needs: [build, web, web-test]
-    # The web jobs do not run for a package without web files.
+    # web-test is skipped for a package without web files.
     if: >-
       !cancelled() && needs.build.result == 'success' &&
-      contains(fromJSON('["success", "skipped"]'), needs.web.result) &&
+      needs.web.result == 'success' &&
       contains(fromJSON('["success", "skipped"]'), needs.web-test.result) &&
       github.repository_owner == 'Telosnex' &&
-      github.actor == inputs.publisher &&
-      github.triggering_actor == inputs.publisher
+      github.actor == 'jpohhhh' && github.triggering_actor == 'jpohhhh'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
     env:
       DRY_RUN: ${{ inputs.dry-run || github.ref_name == 'kiln-release-dry' }}
-      PACKAGE: ${{ inputs.package }}
-      MANIFEST_FILES: ${{ inputs.manifest-files }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@28f952341c98ce5cdfcd1e80854177bd5de9dd4e # self
-        with:
-          version: ${{ inputs.flutter-version }}
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
       - run: flutter pub get --no-example
       - run: echo "ARTIFACTS=$RUNNER_TEMP/artifacts" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -393,17 +313,12 @@ jobs:
           done
           exit $status
 
-      - name: Check the artifacts
-        if: inputs.release-check-command != ''
-        env:
-          COMMAND: ${{ inputs.release-check-command }}
-        run: eval "$COMMAND"
-
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMAND: ${{ inputs.release-command }}
         run: |
+          command=("$PACKAGE:release")
+          if [[ -f tool/kiln/release.dart ]]; then command=(tool/kiln/release.dart); fi
           args=(--staging "$RUNNER_TEMP/staging")
           if [[ "$DRY_RUN" == true ]]; then args+=(--dry-run); fi
           if [[ -d "$ARTIFACTS/web" ]]; then
@@ -411,23 +326,24 @@ jobs:
               --web-runner "$(cat "$ARTIFACTS/web-meta/runner.txt")"
               --web-toolchain "$(cat "$ARTIFACTS/web-meta/toolchain.txt")")
           fi
-          if [[ -z "$COMMAND" ]]; then COMMAND="dart run $PACKAGE:release"; fi
-          eval "$COMMAND" '"${args[@]}"' '"$ARTIFACTS/out"'
-          for f in $MANIFEST_FILES; do
-            if [[ "$f" == *.json && -f "$f" ]]; then cat "$f"; fi
+          echo "dart run ${command[*]} ${args[*]} $ARTIFACTS/out"
+          dart run "${command[@]}" "${args[@]}" "$ARTIFACTS/out"
+          for f in native_artifacts/prebuilt.json native_artifacts/web.json; do
+            if [[ -f "$f" ]]; then cat "$f"; fi
           done
 
       - name: Push the manifest branch
         if: env.DRY_RUN != 'true'
         run: |
-          # The package names the tag: native-<16 characters of the key>.
+          # Kiln names the tag: native-<16 characters of the source key>.
           tag="native-$(dart run "$PACKAGE:key" | tail -1 | cut -c1-16)"
           branch="kiln-manifest/$tag"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          # shellcheck disable=SC2086 # MANIFEST_FILES is a list.
-          git add $MANIFEST_FILES
+          for f in native_artifacts/prebuilt.json native_artifacts/web.json lib/src/web_runtime.g.dart; do
+            if [[ -f "$f" ]]; then git add "$f"; fi
+          done
           git commit -m "kiln: manifest of release $tag"
           git push origin "$branch"
           {

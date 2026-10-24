@@ -11,13 +11,10 @@ Future<void> main() async {
   final package = _require(env, 'PACKAGE');
   final target = _require(env, 'TARGET');
   final out = _require(env, 'OUT');
-  final runner = _require(env, 'RUNNER');
 
   final List<String> buildArgs;
-  final List<String> extras;
   try {
     buildArgs = argsFor(env['BUILD_ARGS'] ?? '', target, env);
-    extras = extrasFor(env['TOOLCHAIN_EXTRA'] ?? '', target, env);
   } on FormatException catch (e) {
     stdout.writeln('::error::${e.message}');
     exit(1);
@@ -25,7 +22,8 @@ Future<void> main() async {
 
   final toolchain = [
     ...await describeToolchain(target, env),
-    ...extras,
+    if (env['KILN_TOOLCHAIN_EXTRA'] case final extra? when extra.isNotEmpty)
+      extra,
   ].join(', ');
   stdout.writeln('Toolchain: $toolchain');
   final outputFile = env['GITHUB_OUTPUT'];
@@ -43,10 +41,9 @@ Future<void> main() async {
     target,
     '--out',
     targetOut,
-    '--runner',
-    runner,
     '--toolchain',
     toolchain,
+    ...?androidDefines(target, env),
     ...buildArgs,
   ];
   stdout.writeln('dart ${args.join(' ')}');
@@ -122,14 +119,14 @@ List<String> argsFor(String json, String target, Map<String, String> env) => [
       throw FormatException('build-args: "$value" is not a list.'),
 ];
 
-/// The texts of every entry in [json] whose pattern matches [target].
-List<String> extrasFor(String json, String target, Map<String, String> env) => [
-  for (final value in _matching(json, target))
-    if (value is String)
-      expand(value, env)
-    else
-      throw FormatException('toolchain-extra: "$value" is not a string.'),
-];
+/// The standard user define of an Android target: the NDK of the job.
+List<String>? androidDefines(String target, Map<String, String> env) {
+  final ndk = env['ANDROID_NDK_HOME'];
+  if (!target.startsWith('android-') || ndk == null || ndk.isEmpty) {
+    return null;
+  }
+  return ['--define', 'android_ndk_home=$ndk'];
+}
 
 Iterable<Object?> _matching(String json, String target) {
   if (json.trim().isEmpty) return const [];

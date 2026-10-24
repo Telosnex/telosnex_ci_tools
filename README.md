@@ -32,7 +32,7 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 
 ## Call a shared workflow
 
-The caller has the triggers, the `run-name` and the package-specific values. The shared workflow has the jobs. This is the kiln release of fonnx, `.github/workflows/kiln_release.yml`:
+The caller has the triggers and the `run-name`. The shared workflow has the jobs. A caller passes only what is different about its package. This is the kiln release of fonnx, `.github/workflows/kiln_release.yml`:
 
 ```yaml
 name: Kiln release
@@ -58,35 +58,32 @@ jobs:
       contents: write
     with:
       dry-run: ${{ inputs.dry_run == true }}
-      flutter-version: 3.47.0
-      build-timeout-minutes: 150
-      targets: >-
-        [{"target": "windows-x64", "runner": "windows-2022"},
-         {"target": "windows-arm64", "runner": "windows-11-arm"},
-         {"target": "linux-x64", "runner": "ubuntu-22.04"},
-         {"target": "linux-arm64", "runner": "ubuntu-22.04-arm"},
-         {"target": "macos-arm64", "runner": "macos-15"},
-         {"target": "ios-arm64-iphoneos", "runner": "macos-15"},
-         {"target": "ios-arm64-iphonesimulator", "runner": "macos-15"},
-         {"target": "android-arm", "runner": "ubuntu-22.04"},
-         {"target": "android-arm64", "runner": "ubuntu-22.04"},
-         {"target": "android-x64", "runner": "ubuntu-22.04"}]
-      build-args: >-
-        {"*": ["--ios-version", "15", "--macos-version", "14", "--android-api", "24"],
-         "android-*": ["--define", "android_ndk_home=${ANDROID_NDK_HOME}"]}
-      web-runner: ubuntu-22.04
-      web-build-command: dart run tool/build_web.dart --out "$OUT/web"
-      web-toolchain-command: echo "onnxruntime-web $(jq -r .version web_build/onnxruntime_web.json) (npm)"
-      web-test-cache-path: example/assets/models/**/*.onnx
-      web-test-cache-hash-files: native_artifacts/manifest.json
-      web-test-command: |
-        dart run tool/fetch_hf_models.dart futoSwipe keywordSpotter magika miniLmL6V2 minishLab/potion8m.onnx msmarcoMiniLmL6V3 nemoAsr/fastconformer_ctc_multilingual_int8.onnx pyannote senseVoice sileroVad whisper
-        node tool/test_web_runtime.mjs
-        dart test -p chrome -c dart2js,dart2wasm test/web_runtime_test.dart test/deterministic_operation_corpus_test.dart
-      release-command: dart run tool/release_native.dart
+      build-args: '{"*": ["--ios-version", "15", "--macos-version", "14"]}'
+      web-test-cache-path: example/assets/models
 ```
 
-`kiln_release.yml` describes each input.
+### Kiln release
+
+The shared workflow sets these values for every package:
+
+| Value | |
+|---|---|
+| Flutter | `flutter_version.txt` |
+| Android NDK | 28.2.13676358, passed to the hook as the user define `android_ndk_home` |
+| Runners | `windows-2022`, `windows-11-arm`, `ubuntu-22.04` and `ubuntu-22.04-arm` (older glibc), `macos-15`. Web: `ubuntu-24.04`. |
+| Targets | The 10 targets in the `targets` default. A package can pass its own list. |
+| Publisher | `jpohhhh`, from a repository of the Telosnex organization. |
+
+A package changes the steps with optional files in `tool/kiln/`. The workflow runs each file with `dart run`:
+
+| File | Runs | Arguments |
+|---|---|---|
+| `prepare.dart` | Before each native build. Installs tools. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN_EXTRA` goes at the end of the toolchain description. |
+| `build_web.dart` | In the web job. Without it, the package has no web files. | `--out <dir> --toolchain-file <file>`: writes the web files to `<dir>` and a description of its toolchain to `<file>`. |
+| `test_web.dart` | After `<package>:web install-dev` of the built web files. | None. |
+| `release.dart` | Instead of `<package>:release`. | The same arguments. |
+
+The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path` and `web-test-cache-path`.
 
 ### Names
 
