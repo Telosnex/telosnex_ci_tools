@@ -68,11 +68,12 @@ on:
           downloaded models. The key is the hash of tool/kiln/test_web.dart.
         type: string
         default: ''
-      containers:
+      runners:
         description: >-
-          JSON. A target to {"runner", "image"}: the target builds in the
-          container image on that runner, for example
-          {"linux-x64": {"runner": "ubuntu-22.04", "image": "gcc@sha256:..."}}.
+          JSON. A target to {"runner", "image"}: the target builds on that
+          runner, and in the container image if there is one, for example
+          {"windows-x64": {"runner": "windows-2025-vs2026"},
+          "linux-x64": {"runner": "ubuntu-22.04", "image": "gcc@sha256:..."}}.
         type: string
         default: '{}'
       web-container:
@@ -101,7 +102,7 @@ jobs:
     name: ${{ matrix.target }}
     # Linux builds use Ubuntu 22.04 for its older glibc.
     runs-on: >-
-      ${{ fromJSON(inputs.containers)[matrix.target].runner ||
+      ${{ fromJSON(inputs.runners)[matrix.target].runner ||
       matrix.target == 'windows-arm64' && 'windows-11-arm' ||
       startsWith(matrix.target, 'windows-') && 'windows-2022' ||
       matrix.target == 'linux-arm64' && 'ubuntu-22.04-arm' ||
@@ -109,7 +110,7 @@ jobs:
       'ubuntu-22.04' }}
     # An empty image: no container.
     container:
-      image: ${{ fromJSON(inputs.containers)[matrix.target].image || '' }}
+      image: ${{ fromJSON(inputs.runners)[matrix.target].image || '' }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -119,7 +120,7 @@ jobs:
       TARGET: ${{ matrix.target }}
     steps:
       - name: Prepare the container
-        if: fromJSON(inputs.containers)[matrix.target].image
+        if: fromJSON(inputs.runners)[matrix.target].image
         run: &prepare-container |
           # actions/checkout needs git for a work tree; Flutter needs curl,
           # unzip and xz. Debian 11 packages are on archive.debian.org.

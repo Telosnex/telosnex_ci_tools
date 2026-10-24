@@ -84,9 +84,9 @@ A package changes the steps with optional files in `tool/kiln/`. The workflow ru
 | `test_web.dart` | After `<package>:web install-dev` of the built web files. | None. |
 | `release.dart` | Instead of `<package>:release`. | The same arguments. |
 
-The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `containers` and `web-container`.
+The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `runners` and `web-container`.
 
-A target in `containers` builds in its container image, on its runner. Before the checkout, the job installs git, curl, unzip and xz with apt-get, if the image has apt-get. The runner description in `target.json` is `local` there: pass `--runner` in `build-args`.
+A target in `runners` builds on its runner, and in its container image if it has one. Before the checkout, the job installs git, curl, unzip and xz with apt-get, if the image has apt-get. The runner description in `target.json` is `local` there: pass `--runner` in `build-args`.
 
 ### Names
 
