@@ -47,7 +47,10 @@ List<Finding> lintWorkflow(String path, String text) {
       findings.add(Finding(path, line, rule, message));
 
   final fileName = p.basename(path);
-  if (!RegExp(r'^[a-z0-9]+(_[a-z0-9]+)*\.yml$').hasMatch(fileName)) {
+  final fileNameOk = RegExp(
+    r'^[a-z0-9]+(_[a-z0-9]+)*\.yml$',
+  ).hasMatch(fileName);
+  if (!fileNameOk) {
     add(1, 'file-name', 'Name workflow files in snake_case with .yml.');
   }
 
@@ -74,7 +77,9 @@ List<Finding> lintWorkflow(String path, String text) {
     final problem = nameProblem(name);
     if (problem != null) add(line, 'name', problem);
     final expected = nameForFile(fileName);
-    if (problem == null && name.toLowerCase() != expected.toLowerCase()) {
+    if (problem == null &&
+        fileNameOk &&
+        name.toLowerCase() != expected.toLowerCase()) {
       add(
         line,
         'name-matches-file',

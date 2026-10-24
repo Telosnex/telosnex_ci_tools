@@ -33,8 +33,8 @@ void main() {
   });
 
   test('file-name', () {
-    expect(_rules('native-release.yml', _workflow()), contains('file-name'));
-    expect(_rules('native_release.yaml', _workflow()), contains('file-name'));
+    expect(_rules('native-release.yml', _workflow()), ['file-name']);
+    expect(_rules('native_release.yaml', _workflow()), ['file-name']);
   });
 
   group('name', () {
