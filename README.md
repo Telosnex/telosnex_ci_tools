@@ -104,9 +104,9 @@ The reusable workflows use the composite actions of this repository. A `uses:` c
 1. Commit the change to `actions/` or `flutter_version.txt`.
 2. Run `dart run telosnex_ci_tools:pin_self`.
 3. Commit the changed workflow files.
-4. Push, then tag the commit `vX.Y.Z`.
+4. Push, then tag the commit of step 3 `vX.Y.Z`.
 
-Callers pin the tagged commit. Renovate opens a pull request in each caller for a new tag.
+Callers pin the tagged commit. Do not pin the commit of step 1: its workflows still reference the actions by branch, and the SHA pinning policy of the organization rejects the run with a startup failure. Renovate opens a pull request in each caller for a new tag.
 
 ## Renovate
 
