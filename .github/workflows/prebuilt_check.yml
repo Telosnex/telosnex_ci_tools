@@ -1,0 +1,33 @@
+# Reusable workflow. Checks the source key and every native and model URL
+# of a native_prebuilt package (`dart run native_prebuilt:check`). The caller
+# sets the triggers, usually the pull requests that change the manifest and a
+# daily schedule.
+name: Prebuilt check
+
+on:
+  workflow_call:
+    inputs:
+      flutter-version:
+        description: Empty for the version of setup-flutter.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        with:
+          version: ${{ inputs.flutter-version }}
+      - run: flutter pub get --no-example
+      - name: Check the source key and every native and model URL
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: dart run native_prebuilt:check

@@ -1,0 +1,22 @@
+name: Check that the work tree is clean
+description: Fails if the checkout has untracked or changed files.
+
+inputs:
+  message:
+    description: The error message if the work tree is not clean.
+    required: false
+    default: Untracked or changed files would change the source key.
+
+runs:
+  using: composite
+  steps:
+    - name: Check that the work tree is clean
+      shell: bash
+      env:
+        MESSAGE: ${{ inputs.message }}
+      run: |
+        if [[ -n "$(git status --porcelain)" ]]; then
+          git status --porcelain
+          echo "::error::$MESSAGE"
+          exit 1
+        fi

@@ -1,0 +1,426 @@
+# Reusable workflow. Builds the native libraries of a native_prebuilt
+# package for every target, and the web runtime files if the package has
+# them. Then publishes the files as a GitHub release (native_prebuilt ADR 001
+# D5, D6, D8; ADR 002 D3, D10). On success it pushes the branch
+# native-manifest/<tag> with the manifest files. Merge that branch to use the
+# release.
+#
+# The caller sets the triggers and passes `dry-run`. A push to the branch
+# native-release-dry is a dry run too. Only `publisher` can publish, and only
+# from a repository of the Telosnex organization.
+#
+# Package-specific steps go into the *-command inputs. Each command runs in
+# bash with `eval`, in the root of the checkout.
+name: Native release
+
+on:
+  workflow_call:
+    inputs:
+      targets:
+        description: >-
+          JSON list of {"target": ..., "runner": ...}, the matrix of the
+          build job.
+        type: string
+        required: true
+      dry-run:
+        description: Build only, upload nothing.
+        type: boolean
+        default: false
+      publisher:
+        description: The GitHub user that can publish.
+        type: string
+        default: jpohhhh
+      flutter-version:
+        description: Empty for the version of setup-flutter.
+        type: string
+        default: ''
+      ndk-version:
+        type: string
+        default: 28.2.13676358
+      build-timeout-minutes:
+        type: number
+        default: 90
+      prepare-command:
+        description: >-
+          Runs in each build job before `flutter pub get`, with TARGET,
+          RUNNER, OUT and NDK_VERSION. It can install tools and write to
+          GITHUB_ENV.
+        type: string
+        default: ''
+      build-args:
+        description: >-
+          JSON. A target pattern (`*` matches any text) to a list of more
+          arguments for native_prebuilt:build. ${NAME} expands to the
+          environment variable NAME.
+        type: string
+        default: '{}'
+      toolchain-extra:
+        description: >-
+          JSON. A target pattern to a text that goes after the default
+          toolchain description.
+        type: string
+        default: '{}'
+      input-artifact:
+        description: >-
+          An artifact of the caller run that each build job downloads into
+          $OUT/<input-artifact-dir>. It goes into the native-* artifacts.
+        type: string
+        default: ''
+      input-artifact-dir:
+        description: Empty for the name of the artifact.
+        type: string
+        default: ''
+      debug-symbols-path:
+        description: >-
+          Android targets upload the files at this path as the artifact
+          debug-symbols-<target>.
+        type: string
+        default: ''
+      web-build-command:
+        description: >-
+          Writes the web runtime files to $OUT/web. Empty: the package has
+          no web files and the web jobs do not run. WEB_CONTAINER is the
+          container image.
+        type: string
+        default: ''
+      web-toolchain-command:
+        description: Writes the web toolchain description to stdout.
+        type: string
+        default: ''
+      web-runner:
+        type: string
+        default: ubuntu-24.04
+      web-container:
+        description: A container image for the web build job. Empty for none.
+        type: string
+        default: ''
+      web-sdk:
+        description: >-
+          `flutter` installs Flutter, runs `flutter pub get` and writes the
+          source key. `dart` installs only the Dart SDK of web-dart-version,
+          for a web build that uses only dart:io.
+        type: string
+        default: flutter
+      web-dart-version:
+        type: string
+        default: ''
+      web-test-command:
+        description: >-
+          Tests the web files after `native_prebuilt:web install-dev`. Empty:
+          no test.
+        type: string
+        default: ''
+      web-test-cache-path:
+        description: A path that the web test job caches, for example models.
+        type: string
+        default: ''
+      web-test-cache-hash-files:
+        description: The hashFiles pattern for the key of the cache.
+        type: string
+        default: ''
+      release-check-command:
+        description: >-
+          Runs in the release job before the release, with ARTIFACTS, the
+          merged native-* artifacts.
+        type: string
+        default: ''
+      release-command:
+        description: Gets the native_prebuilt:release arguments.
+        type: string
+        default: dart run native_prebuilt:release
+      manifest-files:
+        description: The files of the manifest branch, separated by spaces.
+        type: string
+        default: >-
+          native_artifacts/prebuilt.json native_artifacts/web.json
+          lib/src/web_runtime.g.dart
+
+concurrency:
+  group: native-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ inputs.build-timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.targets) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      RUNNER: ${{ matrix.runner }}
+      NDK_VERSION: ${{ inputs.ndk-version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        with:
+          version: ${{ inputs.flutter-version }}
+
+      # Files go to $RUNNER_TEMP: untracked files in the checkout count in
+      # the source key.
+      - name: Set paths
+        run: echo "OUT=$RUNNER_TEMP/native" >> "$GITHUB_ENV"
+
+      - name: Install the Android NDK
+        if: startsWith(matrix.target, 'android-')
+        run: |
+          { yes || true; } | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "ndk;$NDK_VERSION" > /dev/null
+          ndk="$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -d "$ndk"
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+
+      - name: Prepare
+        if: inputs.prepare-command != ''
+        env:
+          COMMAND: ${{ inputs.prepare-command }}
+        run: eval "$COMMAND"
+
+      # flutter pub get also downloads sky_engine, which dart pub get needs.
+      - run: flutter pub get --no-example
+
+      - name: Download ${{ inputs.input-artifact }}
+        if: inputs.input-artifact != ''
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ inputs.input-artifact }}
+          path: ${{ runner.temp }}/native/${{ inputs.input-artifact-dir || inputs.input-artifact }}
+
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+
+      - name: Source key
+        run: |
+          mkdir -p "$OUT/key"
+          dart run native_prebuilt:key --list > "$OUT/key/$TARGET.txt"
+          tail -1 "$OUT/key/$TARGET.txt"
+
+      - uses: Telosnex/telosnex_ci_tools/actions/native-build@main
+        with:
+          target: ${{ matrix.target }}
+          runner: ${{ matrix.runner }}
+          out: ${{ runner.temp }}/native
+          ndk-version: ${{ inputs.ndk-version }}
+          build-args: ${{ inputs.build-args }}
+          toolchain-extra: ${{ inputs.toolchain-extra }}
+
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+
+      # The unstripped libraries, for crash symbolication. The native-*
+      # artifact has only the stripped release copies.
+      - name: Save the Android debug symbols
+        if: startsWith(matrix.target, 'android-') && inputs.debug-symbols-path != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: debug-symbols-${{ matrix.target }}
+          path: ${{ inputs.debug-symbols-path }}
+          if-no-files-found: error
+          retention-days: 90
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-${{ matrix.target }}
+          path: ${{ runner.temp }}/native/
+          if-no-files-found: error
+          retention-days: 90
+
+  web:
+    if: inputs.web-build-command != ''
+    runs-on: ${{ inputs.web-runner }}
+    timeout-minutes: 60
+    # An empty image runs the job on the runner itself.
+    container: ${{ inputs.web-container }}
+    env:
+      WEB_CONTAINER: ${{ inputs.web-container }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - if: inputs.web-sdk == 'flutter'
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        with:
+          version: ${{ inputs.flutter-version }}
+      - if: inputs.web-sdk == 'dart'
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+        with:
+          sdk: ${{ inputs.web-dart-version }}
+      - if: inputs.web-sdk == 'flutter'
+        run: flutter pub get --no-example
+      - name: Set paths
+        run: echo "OUT=$RUNNER_TEMP/native" >> "$GITHUB_ENV"
+      - if: inputs.web-sdk == 'flutter'
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+      - name: Source key
+        if: inputs.web-sdk == 'flutter'
+        run: |
+          mkdir -p "$OUT/key"
+          dart run native_prebuilt:key --list > "$OUT/key/web.txt"
+          tail -1 "$OUT/key/web.txt"
+      - name: Build
+        env:
+          COMMAND: ${{ inputs.web-build-command }}
+        run: |
+          start=$SECONDS
+          eval "$COMMAND"
+          echo "Web build: $((SECONDS - start)) s"
+      - name: Describe the toolchain
+        env:
+          COMMAND: ${{ inputs.web-toolchain-command }}
+          WEB_RUNNER: ${{ inputs.web-runner }}
+        run: |
+          mkdir -p "$OUT/web-meta"
+          echo "$WEB_RUNNER${WEB_CONTAINER:+, $WEB_CONTAINER}" > "$OUT/web-meta/runner.txt"
+          eval "$COMMAND" > "$OUT/web-meta/toolchain.txt"
+          cat "$OUT/web-meta/runner.txt" "$OUT/web-meta/toolchain.txt"
+          if [[ ! -s "$OUT/web-meta/toolchain.txt" ]]; then
+            echo "::error::web-toolchain-command wrote nothing."
+            exit 1
+          fi
+      - if: inputs.web-sdk == 'flutter'
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-web
+          path: ${{ runner.temp }}/native/
+          if-no-files-found: error
+          retention-days: 90
+
+  # The browser test on the files of the web job (ADR 002 D10, D13).
+  web-test:
+    needs: web
+    if: inputs.web-test-command != ''
+    runs-on: ${{ inputs.web-runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        with:
+          version: ${{ inputs.flutter-version }}
+      - run: flutter pub get --no-example
+      - name: Cache the test files
+        if: inputs.web-test-cache-path != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ inputs.web-test-cache-path }}
+          key: web-test-${{ runner.os }}-${{ hashFiles(inputs.web-test-cache-hash-files) }}
+          restore-keys: web-test-${{ runner.os }}-
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-web
+          path: ${{ runner.temp }}/web-artifact
+      - name: Install the web files into lib/web
+        run: dart run native_prebuilt:web install-dev --from "$RUNNER_TEMP/web-artifact/web"
+      - name: Test
+        env:
+          COMMAND: ${{ inputs.web-test-command }}
+        run: eval "$COMMAND"
+
+  release:
+    needs: [build, web, web-test]
+    # The web jobs do not run for a package without web files.
+    if: >-
+      !cancelled() && needs.build.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.web.result) &&
+      contains(fromJSON('["success", "skipped"]'), needs.web-test.result) &&
+      github.repository_owner == 'Telosnex' &&
+      github.actor == inputs.publisher &&
+      github.triggering_actor == inputs.publisher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      DRY_RUN: ${{ inputs.dry-run || github.ref_name == 'native-release-dry' }}
+      MANIFEST_FILES: ${{ inputs.manifest-files }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        with:
+          version: ${{ inputs.flutter-version }}
+      - run: flutter pub get --no-example
+      - run: echo "ARTIFACTS=$RUNNER_TEMP/artifacts" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: native-*
+          path: ${{ runner.temp }}/artifacts
+          merge-multiple: true
+
+      - name: Compare the source keys of all runners (I2)
+        run: |
+          dart run native_prebuilt:key --list > "$RUNNER_TEMP/local-key.txt"
+          status=0
+          for f in "$ARTIFACTS"/key/*.txt; do
+            if ! diff -u "$RUNNER_TEMP/local-key.txt" "$f"; then
+              echo "::error::The source key on $(basename "$f" .txt) differs."
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: Check the artifacts
+        if: inputs.release-check-command != ''
+        env:
+          COMMAND: ${{ inputs.release-check-command }}
+        run: eval "$COMMAND"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMAND: ${{ inputs.release-command }}
+        run: |
+          args=(--staging "$RUNNER_TEMP/staging")
+          if [[ "$DRY_RUN" == true ]]; then args+=(--dry-run); fi
+          if [[ -d "$ARTIFACTS/web" ]]; then
+            args+=(--web "$ARTIFACTS/web"
+              --web-runner "$(cat "$ARTIFACTS/web-meta/runner.txt")"
+              --web-toolchain "$(cat "$ARTIFACTS/web-meta/toolchain.txt")")
+          fi
+          eval "$COMMAND" '"${args[@]}"' '"$ARTIFACTS/out"'
+          for f in $MANIFEST_FILES; do
+            if [[ "$f" == *.json && -f "$f" ]]; then cat "$f"; fi
+          done
+
+      - name: Push the manifest branch
+        if: env.DRY_RUN != 'true'
+        run: |
+          tag="native-$(dart run native_prebuilt:key | tail -1 | cut -c1-16)"
+          branch="native-manifest/$tag"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          # shellcheck disable=SC2086 # MANIFEST_FILES is a list.
+          git add $MANIFEST_FILES
+          git commit -m "native: prebuilt files of release $tag"
+          git push origin "$branch"
+          {
+            echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag"
+            echo
+            echo "Merge branch \`$branch\` to use it."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prebuilt-manifest
+          path: native_artifacts/*.json

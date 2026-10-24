@@ -1,0 +1,41 @@
+# Installs Flutter from a shallow clone of its git tag. Flutter has no SDK
+# archive for ARM64 Linux and Windows hosts. The clone works on every
+# GitHub-hosted runner and gives every job the same Dart and Flutter SDK.
+#
+# subosito/flutter-action caches with an unpinned actions/cache, which the
+# action policy of the Telosnex repositories rejects.
+name: Set up Flutter
+description: Installs the pinned Flutter SDK and puts it on PATH.
+
+inputs:
+  version:
+    description: >-
+      A Flutter tag, for example 3.47.1. Empty: the version in
+      flutter_version.txt of telosnex_ci_tools.
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: The Flutter tag that the action installed.
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Flutter
+      id: install
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        version="$INPUT_VERSION"
+        if [[ -z "$version" ]]; then
+          version="$(tr -d '[:space:]' < "$GITHUB_ACTION_PATH/../../flutter_version.txt")"
+        fi
+        git clone -q --depth 1 --branch "$version" \
+          https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+        echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/flutter/bin/flutter" config --no-analytics > /dev/null
+        "$RUNNER_TEMP/flutter/bin/flutter" --version
+        echo "version=$version" >> "$GITHUB_OUTPUT"
