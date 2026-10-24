@@ -166,7 +166,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
         with:
           version: ${{ inputs.flutter-version }}
 
@@ -200,7 +200,7 @@ jobs:
           name: ${{ inputs.input-artifact }}
           path: ${{ runner.temp }}/native/${{ inputs.input-artifact-dir || inputs.input-artifact }}
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
 
       - name: Source key
         run: |
@@ -208,7 +208,7 @@ jobs:
           dart run native_prebuilt:key --list > "$OUT/key/$TARGET.txt"
           tail -1 "$OUT/key/$TARGET.txt"
 
-      - uses: Telosnex/telosnex_ci_tools/actions/native-build@main
+      - uses: Telosnex/telosnex_ci_tools/actions/native-build@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
         with:
           target: ${{ matrix.target }}
           runner: ${{ matrix.runner }}
@@ -217,7 +217,7 @@ jobs:
           build-args: ${{ inputs.build-args }}
           toolchain-extra: ${{ inputs.toolchain-extra }}
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
 
       # The unstripped libraries, for crash symbolication. The native-*
       # artifact has only the stripped release copies.
@@ -252,7 +252,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
       - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
         with:
           version: ${{ inputs.flutter-version }}
       - if: inputs.web-sdk == 'dart'
@@ -264,7 +264,7 @@ jobs:
       - name: Set paths
         run: echo "OUT=$RUNNER_TEMP/native" >> "$GITHUB_ENV"
       - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
       - name: Source key
         if: inputs.web-sdk == 'flutter'
         run: |
@@ -292,7 +292,7 @@ jobs:
             exit 1
           fi
       - if: inputs.web-sdk == 'flutter'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@main
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: native-web
@@ -312,7 +312,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
         with:
           version: ${{ inputs.flutter-version }}
       - run: flutter pub get --no-example
@@ -356,7 +356,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@main
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@2402143ceb82a6e72fc00ae887e1cfc3c3036b05 # self
         with:
           version: ${{ inputs.flutter-version }}
       - run: flutter pub get --no-example
