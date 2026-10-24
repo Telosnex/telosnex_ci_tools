@@ -110,8 +110,15 @@ Callers pin the tagged commit. Do not pin the commit of step 1: its workflows st
 
 ## Renovate
 
-Install the Renovate GitHub app on the organization. Then add `renovate.json` to each repository:
+The Renovate GitHub app is installed on the organization. Each repository has `renovate.json`:
 
 ```json
 { "extends": ["github>Telosnex/telosnex_ci_tools"] }
 ```
+
+The preset, `default.json`, updates only the pinned GitHub Actions:
+
+- A new tag of this repository: one pull request, at once.
+- Other actions: one grouped pull request, before 6am on Mondays.
+
+This repository pins its own actions with `pin_self`; its `renovate.json` makes Renovate ignore them.

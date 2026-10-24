@@ -1,19 +1,35 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Telosnex: keep the pinned GitHub Actions current. Extend with \"github>Telosnex/telosnex_ci_tools\".",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
-  "enabledManagers": ["github-actions"],
-  "schedule": ["before 6am on monday"],
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "enabledManagers": [
+    "github-actions"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
   "packageRules": [
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "GitHub Actions"
     },
     {
-      "matchManagers": ["github-actions"],
-      "matchPackageNames": ["Telosnex/telosnex_ci_tools"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "Telosnex/telosnex_ci_tools"
+      ],
       "groupName": "telosnex_ci_tools",
-      "schedule": ["at any time"]
+      "schedule": [
+        "at any time"
+      ]
     }
-  ]
+  ],
+  "dependencyDashboard": false
 }

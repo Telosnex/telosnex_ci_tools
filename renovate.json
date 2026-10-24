@@ -1,0 +1,6 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>Telosnex/telosnex_ci_tools"],
+  "description": "The workflows of this repository pin its own actions with `pin_self`, not Renovate.",
+  "ignoreDeps": ["Telosnex/telosnex_ci_tools"]
+}
