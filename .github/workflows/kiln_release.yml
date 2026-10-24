@@ -10,12 +10,13 @@
 #
 # A package changes the steps with files in tool/kiln/. Each file is
 # optional. The workflow runs each one with `dart run`, in the root of the
-# checkout:
+# checkout, except prepare.dart:
 #
 #   prepare.dart    Before each native build. Installs tools. Gets TARGET,
 #                   OUT and ANDROID_NDK_HOME. It can write to GITHUB_ENV and
 #                   GITHUB_PATH. KILN_TOOLCHAIN_EXTRA goes at the end of the
-#                   toolchain description.
+#                   toolchain description. It runs as a copy outside the
+#                   package, so it can import only dart: libraries.
 #   build_web.dart  Gets `--out <dir> --toolchain-file <file>`. Writes the web
 #                   runtime files to <dir> and a description of its toolchain
 #                   to <file>. Without this file the package has no web files.
@@ -127,9 +128,15 @@ jobs:
       # flutter pub get also downloads sky_engine, which dart pub get needs.
       - run: flutter pub get --no-example
 
+      # `dart run` of a package script first runs the build hook of the
+      # package, which needs the tools that prepare.dart installs. A copy
+      # outside the package runs alone.
       - name: Prepare (tool/kiln/prepare.dart)
         if: hashFiles('tool/kiln/prepare.dart') != ''
-        run: dart run tool/kiln/prepare.dart
+        run: |
+          cp tool/kiln/prepare.dart "$RUNNER_TEMP/kiln_prepare.dart"
+          cd "$RUNNER_TEMP"
+          dart kiln_prepare.dart
 
       - name: Download ${{ inputs.input-artifact }}
         if: inputs.input-artifact != ''

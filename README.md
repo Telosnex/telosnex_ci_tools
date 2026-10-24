@@ -78,7 +78,7 @@ A package changes the steps with optional files in `tool/kiln/`. The workflow ru
 
 | File | Runs | Arguments |
 |---|---|---|
-| `prepare.dart` | Before each native build. Installs tools. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN_EXTRA` goes at the end of the toolchain description. |
+| `prepare.dart` | Before each native build. Installs tools. It runs as a copy outside the package, so it can import only `dart:` libraries: `dart run` of a package script first runs the package's build hook, which needs those tools. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN_EXTRA` goes at the end of the toolchain description. |
 | `build_web.dart` | In the web job. Without it, the package has no web files. | `--out <dir> --toolchain-file <file>`: writes the web files to `<dir>` and a description of its toolchain to `<file>`. |
 | `test_web.dart` | After `<package>:web install-dev` of the built web files. | None. |
 | `release.dart` | Instead of `<package>:release`. | The same arguments. |
