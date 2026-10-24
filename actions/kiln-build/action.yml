@@ -31,7 +31,8 @@ outputs:
     description: The toolchain description in target.json.
     value: ${{ steps.build.outputs.toolchain }}
 
-# Android targets get the user define android_ndk_home=$ANDROID_NDK_HOME.
+# Android targets get the user defines android_ndk_home=$ANDROID_NDK_HOME and
+# android={"android_home": $ANDROID_HOME, "ndk_version": <ndk-version>}.
 # KILN_TOOLCHAIN_EXTRA in the environment goes at the end of the toolchain
 # description. kiln:build records the runner image (ImageOS, ImageVersion).
 runs:

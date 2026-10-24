@@ -119,13 +119,28 @@ List<String> argsFor(String json, String target, Map<String, String> env) => [
       throw FormatException('build-args: "$value" is not a list.'),
 ];
 
-/// The standard user define of an Android target: the NDK of the job.
+/// The standard user defines of an Android target, for the NDK of the job.
+/// A hook reads the one it knows and ignores the other:
+///
+/// - `android_ndk_home`: the NDK directory.
+/// - `android`: `{"android_home", "ndk_version"}`, the form of
+///   package:native_toolchain_cmake.
 List<String>? androidDefines(String target, Map<String, String> env) {
   final ndk = env['ANDROID_NDK_HOME'];
   if (!target.startsWith('android-') || ndk == null || ndk.isEmpty) {
     return null;
   }
-  return ['--define', 'android_ndk_home=$ndk'];
+  return [
+    '--define',
+    'android_ndk_home=$ndk',
+    if ((env['ANDROID_HOME'], env['NDK_VERSION']) case (
+      final home?,
+      final version?,
+    ) when home.isNotEmpty && version.isNotEmpty) ...[
+      '--define',
+      'android=${jsonEncode({'android_home': home, 'ndk_version': version})}',
+    ],
+  ];
 }
 
 Iterable<Object?> _matching(String json, String target) {

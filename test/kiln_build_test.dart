@@ -48,6 +48,19 @@ void main() {
       '--define',
       'android_ndk_home=/ndk',
     ]);
+    expect(
+      androidDefines('android-arm64', {
+        ...env,
+        'ANDROID_HOME': '/sdk',
+        'NDK_VERSION': '28.2',
+      }),
+      [
+        '--define',
+        'android_ndk_home=/ndk',
+        '--define',
+        'android={"android_home":"/sdk","ndk_version":"28.2"}',
+      ],
+    );
     expect(androidDefines('linux-x64', env), isNull);
     expect(androidDefines('android-arm64', {}), isNull);
   });

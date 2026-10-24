@@ -69,7 +69,7 @@ The shared workflow sets these values for every package:
 | Value | |
 |---|---|
 | Flutter | `flutter_version.txt` |
-| Android NDK | 28.2.13676358, passed to the hook as the user define `android_ndk_home` |
+| Android NDK | 28.2.13676358, passed to the hook as the user defines `android_ndk_home` (the NDK directory) and `android` (`{"android_home", "ndk_version"}`, the form of native_toolchain_cmake) |
 | Runners | `windows-2022`, `windows-11-arm`, `ubuntu-22.04` and `ubuntu-22.04-arm` (older glibc), `macos-15`. Web: `ubuntu-24.04`. |
 | Targets | The 10 targets in the `targets` default. A package can pass its own list. |
 | Publisher | `jpohhhh`, from a repository of the Telosnex organization. |
