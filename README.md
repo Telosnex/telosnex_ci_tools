@@ -74,12 +74,12 @@ The shared workflow sets these values for every package:
 | Targets | The 10 targets in the `targets` default. A package can pass its own list. |
 | Publisher | `jpohhhh`, from a repository of the Telosnex organization. |
 
-A package changes the steps with optional files in `tool/kiln/`. The workflow runs each file with `dart run`:
+A package changes the steps with optional files in `tool/kiln/`. The workflow runs each file with `dart <file>`, in the root of the checkout, after pub get. `dart run` would first run the package's build hook, which can need the tools that `prepare.dart` installs.
 
 | File | Runs | Arguments |
 |---|---|---|
-| `prepare.dart` | Before each native build. Installs tools. It runs as a copy outside the package, in `$RUNNER_TEMP`, so it can import only `dart:` libraries: `dart run` of a package script first runs the package's build hook, which needs those tools. The checkout is `$GITHUB_WORKSPACE`. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN` replaces the toolchain description; `KILN_TOOLCHAIN_EXTRA` goes at its end. |
-| `test_build.dart` | After each native build. Tests the files in `$OUT/out/$TARGET`. It runs like `prepare.dart`. | Environment: `TARGET`, `OUT`. |
+| `prepare.dart` | Before each native build. Installs tools. | Environment: `TARGET`, `OUT`, `ANDROID_NDK_HOME`. It can write to `GITHUB_ENV` and `GITHUB_PATH`. `KILN_TOOLCHAIN` replaces the toolchain description; `KILN_TOOLCHAIN_EXTRA` goes at its end. |
+| `test_build.dart` | After each native build. Tests the files in `$OUT/out/$TARGET`. | Environment: `TARGET`, `OUT`. |
 | `build_web.dart` | In the web job. Without it, the package has no web files. | `--out <dir> --toolchain-file <file>`: writes the web files to `<dir>` and a description of its toolchain to `<file>`. |
 | `test_web.dart` | After `<package>:web install-dev` of the built web files, on `web-test-runner`. | Environment: `KILN_WEB_FILES`, the directory of the built web files. |
 | `release.dart` | Instead of `<package>:release`. | The same arguments. |

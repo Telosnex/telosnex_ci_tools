@@ -9,19 +9,22 @@
 # repository of the Telosnex organization.
 #
 # A package changes the steps with files in tool/kiln/. Each file is
-# optional. The workflow runs each one with `dart run`, in the root of the
-# checkout, except prepare.dart:
+# optional. The workflow runs each one with `dart <file>`, in the root of the
+# checkout, after pub get. `dart run` would first run the build hook of the
+# package.
 #
-#   prepare.dart    Before each native build. Installs tools. Gets TARGET,
-#                   OUT and ANDROID_NDK_HOME. It can write to GITHUB_ENV and
-#                   GITHUB_PATH. KILN_TOOLCHAIN_EXTRA goes at the end of the
-#                   toolchain description. It runs as a copy outside the
-#                   package, so it can import only dart: libraries.
-#   build_web.dart  Gets `--out <dir> --toolchain-file <file>`. Writes the web
-#                   runtime files to <dir> and a description of its toolchain
-#                   to <file>. Without this file the package has no web files.
-#   test_web.dart   Tests the web files after `<package>:web install-dev`.
-#   release.dart    Replaces `<package>:release`, with the same arguments.
+#   prepare.dart     Before each native build. Installs tools. Gets TARGET,
+#                    OUT and ANDROID_NDK_HOME. It can write to GITHUB_ENV and
+#                    GITHUB_PATH. KILN_TOOLCHAIN replaces the toolchain
+#                    description; KILN_TOOLCHAIN_EXTRA goes at its end.
+#   test_build.dart  After each native build. Tests $OUT/out/$TARGET.
+#   build_web.dart   Gets `--out <dir> --toolchain-file <file>`. Writes the
+#                    web runtime files to <dir> and a description of its
+#                    toolchain to <file>. Without this file the package has
+#                    no web files.
+#   test_web.dart    Tests the web files after `<package>:web install-dev`.
+#                    Gets KILN_WEB_FILES, the directory of the built files.
+#   release.dart     Replaces `<package>:release`, with the same arguments.
 name: Kiln release
 
 on:
@@ -163,15 +166,12 @@ jobs:
       # flutter pub get also downloads sky_engine, which dart pub get needs.
       - run: flutter pub get --no-example
 
-      # `dart run` of a package script first runs the build hook of the
-      # package, which needs the tools that prepare.dart installs. A copy
-      # outside the package runs alone.
+      # Each tool/kiln/ script runs with `dart <file>`. `dart run` would first
+      # run the build hook of the package, which needs the tools that
+      # prepare.dart installs.
       - name: Prepare (tool/kiln/prepare.dart)
         if: hashFiles('tool/kiln/prepare.dart') != ''
-        run: |
-          cp tool/kiln/prepare.dart "$RUNNER_TEMP/kiln_prepare.dart"
-          cd "$RUNNER_TEMP"
-          dart kiln_prepare.dart
+        run: dart tool/kiln/prepare.dart
 
       - name: Download ${{ inputs.input-artifact }}
         if: inputs.input-artifact != ''
@@ -196,13 +196,9 @@ jobs:
           ndk-version: ${{ env.NDK_VERSION }}
           build-args: ${{ inputs.build-args }}
 
-      # Like prepare.dart, a copy outside the package.
       - name: Test the build (tool/kiln/test_build.dart)
         if: hashFiles('tool/kiln/test_build.dart') != ''
-        run: |
-          cp tool/kiln/test_build.dart "$RUNNER_TEMP/kiln_test_build.dart"
-          cd "$RUNNER_TEMP"
-          dart kiln_test_build.dart
+        run: dart tool/kiln/test_build.dart
 
       - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@8bc99ddb15cda9c383417c529e21b71680513141 # self
 
@@ -268,7 +264,7 @@ jobs:
           mkdir -p "$OUT/web-meta"
           echo "$WEB_RUNNER${WEB_CONTAINER:+, $WEB_CONTAINER}" > "$OUT/web-meta/runner.txt"
           start=$SECONDS
-          dart run tool/kiln/build_web.dart \
+          dart tool/kiln/build_web.dart \
             --out "$OUT/web" --toolchain-file "$OUT/web-meta/toolchain.txt"
           echo "Web build: $((SECONDS - start)) s"
           if [[ ! -s "$OUT/web-meta/toolchain.txt" ]]; then
@@ -329,7 +325,7 @@ jobs:
         if: steps.find.outputs.found == 'true'
         env:
           KILN_WEB_FILES: ${{ runner.temp }}/web-artifact/web
-        run: dart run tool/kiln/test_web.dart
+        run: dart tool/kiln/test_web.dart
 
   release:
     needs: [build, web, web-test]
@@ -376,7 +372,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          command=("$PACKAGE:release")
+          command=(run "$PACKAGE:release")
           if [[ -f tool/kiln/release.dart ]]; then command=(tool/kiln/release.dart); fi
           args=(--staging "$RUNNER_TEMP/staging")
           if [[ "$DRY_RUN" == true ]]; then args+=(--dry-run); fi
@@ -385,8 +381,8 @@ jobs:
               --web-runner "$(cat "$ARTIFACTS/web-meta/runner.txt")"
               --web-toolchain "$(cat "$ARTIFACTS/web-meta/toolchain.txt")")
           fi
-          echo "dart run ${command[*]} ${args[*]} $ARTIFACTS/out"
-          dart run "${command[@]}" "${args[@]}" "$ARTIFACTS/out"
+          echo "dart ${command[*]} ${args[*]} $ARTIFACTS/out"
+          dart "${command[@]}" "${args[@]}" "$ARTIFACTS/out"
           for f in native_artifacts/prebuilt.json native_artifacts/web.json; do
             if [[ -f "$f" ]]; then cat "$f"; fi
           done
