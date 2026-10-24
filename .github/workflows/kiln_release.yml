@@ -68,6 +68,17 @@ on:
           downloaded models. The key is the hash of tool/kiln/test_web.dart.
         type: string
         default: ''
+      containers:
+        description: >-
+          JSON. A target to {"runner", "image"}: the target builds in the
+          container image on that runner, for example
+          {"linux-x64": {"runner": "ubuntu-22.04", "image": "gcc@sha256:..."}}.
+        type: string
+        default: '{}'
+      web-container:
+        description: The container image of the web build, for example emsdk.
+        type: string
+        default: ''
 
 concurrency:
   group: kiln-release
@@ -90,11 +101,15 @@ jobs:
     name: ${{ matrix.target }}
     # Linux builds use Ubuntu 22.04 for its older glibc.
     runs-on: >-
-      ${{ matrix.target == 'windows-arm64' && 'windows-11-arm' ||
+      ${{ fromJSON(inputs.containers)[matrix.target].runner ||
+      matrix.target == 'windows-arm64' && 'windows-11-arm' ||
       startsWith(matrix.target, 'windows-') && 'windows-2022' ||
       matrix.target == 'linux-arm64' && 'ubuntu-22.04-arm' ||
       (startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'ios-')) && 'macos-15' ||
       'ubuntu-22.04' }}
+    # An empty image: no container.
+    container:
+      image: ${{ fromJSON(inputs.containers)[matrix.target].image || '' }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -103,6 +118,21 @@ jobs:
     env:
       TARGET: ${{ matrix.target }}
     steps:
+      - name: Prepare the container
+        if: fromJSON(inputs.containers)[matrix.target].image
+        run: &prepare-container |
+          # actions/checkout needs git for a work tree; Flutter needs curl,
+          # unzip and xz. Debian 11 packages are on archive.debian.org.
+          if command -v apt-get > /dev/null; then
+            if grep -q '^VERSION_CODENAME=bullseye$' /etc/os-release; then
+              printf 'deb http://archive.debian.org/debian %s main\n' bullseye bullseye-updates > /etc/apt/sources.list
+              echo 'deb http://archive.debian.org/debian-security bullseye-security main' >> /etc/apt/sources.list
+            fi
+            apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+              ca-certificates curl git unzip xz-utils > /dev/null
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -161,6 +191,14 @@ jobs:
           ndk-version: ${{ env.NDK_VERSION }}
           build-args: ${{ inputs.build-args }}
 
+      # Like prepare.dart, a copy outside the package.
+      - name: Test the build (tool/kiln/test_build.dart)
+        if: hashFiles('tool/kiln/test_build.dart') != ''
+        run: |
+          cp tool/kiln/test_build.dart "$RUNNER_TEMP/kiln_test_build.dart"
+          cd "$RUNNER_TEMP"
+          dart kiln_test_build.dart
+
       - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@54ea0b407a2b44e79b0c0e697bbd8b6bb4fddf1b # self
 
       # The unstripped libraries. The kiln-* artifact has only the stripped
@@ -183,10 +221,15 @@ jobs:
 
   web:
     runs-on: ubuntu-24.04
+    container:
+      image: ${{ inputs.web-container }}
     timeout-minutes: 60
     outputs:
       built: ${{ steps.find.outputs.built }}
     steps:
+      - name: Prepare the container
+        if: inputs.web-container != ''
+        run: *prepare-container
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -214,9 +257,11 @@ jobs:
           tail -1 "$OUT/key/web.txt"
       - name: Build (tool/kiln/build_web.dart)
         if: steps.find.outputs.built == 'true'
+        env:
+          WEB_CONTAINER: ${{ inputs.web-container }}
         run: |
           mkdir -p "$OUT/web-meta"
-          echo "$WEB_RUNNER" > "$OUT/web-meta/runner.txt"
+          echo "$WEB_RUNNER${WEB_CONTAINER:+, $WEB_CONTAINER}" > "$OUT/web-meta/runner.txt"
           start=$SECONDS
           dart run tool/kiln/build_web.dart \
             --out "$OUT/web" --toolchain-file "$OUT/web-meta/toolchain.txt"

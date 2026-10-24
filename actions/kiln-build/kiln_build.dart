@@ -21,7 +21,10 @@ Future<void> main() async {
   }
 
   final toolchain = [
-    ...await describeToolchain(target, env),
+    ...switch (env['KILN_TOOLCHAIN']) {
+      final String own when own.isNotEmpty => [own],
+      _ => await describeToolchain(target, env),
+    },
     if (env['KILN_TOOLCHAIN_EXTRA'] case final extra? when extra.isNotEmpty)
       extra,
   ].join(', ');
