@@ -1,8 +1,8 @@
-// Runs `dart run <package>:build` for one target. actions/prebuilt-build
+// Runs `dart run <package>:build` for one target. actions/kiln-build
 // runs this file with the environment variables of its action.yml.
 //
 // This file uses only dart:io and dart:convert: the action runs it without a
-// pub get. test/prebuilt_build_test.dart imports it.
+// pub get. test/kiln_build_test.dart imports it.
 import 'dart:convert';
 import 'dart:io';
 

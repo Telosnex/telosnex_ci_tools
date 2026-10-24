@@ -8,9 +8,9 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 |---|---|---|
 | `actions/setup-flutter` | Composite action | Installs Flutter from a shallow clone of its tag. The default version is in `flutter_version.txt`. |
 | `actions/check-clean-tree` | Composite action | Fails if the checkout has untracked or changed files. |
-| `actions/prebuilt-build` | Composite action | Describes the toolchain and runs `<package>:build` for one target. |
-| `.github/workflows/prebuilt_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a package. |
-| `.github/workflows/prebuilt_check.yml` | Reusable workflow | Runs `<package>:check`. |
+| `actions/kiln-build` | Composite action | Describes the toolchain and runs `<package>:build` for one target. |
+| `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
+| `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
 | `default.json` | Renovate preset | Keeps the pinned actions current. |
@@ -32,11 +32,11 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 
 ## Call a shared workflow
 
-The caller has the triggers, the `run-name` and the package-specific values. The shared workflow has the jobs. This is the prebuilt release of fonnx, `.github/workflows/prebuilt_release.yml`:
+The caller has the triggers, the `run-name` and the package-specific values. The shared workflow has the jobs. This is the kiln release of fonnx, `.github/workflows/kiln_release.yml`:
 
 ```yaml
-name: Prebuilt release
-run-name: Prebuilt release / ${{ (github.ref_name == 'prebuilt-release-dry' || inputs.dry_run) && 'build only' || 'publish' }}
+name: Kiln release
+run-name: Kiln release / ${{ (github.ref_name == 'kiln-release-dry' || inputs.dry_run) && 'build only' || 'publish' }}
 
 on:
   workflow_dispatch:
@@ -46,14 +46,14 @@ on:
         type: boolean
         default: false
   push:
-    branches: [prebuilt-release, prebuilt-release-dry]
+    branches: [kiln-release, kiln-release-dry]
 
 permissions:
   contents: read
 
 jobs:
-  prebuilt-release:
-    uses: Telosnex/telosnex_ci_tools/.github/workflows/prebuilt_release.yml@<sha> # v0.1.0
+  kiln-release:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/kiln_release.yml@<sha> # v0.1.0
     permissions:
       contents: write
     with:
@@ -86,19 +86,19 @@ jobs:
       release-command: dart run tool/release_native.dart
 ```
 
-`prebuilt_release.yml` describes each input.
+`kiln_release.yml` describes each input.
 
 ### Names
 
 | Thing | Name |
 |---|---|
-| Workflow file and name | `prebuilt_release.yml`, `Prebuilt release` |
-| Trigger branches | `prebuilt-release`, `prebuilt-release-dry` (a dry run) |
-| Artifacts | `prebuilt-<target>`, `prebuilt-web`, `manifest`, `debug-symbols-<target>` |
-| Manifest branch | `prebuilt-manifest/<tag>` |
-| Release tag | `native-<16 characters of the source key>`. The package sets it. |
+| Workflow file and name | `kiln_release.yml`, `Kiln release` |
+| Trigger branches | `kiln-release`, `kiln-release-dry` (a dry run) |
+| Artifacts | `kiln-<target>`, `kiln-web`, `manifest`, `debug-symbols-<target>` |
+| Manifest branch | `kiln-manifest/<tag>` |
+| Release tag | `native-<16 characters of the source key>`. Kiln sets it. |
 
-The `package` input is the Dart package of the tool, `native_prebuilt` by default. When that package is renamed, only the default changes.
+The `package` input is the Dart package of [kiln](https://github.com/Telosnex/kiln), `kiln` by default. A package that still uses `native_prebuilt` passes `package: native_prebuilt`.
 
 ## Change this repository
 

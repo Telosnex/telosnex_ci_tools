@@ -1,6 +1,6 @@
 import 'package:test/test.dart';
 
-import '../actions/prebuilt-build/prebuilt_build.dart';
+import '../actions/kiln-build/kiln_build.dart';
 
 void main() {
   test('matchesTarget', () {

@@ -51,7 +51,7 @@ void main() {
       expect(nameForFile('native_release.yml'), 'Native release');
       expect(_rules('cuda_pack.yml', _workflow(name: 'CUDA pack')), isEmpty);
       expect(
-        _rules('prebuilt_check.yml', _workflow(name: 'Check prebuilt files')),
+        _rules('kiln_check.yml', _workflow(name: 'Check prebuilt files')),
         ['name-matches-file'],
       );
     });
@@ -106,8 +106,8 @@ permissions:
 concurrency:
   group: native-release
 jobs:
-  prebuilt-release:
-    uses: $selfRepository/.github/workflows/prebuilt_release.yml@3d3c42e5aac5ba805825da76410c181273ba90b1 # v1.0.0
+  kiln-release:
+    uses: $selfRepository/.github/workflows/kiln_release.yml@3d3c42e5aac5ba805825da76410c181273ba90b1 # v1.0.0
 ''';
     expect(_rules('native_release.yml', text), ['shared-concurrency']);
   });

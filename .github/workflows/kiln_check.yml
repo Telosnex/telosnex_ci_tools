@@ -2,15 +2,15 @@
 # of a package (`dart run <package>:check`). The caller
 # sets the triggers, usually the pull requests that change the manifest and a
 # daily schedule.
-name: Prebuilt check
+name: Kiln check
 
 on:
   workflow_call:
     inputs:
       package:
-        description: The Dart package of the prebuilt tool.
+        description: The Dart package of kiln. native_prebuilt before its rename.
         type: string
-        default: native_prebuilt
+        default: kiln
       flutter-version:
         description: Empty for the version of setup-flutter.
         type: string

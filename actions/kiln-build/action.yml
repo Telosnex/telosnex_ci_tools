@@ -5,9 +5,9 @@ description: >-
 
 inputs:
   package:
-    description: The Dart package of the prebuilt tool.
+    description: The Dart package of kiln. native_prebuilt before its rename.
     required: false
-    default: native_prebuilt
+    default: kiln
   target:
     description: A target, for example windows-x64.
     required: true
@@ -55,4 +55,4 @@ runs:
         BUILD_ARGS: ${{ inputs.build-args }}
         TOOLCHAIN_EXTRA: ${{ inputs.toolchain-extra }}
       # The script uses only dart:io and dart:convert, so it needs no pub get.
-      run: dart "$GITHUB_ACTION_PATH/prebuilt_build.dart"
+      run: dart "$GITHUB_ACTION_PATH/kiln_build.dart"
