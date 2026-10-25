@@ -20,7 +20,7 @@ fllama spike: branch `spike/test-cells`, workflow
 
 ### fllama
 - [ ] test.yml run 40241296726: Firefox stalled (no output 600 s after the build; the previous Firefox drive step took 167 s). Watch for a repeat; flutter drive prints nothing while tests run, so web-driver's idle limit is also the test-time limit.
-- [ ] Windows: `watch` is broken there. Under the bash it starts, flutter.bat's last step fails: `/usr/bin/bash: line 1: D:a_tempflutter/bin/internal/exit_with_errorlevel.bat` (a Windows path passed to bash, backslashes eaten). Same with Git\usr\bin and Git\bin bash (runs 40241296726, 40245072960); `flutter pub get` itself completes. Cause unknown. fllama test.yml runs Windows without watch (spike's proven way). Needs a Windows machine or a debug run.
+- [x] Windows: `watch` broke flutter (`bash: D:a_tempflutter/bin/internal/exit_with_errorlevel.bat`). Cause, reproduced in the Parallels Windows 11 VM: the step ran `dart` through Flutter's wrapper (bin/dart -> dart.bat), which leaves OS=MINGW64_NT..., FLUTTER_ROOT, EXIT_WITH_ERRORLEVEL etc. in the environment; every flutter that watch's bash started then took the wrong path in flutter.bat. Fix ci_tools e1d108c: start `bin/cache/dart-sdk/bin/dart.exe` directly. The action's real script passes in the VM; fllama bc292ca uses it (push after run 40245072960).
 - [ ] **iOS simulator stall.** Read the `ios-diagnostics` artifact of run 40231960707: simulator log, app list, screenshot. Find out whether install, launch or the connection to `flutter test` stalls.
 - [x] Thread count: owner changed mind (2026-10-25). Default (numThreads <= 0) is physical cores - 1, at least 1; web CPUs - 1, at most 4. A set value is used as is. fllama spike a6760c8.
 - [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
@@ -97,6 +97,8 @@ fllama spike: branch `spike/test-cells`, workflow
 - [x] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). Done 2026-10-25 for all 6 (above). Common gaps: Firefox/Safari, Linux/Windows/arm Dart tests, mobile scripts that exist but are not in CI, and no PR test workflow outside kiln.
 
 ## Runner facts
+
+- Windows debugging: the Parallels `Windows 11` VM (ARM64). Send scripts with `powershell -EncodedCommand` (prlctl mangles quotes; long commands fail), clone repos there from GitHub.
 
 - macos-15 has 3 CPUs. ubuntu-24.04, ubuntu-24.04-arm and the Windows runners have 4.
 - macos-15's GPU is "Apple Paravirtual device": no Apple6-9 or Metal3 family, so ggml-metal has no simdgroup kernels.
