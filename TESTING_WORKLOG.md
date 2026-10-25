@@ -80,8 +80,8 @@ fllama spike: branch `spike/test-cells`, workflow
   - `tool/test_all.*` and `tool/test_native_sanitizers.sh` (local gates).
   - No PR test workflow: tests run only in a release.
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): confirmed. Upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
-- [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests.
-- [ ] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). The first survey missed most of fllama's tests.
+- [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests. Survey (2026-10-25, native-prebuilt ec61bda): upstream `check_and_lint.yml` runs `melos exec flutter test` (Linux), cargo clippy (host, Android, iOS) and `cargo test` on an OS matrix. Dart tests are few and shallow (one file per package, 2 web drop tests); no integration tests. Clipboard and drag-and-drop need a desktop session: a smoke test is an example app on macOS/Windows/Linux (xvfb) that writes and reads the clipboard.
+- [x] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). Done 2026-10-25 for all 6 (above). Common gaps: Firefox/Safari, Linux/Windows/arm Dart tests, mobile scripts that exist but are not in CI, and no PR test workflow outside kiln.
 
 ## Runner facts
 
