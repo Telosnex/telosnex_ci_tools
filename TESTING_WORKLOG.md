@@ -67,7 +67,12 @@ fllama spike: branch `spike/test-cells`, workflow
   - Android emulator and iOS simulator: `example/lib/device_check.dart` is an app entry that prints `TSNX_DEVICE` lines and PASS/FAIL to logcat/console. Run it with `flutter run --release -t lib/device_check.dart` on the emulator/simulator, read the log. The emulator has no earpiece (routes differ).
   - `flutter test` on Linux and Windows (only macOS today).
   - Uses `Telosnex/flutter-action` and old checkout pins, not `setup-flutter`; lint finds nothing because ci.yml is not a kiln workflow name. Move to ci_tools actions when tests are added.
-- [ ] fonnx: Firefox and Safari, mobile, model cache.
+- [ ] fonnx. Survey (2026-10-25, main 39f651b): `native_assets_smoke.yml` runs on Linux x64, macOS arm64, Windows x64: `tool/test_web_runtime.mjs` (Node), sanitizers, the operation corpus, ORT sessions, FUTO Swipe. Not in CI:
+  - `tool/test_all.sh`, the "authoritative package gate": 38 model test files in one serialized process. Needs the models: `tool/fetch_hf_models.dart` downloads 1.5 GB (2.3 GB on disk), pinned to Hugging Face commits and SHA-256 in `native_artifacts/manifest.json`. A cache keyed on that manifest is the cached-downloads action.
+  - `tool/test_ios_simulator_artifacts.sh` and `tool/test_android_artifacts.sh` (ORT session on the simulator / an AVD with `FONNX_ANDROID_AVD`): ready for the ios-simulator and android-emulator actions.
+  - `example/integration_test`: 2 files, 3 tests (plugin, keyword spotter). Not run anywhere.
+  - Web: 3 `@TestOn('browser')` files (web runtime, kokoro web, misaki web), Chrome only if at all.
+  - `codemagic.yaml` still in the repo (builds and signing only, no tests).
 - [ ] zxing_dart, image_ffmpeg: unit and web cells with the default commands.
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`.
 - [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests.
