@@ -108,7 +108,10 @@ Future<int> watch(
   final process = await Process.start(
     options.command.first,
     options.command.sublist(1),
-    runInShell: Platform.isWindows,
+    // A name such as `flutter` (a .bat) needs cmd on Windows. A path must
+    // not go through cmd: it splits "C:\Program Files\..." at the space.
+    runInShell:
+        Platform.isWindows && !options.command.first.contains(RegExp(r'[\\/]')),
   );
   var lastOutput = DateTime.now();
   final done = <Future<void>>[];
