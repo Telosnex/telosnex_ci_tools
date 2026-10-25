@@ -29,6 +29,7 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
 - [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix.
 - [ ] iOS: from the `flutter test -v` log, find why flutter_tools does not connect to the app's VM service (port forwarding? mDNS?), and fix it.
+- [ ] iOS watchdog false stall (run 40235095714): attempt 1 was killed during the Xcode build, silent for 500 s against the 480 s limit. Attempt 2 passed (32 tests, 4 min). So the original stall (VM service listens, flutter test never connects) has not been seen again yet. Fix: build in a separate step (`flutter build ios --simulator --debug`) before `flutter test`, or a longer limit until the first test starts.
 - [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
 - [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
 - [ ] Remove `/tmp/wip_backup.patch` once the uncommitted ggml-metal work in the fllama checkout is confirmed intact.
