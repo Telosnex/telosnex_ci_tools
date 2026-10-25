@@ -82,9 +82,14 @@ runs:
         WATCH_RUN: ${{ inputs.run }}
         WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
       run: |
-        # Git Bash, by path: from cmd, "bash" on Windows can be WSL's.
+        # On Windows, the bash of GitHub's steps: Git\bin\bash.exe sets up the
+        # MSYS environment. Git\usr\bin\bash.exe, started from dart, broke
+        # flutter's scripts (run 40241296726); "bash" from cmd can be WSL's.
         bash_exe=bash
-        if [[ "$RUNNER_OS" == Windows ]]; then bash_exe=$(cygpath -w "$(command -v bash)"); fi
+        if [[ "$RUNNER_OS" == Windows ]]; then
+          git_root=$(cygpath -m /)
+          bash_exe="${git_root%/}/bin/bash.exe"
+        fi
         out="$RUNNER_TEMP/web_driver_run.log"
         for attempt in 1 2 3; do
           status=0
