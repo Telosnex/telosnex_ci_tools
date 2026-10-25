@@ -30,9 +30,10 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
 
 ### telosnex_ci_tools
-- [ ] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
-- [ ] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
-- [ ] Lint: an example's `web/index.html` loads `flutter_bootstrap.js`. The legacy loader runs `main.dart.js` in a `--wasm` build.
+- [ ] Release the 3 lint rules (committed locally, not pushed). First run found 3 legacy `index.html` in super_native_extensions examples (super_context_menu, super_drag_and_drop, super_keyboard_layout). Fix them before the repo's CI runs the new lint.
+- [x] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
+- [x] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
+- [x] Lint: an example's `web/index.html` loads `flutter_bootstrap.js`. The legacy loader runs `main.dart.js` in a `--wasm` build.
 - [ ] `bin/watch.dart`: stops a command after N minutes with no output, and runs a diagnostics hook first.
 - [ ] Action `android-emulator`: KVM permissions, `ANDROID_AVD_HOME`, `adb` on `PATH`, system image, boot wait, emulator log.
 - [ ] Action `ios-simulator`: start CoreSimulator, a fresh simulator, log stream, watchdog, one retry only if no test started, cleanup. Wait until the iOS stall is fixed.

@@ -111,4 +111,126 @@ jobs:
 ''';
     expect(_rules('native_release.yml', text), ['shared-concurrency']);
   });
+
+  group('allowed-actions', () {
+    for (final sub in ['restore', 'save']) {
+      test('actions/cache/$sub', () {
+        final text = _workflow(
+          job:
+              '      - uses: actions/cache/$sub@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0\n',
+        );
+        expect(_rules('native_release.yml', text), ['allowed-actions']);
+      });
+    }
+
+    test('actions/cache', () {
+      final text = _workflow(
+        job:
+            '      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0\n',
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+  });
+
+  group('job-defaults-shell', () {
+    const workflowDefaults = 'defaults:\n  run:\n    shell: bash\n';
+    String withJobDefaults(String jobDefaults) =>
+        _workflow(extra: workflowDefaults).replaceFirst(
+          '    timeout-minutes: 10\n',
+          '    timeout-minutes: 10\n$jobDefaults',
+        );
+
+    test('job defaults without the shell', () {
+      final text = withJobDefaults(
+        '    defaults:\n      run:\n        working-directory: pkg\n',
+      );
+      expect(_rules('native_release.yml', text), ['job-defaults-shell']);
+    });
+
+    test('job defaults with the shell', () {
+      final text = withJobDefaults(
+        '    defaults:\n      run:\n        shell: bash\n        working-directory: pkg\n',
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
+    test('an alias of job defaults with the shell', () {
+      final text =
+          '''
+name: Native release
+on: push
+permissions:
+  contents: read
+$workflowDefaults
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults: &d
+      run:
+        shell: bash
+        working-directory: pkg
+    steps:
+      - run: true
+  b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults: *d
+    steps:
+      - run: true
+''';
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
+    test('no workflow shell: no finding', () {
+      final text = _workflow().replaceFirst(
+        '    timeout-minutes: 10\n',
+        '    timeout-minutes: 10\n    defaults:\n      run:\n        working-directory: pkg\n',
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+  });
+
+  group('flutter-bootstrap', () {
+    List<String> rules(String html) => [
+      for (final f in lintWebIndex('example/web/index.html', html)) f.rule,
+    ];
+
+    test('the legacy loader', () {
+      expect(
+        rules('''
+<head>
+  <script src="flutter.js" defer></script>
+</head>
+<body>
+  <script>
+    window.addEventListener('load', function () {
+      _flutter.loader.loadEntrypoint({});
+    });
+  </script>
+</body>
+'''),
+        ['flutter-bootstrap'],
+      );
+      expect(
+        rules(
+          '<script src="main.dart.js" type="application/javascript"></script>',
+        ),
+        ['flutter-bootstrap'],
+      );
+    });
+
+    test('flutter_bootstrap.js', () {
+      expect(
+        rules(
+          '<body>\n  <script src="flutter_bootstrap.js" async></script>\n</body>',
+        ),
+        isEmpty,
+      );
+    });
+
+    test('not a Flutter page', () {
+      expect(rules('<html><body>Hello</body></html>'), isEmpty);
+    });
+  });
 }

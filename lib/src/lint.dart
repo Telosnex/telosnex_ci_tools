@@ -25,18 +25,73 @@ final class Finding {
       '::error file=$path,line=$line,title=$rule::$message';
 }
 
-/// The findings of every workflow file in `<repo>/.github/workflows`.
+/// The findings of every workflow file in `<repo>/.github/workflows`, and
+/// of the `web/index.html` of each Flutter app in the repository.
 List<Finding> lintRepository(String repo) {
   final dir = Directory(p.join(repo, '.github', 'workflows'));
-  if (!dir.existsSync()) return const [];
-  final files = dir.listSync().whereType<File>().toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  final files = dir.existsSync()
+      ? (dir.listSync().whereType<File>().toList()
+          ..sort((a, b) => a.path.compareTo(b.path)))
+      : <File>[];
   return [
     for (final file in files)
       ...lintWorkflow(
         p.relative(file.path, from: repo),
         file.readAsStringSync(),
       ),
+    for (final file in _webIndexFiles(repo))
+      ...lintWebIndex(
+        p.relative(file.path, from: repo),
+        file.readAsStringSync(),
+      ),
+  ];
+}
+
+/// `web/index.html` of the repository, of `example/`, and of the packages
+/// one level down (`super_native_extensions/example/web/index.html`).
+List<File> _webIndexFiles(String repo) {
+  final roots = <String>[repo, p.join(repo, 'example')];
+  final top = Directory(repo);
+  if (top.existsSync()) {
+    for (final d in top.listSync().whereType<Directory>()) {
+      final name = p.basename(d.path);
+      if (name.startsWith('.') || name == 'build' || name == 'example') {
+        continue;
+      }
+      roots
+        ..add(d.path)
+        ..add(p.join(d.path, 'example'));
+    }
+  }
+  return [
+    for (final root in roots)
+      if (File(p.join(root, 'web', 'index.html')) case final f
+          when f.existsSync())
+        f,
+  ]..sort((a, b) => a.path.compareTo(b.path));
+}
+
+/// The findings of one Flutter `web/index.html`.
+///
+/// The legacy loader (`flutter.js` with `loadEntrypoint`, or a
+/// `main.dart.js` script) always runs `main.dart.js`. In a `--wasm` build the
+/// app then stalls, or runs the JS build while the test claims Wasm.
+List<Finding> lintWebIndex(String path, String text) {
+  final flutterApp =
+      text.contains('flutter.js') || text.contains('main.dart.js');
+  if (!flutterApp || text.contains('flutter_bootstrap.js')) return const [];
+  final lines = text.split('\n');
+  final line = lines.indexWhere(
+    (l) => l.contains('flutter.js') || l.contains('main.dart.js'),
+  );
+  return [
+    Finding(
+      path,
+      line + 1,
+      'flutter-bootstrap',
+      'Load flutter_bootstrap.js: <script src="flutter_bootstrap.js" async>. '
+          'The legacy loader runs main.dart.js in a --wasm build.',
+    ),
   ];
 }
 
@@ -95,9 +150,23 @@ List<Finding> lintWorkflow(String path, String text) {
 
   final jobs = root.nodes['jobs'];
   if (jobs is! YamlMap) return findings;
+  final workflowShell = _defaultShell(root);
   var callsShared = false;
   for (final MapEntry(:key, :value) in jobs.nodes.entries) {
     if (value is! YamlMap) continue;
+    final jobDefaults = value.nodes['defaults'];
+    if (workflowShell != null &&
+        jobDefaults is YamlMap &&
+        jobDefaults['run'] is YamlMap &&
+        _defaultShell(value) == null) {
+      add(
+        _line(jobDefaults),
+        'job-defaults-shell',
+        'Set shell: $workflowShell in the defaults.run of job '
+            '${(key as YamlNode).value}. Job defaults replace the workflow '
+            'defaults: without it, steps run in sh or PowerShell.',
+      );
+    }
     final uses = value['uses'];
     if (uses is String) {
       if (uses.startsWith('$selfRepository/')) {
@@ -128,6 +197,15 @@ List<Finding> lintWorkflow(String path, String text) {
     );
   }
   return findings;
+}
+
+/// `defaults.run.shell` of a workflow or job map, or null.
+Object? _defaultShell(YamlMap map) {
+  final defaults = map['defaults'];
+  if (defaults is! YamlMap) return null;
+  final run = defaults['run'];
+  if (run is! YamlMap) return null;
+  return run['shell'];
 }
 
 /// The workflow name for a file name: `native_release.yml` is
@@ -163,6 +241,7 @@ String? nameProblem(String name) {
 final _uses = RegExp(r'''^\s*(?:-\s+)?uses:\s*['"]?([^\s'"]+)['"]?(.*)$''');
 final _pinned = RegExp(r'^[\w.-]+/[\w.-]+(/[^@]+)?@[0-9a-f]{40}$');
 final _versionComment = RegExp(r'^\s*#\s*\S+');
+final _cacheSubaction = RegExp(r'^actions/cache/(restore|save)@');
 final _flutterClone = RegExp(r'github\.com/flutter/flutter(\.git)?\b');
 
 void _lintLines(String text, void Function(int, String, String) add) {
@@ -180,6 +259,16 @@ void _lintLines(String text, void Function(int, String, String) add) {
         add(i + 1, 'pinned-uses', 'Pin $ref to a full commit SHA.');
       } else if (!_versionComment.hasMatch(rest)) {
         add(i + 1, 'pinned-uses', 'Add the version comment, "# v1.2.3".');
+      }
+      final subaction = _cacheSubaction.firstMatch(ref);
+      if (subaction != null) {
+        add(
+          i + 1,
+          'allowed-actions',
+          'Use actions/cache, not actions/cache/${subaction[1]}. The '
+              'Telosnex allow list has only actions/cache: the run fails at '
+              'startup.',
+        );
       }
       if (ref.startsWith('subosito/flutter-action')) {
         add(i + 1, 'setup-flutter', _setupFlutter);
