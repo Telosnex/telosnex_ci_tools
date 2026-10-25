@@ -1,0 +1,46 @@
+# Runs a bash command, and stops it when it prints nothing for a time. A
+# stalled test (an app that never connects, a page that never loads) then
+# fails in minutes with diagnostics, not at the job timeout.
+name: Watch a command
+description: Runs a command; stops it after a time without output, and exits 124.
+
+inputs:
+  run:
+    description: The bash script to run (bash -eo pipefail).
+    required: true
+  idle-minutes:
+    description: Minutes without output before the command is stopped.
+    required: false
+    default: '8'
+  ignore:
+    description: >-
+      A regular expression. Matching lines do not count as output, for
+      example the "[ +12 ms]" lines of flutter -v.
+    required: false
+    default: ''
+  on-stall:
+    description: A bash command that saves diagnostics before the stop.
+    required: false
+    default: ''
+  working-directory:
+    description: The directory of the command.
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Run with a watchdog
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        WATCH_RUN: ${{ inputs.run }}
+        WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
+        WATCH_IGNORE: ${{ inputs.ignore }}
+        WATCH_ON_STALL: ${{ inputs.on-stall }}
+      # The script uses only dart:io, so it needs no pub get.
+      run: |
+        dart "$GITHUB_ACTION_PATH/watch.dart" \
+          --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
+          --ignore "$WATCH_IGNORE" --on-stall "$WATCH_ON_STALL" \
+          -- bash -eo pipefail -c "$WATCH_RUN"

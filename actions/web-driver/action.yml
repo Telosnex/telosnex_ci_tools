@@ -1,0 +1,94 @@
+# Starts the WebDriver server of a stock browser on a GitHub-hosted runner,
+# for `flutter drive -d web-server --browser-name <browser>`:
+# chromedriver and geckodriver (Linux), safaridriver (macOS).
+#
+# With `run`, it also runs that command (flutter drive) with a watchdog, and
+# runs it again, up to 3 times, only when the driver could not start a
+# browser session (safaridriver sometimes times out launching Safari). The
+# app never ran then. Other failures are final.
+name: Web driver
+description: Starts chromedriver, geckodriver or safaridriver, and runs flutter drive.
+
+inputs:
+  browser:
+    description: chrome, firefox or safari.
+    required: true
+  port:
+    description: The driver port. flutter drive uses 4444.
+    required: false
+    default: '4444'
+  run:
+    description: >-
+      Optional. A bash script that runs flutter drive. Empty: only start the
+      driver.
+    required: false
+    default: ''
+  idle-minutes:
+    description: Minutes without output before `run` is stopped.
+    required: false
+    default: '10'
+  working-directory:
+    description: The directory of `run`.
+    required: false
+    default: '.'
+
+outputs:
+  port:
+    description: The driver port.
+    value: ${{ inputs.port }}
+
+runs:
+  using: composite
+  steps:
+    - name: Start the driver
+      shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+        PORT: ${{ inputs.port }}
+      run: |
+        log="$RUNNER_TEMP/web_driver.log"
+        case "$BROWSER" in
+          chrome)
+            version="$(google-chrome --version), $("$CHROMEWEBDRIVER/chromedriver" --version)"
+            "$CHROMEWEBDRIVER/chromedriver" --port="$PORT" > "$log" 2>&1 & ;;
+          firefox)
+            version="$(firefox --version), $("$GECKOWEBDRIVER/geckodriver" --version | head -1)"
+            "$GECKOWEBDRIVER/geckodriver" --port "$PORT" > "$log" 2>&1 & ;;
+          safari)
+            version="Safari $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' /Applications/Safari.app/Contents/Info.plist)"
+            sudo safaridriver --enable
+            safaridriver --port "$PORT" > "$log" 2>&1 & ;;
+          *)
+            echo "::error::browser must be chrome, firefox or safari, not $BROWSER."
+            exit 1 ;;
+        esac
+        for _ in $(seq 1 30); do
+          curl -sf "http://127.0.0.1:$PORT/status" > /dev/null && break
+          sleep 1
+        done
+        if ! curl -sf "http://127.0.0.1:$PORT/status"; then
+          echo "::error::The $BROWSER driver did not start."
+          cat "$log"
+          exit 1
+        fi
+        echo
+        echo "$BROWSER: $version" | tee -a "$GITHUB_STEP_SUMMARY"
+    - name: Run
+      if: inputs.run != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSER: ${{ inputs.browser }}
+        WATCH_RUN: ${{ inputs.run }}
+        WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
+      run: |
+        out="$RUNNER_TEMP/web_driver_run.log"
+        for attempt in 1 2 3; do
+          status=0
+          dart "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
+            -- bash -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
+          grep -q "SessionNotCreatedException" "$out" || break
+          echo "::warning::$BROWSER: the driver could not start a session (attempt $attempt)"
+          sleep 10
+        done
+        exit "$status"

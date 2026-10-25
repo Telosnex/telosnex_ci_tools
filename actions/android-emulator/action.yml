@@ -1,0 +1,102 @@
+# Boots an x86_64 Android emulator on an x64 Linux runner with KVM
+# (ubuntu-24.04). Other runners fail at once: an emulator without KVM, or an
+# arm64 image on the arm runner, is too slow for tests.
+#
+# The emulator keeps running for the later steps of the job. adb is on PATH
+# after this action (it is not on ubuntu-24.04).
+name: Android emulator
+description: Boots an x86_64 Android emulator with KVM, and puts adb on PATH.
+
+inputs:
+  api-level:
+    description: The Android API level of the system image.
+    required: false
+    default: '35'
+  target:
+    description: The system image target, for example google_apis.
+    required: false
+    default: google_apis
+  device:
+    description: The avdmanager device profile.
+    required: false
+    default: pixel_6
+  ram-mb:
+    description: The RAM of the emulator.
+    required: false
+    default: '4096'
+  cores:
+    description: The CPU cores of the emulator.
+    required: false
+    default: '4'
+  boot-timeout-minutes:
+    description: Minutes for the boot, with the system image download.
+    required: false
+    default: '15'
+
+outputs:
+  serial:
+    description: The adb serial of the emulator, for flutter -d.
+    value: emulator-5554
+  log:
+    description: The emulator log file.
+    value: ${{ steps.boot.outputs.log }}
+
+runs:
+  using: composite
+  steps:
+    - name: KVM
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != X64 ]]; then
+          echo "::error::android-emulator needs an x64 Linux runner (ubuntu-24.04), not $RUNNER_OS $RUNNER_ARCH."
+          exit 1
+        fi
+        if [[ ! -e /dev/kvm ]]; then
+          echo "::error::This runner has no /dev/kvm."
+          exit 1
+        fi
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+          | sudo tee /etc/udev/rules.d/99-kvm4all.rules > /dev/null
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+    - name: Boot the emulator
+      id: boot
+      shell: bash
+      env:
+        API_LEVEL: ${{ inputs.api-level }}
+        TARGET: ${{ inputs.target }}
+        DEVICE: ${{ inputs.device }}
+        RAM_MB: ${{ inputs.ram-mb }}
+        CORES: ${{ inputs.cores }}
+        BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
+      run: |
+        start=$(date +%s)
+        deadline=$(( start + BOOT_TIMEOUT_MINUTES * 60 ))
+        sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+        image="system-images;android-$API_LEVEL;$TARGET;x86_64"
+        # avdmanager does not always use ~/.android/avd: set the directory.
+        export ANDROID_AVD_HOME="$RUNNER_TEMP/avd"
+        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+        echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+        export PATH="$ANDROID_HOME/platform-tools:$PATH"
+        mkdir -p "$ANDROID_AVD_HOME"
+        # yes ends with SIGPIPE when sdkmanager stops reading.
+        (yes || true) | "$sdk/sdkmanager" --licenses > /dev/null
+        "$sdk/sdkmanager" emulator "$image" > /dev/null
+        echo no | "$sdk/avdmanager" create avd -n ci -k "$image" -d "$DEVICE" > /dev/null
+        printf 'hw.ramSize=%s\ndisk.dataPartition.size=8G\nhw.cpu.ncore=%s\n' "$RAM_MB" "$CORES" \
+          >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
+        log="$RUNNER_TEMP/emulator.log"
+        echo "log=$log" >> "$GITHUB_OUTPUT"
+        "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim \
+          -gpu swiftshader_indirect -no-snapshot > "$log" 2>&1 &
+        timeout "$(( deadline - $(date +%s) ))" adb wait-for-device
+        until [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]]; do
+          if (( $(date +%s) > deadline )); then
+            echo "::error::The emulator did not boot in $BOOT_TIMEOUT_MINUTES minutes."
+            tail -50 "$log"
+            exit 1
+          fi
+          sleep 5
+        done
+        echo "Android $API_LEVEL emulator booted after $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"

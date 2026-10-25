@@ -37,6 +37,7 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
 
 ### telosnex_ci_tools
+- [ ] Prove `actions/watch`, `android-emulator` and `web-driver` on runners: switch the fllama spike to them. Only shellcheck and unit tests (watch) so far.
 - [x] Lint: a workflow `run:` that pipes into `tee` needs `pipefail` (workflow `defaults.run.shell: bash`). Without it a failed `flutter drive` passed.
 - [x] Lint or check: an integration test run with `flutter drive` uses `testWidgets`. `test()` failures are not reported to the driver.
 - [ ] Never `git commit -a` in a package checkout that has someone's local work (fllama: uncommitted ggml-metal changes went into 73898ff and started CUDA pack / publish; cancelled before it published).
@@ -44,10 +45,10 @@ fllama spike: branch `spike/test-cells`, workflow
 - [x] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
 - [x] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
 - [x] Lint: an example's `web/index.html` loads `flutter_bootstrap.js`. The legacy loader runs `main.dart.js` in a `--wasm` build.
-- [ ] `bin/watch.dart`: stops a command after N minutes with no output, and runs a diagnostics hook first.
-- [ ] Action `android-emulator`: KVM permissions, `ANDROID_AVD_HOME`, `adb` on `PATH`, system image, boot wait, emulator log.
+- [x] `actions/watch` (`watch.dart`, dart:io only, no pub get; was planned as `bin/watch.dart`): stops a command after N minutes with no output, and runs a diagnostics hook first.
+- [x] Action `android-emulator`: KVM permissions, `ANDROID_AVD_HOME`, `adb` on `PATH`, system image, boot wait, emulator log.
 - [ ] Action `ios-simulator`: start CoreSimulator, a fresh simulator, log stream, watchdog, one retry only if no test started, cleanup. Wait until the iOS stall is fixed.
-- [ ] Action `web-driver`: start chromedriver, geckodriver or safaridriver, wait for `/status`, run `flutter drive`, retry only on `SessionNotCreatedException`.
+- [x] Action `web-driver`: start chromedriver, geckodriver or safaridriver, wait for `/status`, run `flutter drive`, retry only on `SessionNotCreatedException`.
 - [ ] Maybe: an action that caches test downloads by URL and SHA-256 (GGUF models, GPU packs, fonnx models).
 - [ ] README: the runner facts below.
 - [ ] Later: a shared `kiln_test.yml`, when a second package uses the actions.

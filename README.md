@@ -9,6 +9,9 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `actions/setup-flutter` | Composite action | Installs Flutter from a shallow clone of its tag. The default version is in `flutter_version.txt`. |
 | `actions/check-clean-tree` | Composite action | Fails if the checkout has untracked or changed files. |
 | `actions/kiln-build` | Composite action | Describes the toolchain and runs `<package>:build` for one target. |
+| `actions/watch` | Composite action | Runs a bash command; stops it after N minutes without output, runs an `on-stall` command first, and exits 124. |
+| `actions/android-emulator` | Composite action | Boots an x86_64 Android emulator with KVM on ubuntu-24.04, and puts `adb` on `PATH`. |
+| `actions/web-driver` | Composite action | Starts chromedriver, geckodriver or safaridriver. Optionally runs `flutter drive` with a watchdog, and again only when the driver could not start a session. |
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
 | `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
