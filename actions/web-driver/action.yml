@@ -82,11 +82,14 @@ runs:
         WATCH_RUN: ${{ inputs.run }}
         WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
       run: |
+        # Git Bash, by path: from cmd, "bash" on Windows can be WSL's.
+        bash_exe=bash
+        if [[ "$RUNNER_OS" == Windows ]]; then bash_exe=$(cygpath -w "$(command -v bash)"); fi
         out="$RUNNER_TEMP/web_driver_run.log"
         for attempt in 1 2 3; do
           status=0
           dart "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
-            -- bash -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
+            -- "$bash_exe" -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
           grep -q "SessionNotCreatedException" "$out" || break
           echo "::warning::$BROWSER: the driver could not start a session (attempt $attempt)"
           sleep 10

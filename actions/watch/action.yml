@@ -40,7 +40,10 @@ runs:
         WATCH_ON_STALL: ${{ inputs.on-stall }}
       # The script uses only dart:io, so it needs no pub get.
       run: |
+        # Git Bash, by path: from cmd, "bash" on Windows can be WSL's.
+        bash_exe=bash
+        if [[ "$RUNNER_OS" == Windows ]]; then bash_exe=$(cygpath -w "$(command -v bash)"); fi
         dart "$GITHUB_ACTION_PATH/watch.dart" \
           --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
           --ignore "$WATCH_IGNORE" --on-stall "$WATCH_ON_STALL" \
-          -- bash -eo pipefail -c "$WATCH_RUN"
+          -- "$bash_exe" -eo pipefail -c "$WATCH_RUN"
