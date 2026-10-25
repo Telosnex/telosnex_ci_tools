@@ -27,9 +27,9 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
 - [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
 - [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
-- [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix.
+- [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix. CI: Chrome 185/128 s to 46 s, Firefox 215 s to 52 s.
 - [ ] iOS: from the `flutter test -v` log, find why flutter_tools does not connect to the app's VM service (port forwarding? mDNS?), and fix it.
-- [ ] iOS watchdog false stall (run 40235095714): attempt 1 was killed during the Xcode build, silent for 500 s against the 480 s limit. Attempt 2 passed (32 tests, 4 min). So the original stall (VM service listens, flutter test never connects) has not been seen again yet. Fix: build in a separate step (`flutter build ios --simulator --debug`) before `flutter test`, or a longer limit until the first test starts.
+- [x] iOS watchdog false stall (run 40235095714): attempt 1 was killed during the Xcode build, silent for 500 s against the 480 s limit. Attempt 2 passed (32 tests, 4 min). So the original stall (VM service listens, flutter test never connects) has not been seen again yet. Fix: build in a separate step (`flutter build ios --simulator --debug`) before `flutter test`, or a longer limit until the first test starts. Done: spike 63ca01c builds in its own step (run 40237842614).
 - [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
 - [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
 - [ ] Remove `/tmp/wip_backup.patch` once the uncommitted ggml-metal work in the fllama checkout is confirmed intact.
@@ -38,7 +38,8 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
 
 ### telosnex_ci_tools
-- [ ] Prove `actions/watch`, `android-emulator` and `web-driver` on runners: switch the fllama spike to them. Only shellcheck and unit tests (watch) so far.
+- [x] drive-test-widgets flagged `flutter build -t` targets (35 false findings in fllama). Fixed in c23e4fd; fllama still pins 7c9f879, bump with the next pin.
+- [ ] Prove `actions/watch`, `android-emulator` and `web-driver` on runners. fllama spike ad4048c switched web and android to them (run 40238004336). `watch` runs inside `web-driver`; iOS still has its inline watchdog.
 - [x] Lint: a workflow `run:` that pipes into `tee` needs `pipefail` (workflow `defaults.run.shell: bash`). Without it a failed `flutter drive` passed.
 - [x] Lint or check: an integration test run with `flutter drive` uses `testWidgets`. `test()` failures are not reported to the driver.
 - [ ] Never `git commit -a` in a package checkout that has someone's local work (fllama: uncommitted ggml-metal changes went into 73898ff and started CUDA pack / publish; cancelled before it published).
@@ -72,7 +73,7 @@ fllama spike: branch `spike/test-cells`, workflow
 
 - macos-15 has 3 CPUs. ubuntu-24.04, ubuntu-24.04-arm and the Windows runners have 4.
 - macos-15's GPU is "Apple Paravirtual device": no Apple6-9 or Metal3 family, so ggml-metal has no simdgroup kernels.
-- ubuntu-24.04 has `/dev/kvm`. ubuntu-24.04-arm: not confirmed (the spike job checked only x64 fully).
+- ubuntu-24.04 has `/dev/kvm`. ubuntu-24.04-arm has none (run 40226383012), so no Android emulator cell there.
 - Preinstalled: Chrome 155 with `$CHROMEWEBDRIVER`, Firefox 157 with `$GECKOWEBDRIVER` (Linux), Safari 26.6.1 with `safaridriver` (needs `sudo safaridriver --enable`).
 - On a fresh macOS runner the first `simctl` call starts CoreSimulator, and can take more than 1 minute.
 - `adb` is not on `PATH` on ubuntu-24.04: use `$ANDROID_HOME/platform-tools`.
