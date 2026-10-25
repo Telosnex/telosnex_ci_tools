@@ -13,7 +13,7 @@ fllama spike: branch `spike/test-cells`, workflow
 |---|---|
 | desktop: linux-x64, linux-arm64, macos-arm64 (CPU), macos-arm64-metal, windows-x64, windows-arm64 | Pass, 2 runs in a row |
 | android-x64 emulator (ubuntu-24.04, KVM) | Pass, about 23 min |
-| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | **Unproven.** The probe used `test()`, which `flutter drive` never reports, and since 5487175 the build did not even compile (hidden by `| tee` without pipefail). Real test `web_llm_integration_test.dart` passes locally in Firefox; first CI run pending. |
+| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | Pass with `web_llm_integration_test.dart` (run 40235700903): default build in Chrome and Firefox, compat in Safari, `compat_solid_red` in Chrome and Safari, all cross-origin isolated. |
 | ios simulator | **Open.** Passed twice, then stalled 18 min after `Xcode build done`, before any test. Run 40231960707 has the diagnostics. |
 
 ## TODO
@@ -80,6 +80,8 @@ fllama spike: branch `spike/test-cells`, workflow
 - Playwright's Firefox runs WebAssembly about 10 times slower than stock Firefox and has no JSPI. Use stock browsers.
 
 ## Decisions
+
+- 2026-10-25: No version tag for telosnex_ci_tools until the first consumer (fllama) is through. Consumers pin the commit SHA with `# main`.
 
 - 2026-10-25: Web tests use `flutter drive` with stock browsers, not Playwright.
 - 2026-10-25: No dart2wasm cells for Firefox and Safari, also not nightly. Flutter needs an opt-in for them; revisit when Flutter supports them by default.
