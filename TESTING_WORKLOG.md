@@ -61,6 +61,11 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] `native_build: local` with `native_build_dir`, as `web_build: local`. Then `kiln_release` can test the binaries it built before it uploads them.
 - [ ] `kiln:build` writes unstripped libraries to a fixed directory in `--out`, so the release workflow need not know the cache layout of each package.
 
+### Mobile browsers (fllama web)
+- [ ] iOS Safari: `flutter drive --browser-name ios-safari` (safaridriver with `safari:useSimulator`). Reuses the iOS simulator setup; localhost is shared with the Mac. Same WebKit as desktop Safari, so likely the compat build again. The simulator does not enforce iPhone tab memory limits (WebKit bug 291677: iOS kills WebContent at its high-water mark; three.js #30047, WebKit 284752: crashes on device only), so it cannot catch out-of-memory reloads. It does catch some iOS WebAssembly bugs (emscripten #24600 reproduced in the 18.0 simulator).
+- [ ] Android Chrome: `flutter drive --browser-name android-chrome` (chromedriver `androidPackage: com.android.chrome`). Unknown: whether the google_apis image has Chrome, and which version. Spike 5a5752e lists it. Emulator Chrome can be very old (Bitrise: 83 against chromedriver 104); the usual fix installs an APK from APKMirror, which needs the owner's OK. chromedriver must match the device Chrome; the page needs `adb reverse` for localhost unless flutter drive does it.
+- Real-device memory, thermals and GPU need real devices: out of the MVP.
+
 ### Other packages (after fllama)
 - [ ] telosnex_audio. Survey (2026-10-25, main de64d41): CI already runs native gtest on macOS (with TSan), Linux x64 and arm64, Windows x64; `flutter test` engine/licenses/hook on macOS; example builds (desktop, apk); web engine cases in Chrome plus the AudioWorklet check (`tool/kiln/test_web.dart`, JS and Wasm). Gaps:
   - Web: Firefox and Safari. `tool/web_check.dart` already supports both, but Safari needs a click (AudioContext user gesture): with safaridriver, the click can be scripted.
