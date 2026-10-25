@@ -132,8 +132,10 @@ jobs:
         target: ${{ fromJSON(inputs.targets) }}
     env:
       TARGET: ${{ matrix.target }}
+    # Job defaults replace the workflow defaults: repeat the shell.
     defaults: &defaults
       run:
+        shell: bash
         working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Prepare the container
