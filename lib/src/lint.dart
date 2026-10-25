@@ -57,10 +57,17 @@ List<Finding> lintRepository(String repo) {
 List<File> _driveTargets(String repo, List<File> workflows) {
   final targets = <String>{};
   for (final workflow in workflows) {
-    final text = workflow.readAsStringSync();
-    if (!text.contains('flutter drive')) continue;
-    for (final m in _driveTarget.allMatches(text)) {
-      if (!m[1]!.contains(r'$')) targets.add(m[1]!);
+    // One command per line, with the backslash continuations joined: only
+    // the -t of flutter drive counts, not the one of flutter build.
+    final commands = workflow
+        .readAsStringSync()
+        .replaceAll(RegExp(r'\\\r?\n'), ' ')
+        .split('\n')
+        .where((line) => line.contains('flutter drive'));
+    for (final command in commands) {
+      for (final m in _driveTarget.allMatches(command)) {
+        if (!m[1]!.contains(r'$')) targets.add(m[1]!);
+      }
     }
   }
   final files = <String, File>{};

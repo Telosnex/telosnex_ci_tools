@@ -323,5 +323,37 @@ jobs:
         ['example/integration_test/web_test.dart:2 drive-test-widgets'],
       );
     });
+
+    test('the -t of another command is not a drive target', () {
+      final repo = Directory.systemTemp.createTempSync('lint_drive');
+      addTearDown(() => repo.deleteSync(recursive: true));
+      File('${repo.path}/.github/workflows/web_test.yml')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(
+          _workflow(
+            name: 'Web test',
+            extra: 'defaults:\n  run:\n    shell: bash\n',
+            job:
+                '      - run: |\n'
+                '          flutter build ios --simulator \\\n'
+                '            -t integration_test/native_test.dart\n'
+                '          flutter drive --driver test_driver/d.dart \\\n'
+                '            --target integration_test/web_test.dart\n'
+                '        working-directory: example\n',
+          ),
+        );
+      for (final name in ['native_test.dart', 'web_test.dart']) {
+        File('${repo.path}/example/integration_test/$name')
+          ..createSync(recursive: true)
+          ..writeAsStringSync("void main() {\n  test('a', () {});\n}\n");
+      }
+      expect(
+        [
+          for (final f in lintRepository(repo.path))
+            '${f.path}:${f.line} ${f.rule}',
+        ],
+        ['example/integration_test/web_test.dart:2 drive-test-widgets'],
+      );
+    });
   });
 }
