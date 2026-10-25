@@ -87,6 +87,13 @@ on:
         description: The runner of tool/kiln/test_web.dart.
         type: string
         default: ubuntu-24.04
+      working-directory:
+        description: >-
+          The directory of the package in the repository, for a repository
+          with more than one package. The steps run there; tool/kiln/ and
+          native_artifacts/ are in it.
+        type: string
+        default: .
 
 concurrency:
   group: kiln-release
@@ -125,9 +132,14 @@ jobs:
         target: ${{ fromJSON(inputs.targets) }}
     env:
       TARGET: ${{ matrix.target }}
+    defaults: &defaults
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - name: Prepare the container
         if: fromJSON(inputs.runners)[matrix.target].image
+        # Before the checkout: the package directory does not exist yet.
+        working-directory: .
         run: &prepare-container |
           # actions/checkout needs git for a work tree; Flutter needs curl,
           # unzip and xz. Debian 11 packages are on archive.debian.org.
@@ -170,8 +182,8 @@ jobs:
       # run the build hook of the package, which needs the tools that
       # prepare.dart installs.
       - name: Prepare (tool/kiln/prepare.dart)
-        if: hashFiles('tool/kiln/prepare.dart') != ''
-        run: dart tool/kiln/prepare.dart
+        run: |
+          if [[ -f tool/kiln/prepare.dart ]]; then dart tool/kiln/prepare.dart; fi
 
       - name: Download ${{ inputs.input-artifact }}
         if: inputs.input-artifact != ''
@@ -195,10 +207,11 @@ jobs:
           out: ${{ runner.temp }}/kiln
           ndk-version: ${{ env.NDK_VERSION }}
           build-args: ${{ inputs.build-args }}
+          working-directory: ${{ inputs.working-directory }}
 
       - name: Test the build (tool/kiln/test_build.dart)
-        if: hashFiles('tool/kiln/test_build.dart') != ''
-        run: dart tool/kiln/test_build.dart
+        run: |
+          if [[ -f tool/kiln/test_build.dart ]]; then dart tool/kiln/test_build.dart; fi
 
       - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@f0b1a0c246eab98dc51a8251cfbe66a4e0a27fba # self
 
@@ -227,9 +240,11 @@ jobs:
     timeout-minutes: 60
     outputs:
       built: ${{ steps.find.outputs.built }}
+    defaults: *defaults
     steps:
       - name: Prepare the container
         if: inputs.web-container != ''
+        working-directory: .
         run: *prepare-container
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -288,6 +303,7 @@ jobs:
     if: needs.web.outputs.built == 'true'
     runs-on: ${{ inputs.web-test-runner }}
     timeout-minutes: 45
+    defaults: *defaults
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -310,8 +326,8 @@ jobs:
         if: steps.find.outputs.found == 'true' && inputs.web-test-cache-path != ''
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ inputs.web-test-cache-path }}
-          key: kiln-web-test-${{ hashFiles('tool/kiln/test_web.dart') }}
+          path: ${{ inputs.working-directory }}/${{ inputs.web-test-cache-path }}
+          key: kiln-web-test-${{ hashFiles(format('{0}/tool/kiln/test_web.dart', inputs.working-directory)) }}
           restore-keys: kiln-web-test-
       - if: steps.find.outputs.found == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -342,6 +358,7 @@ jobs:
       contents: write
     env:
       DRY_RUN: ${{ inputs.dry-run || github.ref_name == 'kiln-release-dry' }}
+    defaults: *defaults
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -410,4 +427,4 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: manifest
-          path: native_artifacts/*.json
+          path: ${{ inputs.working-directory }}/native_artifacts/*.json

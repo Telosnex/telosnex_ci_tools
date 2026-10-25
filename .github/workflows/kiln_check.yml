@@ -11,6 +11,10 @@ on:
         description: The Dart package of kiln. native_prebuilt before its rename.
         type: string
         default: kiln
+      working-directory:
+        description: The directory of the package in the repository.
+        type: string
+        default: .
 
 permissions:
   contents: read
@@ -19,6 +23,9 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

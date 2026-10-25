@@ -74,7 +74,7 @@ The shared workflow sets these values for every package:
 | Targets | The 10 targets in the `targets` default. A package can pass its own list. |
 | Publisher | `jpohhhh`, from a repository of the Telosnex organization. |
 
-A package changes the steps with optional files in `tool/kiln/`. The workflow runs each file with `dart <file>`, in the root of the checkout, after pub get. `dart run` would first run the package's build hook, which can need the tools that `prepare.dart` installs.
+A package changes the steps with optional files in `tool/kiln/`. The workflow runs each file with `dart <file>`, in the package directory, after pub get. `dart run` would first run the package's build hook, which can need the tools that `prepare.dart` installs.
 
 | File | Runs | Arguments |
 |---|---|---|
@@ -84,7 +84,9 @@ A package changes the steps with optional files in `tool/kiln/`. The workflow ru
 | `test_web.dart` | After `<package>:web install-dev` of the built web files, on `web-test-runner`. | Environment: `KILN_WEB_FILES`, the directory of the built web files. |
 | `release.dart` | Instead of `<package>:release`. | The same arguments. |
 
-The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `runners`, `web-container` and `web-test-runner`.
+The inputs of `kiln_release.yml` are for the rest: `targets`, `build-args`, `input-artifact`, `debug-symbols-path`, `web-test-cache-path`, `runners`, `web-container`, `web-test-runner` and `working-directory`.
+
+`working-directory` is the directory of the package in a repository with more than one package, for example `super_native_extensions`. Every step runs there, and `tool/kiln/` and `native_artifacts/` are in it. `kiln_check.yml` has the same input.
 
 A target in `runners` builds on its runner, and in its container image if it has one. Before the checkout, the job installs git, curl, unzip and xz with apt-get, if the image has apt-get. The runner description in `target.json` is `local` there: pass `--runner` in `build-args`.
 

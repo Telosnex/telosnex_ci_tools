@@ -25,6 +25,10 @@ inputs:
       environment variable NAME.
     required: false
     default: '{}'
+  working-directory:
+    description: The directory of the package in the repository.
+    required: false
+    default: .
 
 outputs:
   toolchain:
@@ -41,6 +45,7 @@ runs:
     - name: Build
       id: build
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         PACKAGE: ${{ inputs.package }}
         TARGET: ${{ inputs.target }}
