@@ -13,7 +13,7 @@ fllama spike: branch `spike/test-cells`, workflow
 |---|---|
 | desktop: linux-x64, linux-arm64, macos-arm64 (CPU), macos-arm64-metal, windows-x64, windows-arm64 | Pass, 2 runs in a row |
 | android-x64 emulator (ubuntu-24.04, KVM) | Pass, about 23 min |
-| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | Pass |
+| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | **Unproven.** The probe used `test()`, which `flutter drive` never reports, and since 5487175 the build did not even compile (hidden by `| tee` without pipefail). Real test `web_llm_integration_test.dart` passes locally in Firefox; first CI run pending. |
 | ios simulator | **Open.** Passed twice, then stalled 18 min after `Xcode build done`, before any test. Run 40231960707 has the diagnostics. |
 
 ## TODO
@@ -25,11 +25,16 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
 - [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
 - [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
-- [ ] Port the 4 Playwright smoke cases (`dev/web_smoke`) to `example/integration_test/web_llm_integration_test.dart`, run with `flutter drive` and stock browsers.
-- [ ] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
+- [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
+- [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
+- [ ] Merge to main: `fllamaWebRuntimeInfoJs`, the mmproj cache fix in `fllama_web_init.js`, `scripts/fetch_web_release.dart`, the reporting driver.
+- [x] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
 
 ### telosnex_ci_tools
+- [ ] Lint: a workflow `run:` that pipes into `tee` needs `pipefail` (workflow `defaults.run.shell: bash`). Without it a failed `flutter drive` passed.
+- [ ] Lint or check: an integration test run with `flutter drive` uses `testWidgets`. `test()` failures are not reported to the driver.
+- [ ] Never `git commit -a` in a package checkout that has someone's local work (fllama: uncommitted ggml-metal changes went into 73898ff and started CUDA pack / publish; cancelled before it published).
 - [ ] Release the 3 lint rules (committed locally, not pushed). First run found 3 legacy `index.html` in super_native_extensions examples (super_context_menu, super_drag_and_drop, super_keyboard_layout). Fix them before the repo's CI runs the new lint.
 - [x] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
 - [x] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
@@ -78,6 +83,9 @@ fllama spike: branch `spike/test-cells`, workflow
   - Tests: the pause test leaves a CPU free; long requests are cancelled in tearDown; GPU pack test timeout 10 min, with pack files in the model cache.
 
 ## Log
+
+- 2026-10-25: web tests were not testing. `test()` results do not reach `flutter drive`, and the job's `| tee` hid a compile failure for 3 runs. Found with the port. Real fllama bug found: wllama's model cache keys by URL only, so a model cached for a text request loaded again without mmproj and images were ignored.
+- 2026-10-25: iOS stall diagnosed: the app launches and its Dart VM service listens 3 s later, but `flutter test` never connects. Next run has `flutter test -v`.
 
 - 2026-10-25: fllama spike started. The failures it found and their causes:
   - A `--wasm` build with the legacy `index.html` stalled: the loader ran `main.dart.js`.
