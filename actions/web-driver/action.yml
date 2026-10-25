@@ -82,18 +82,24 @@ runs:
         WATCH_RUN: ${{ inputs.run }}
         WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
       run: |
-        # On Windows, the bash of GitHub's steps: Git\bin\bash.exe sets up the
-        # MSYS environment. Git\usr\bin\bash.exe, started from dart, broke
-        # flutter's scripts (run 40241296726); "bash" from cmd can be WSL's.
+        # On Windows: Git\bin\bash.exe, the bash of GitHub's steps ("bash"
+        # from cmd can be WSL's), and dart.exe itself. Flutter's `dart`
+        # wrapper (bin/dart, then dart.bat) leaves OS=MINGW64... and its
+        # cmd variables in the environment, and every flutter that watch then
+        # started failed: "bash: C:Usersjpodevflutter/bin/internal/
+        # exit_with_errorlevel.bat" (reproduced in a Windows 11 VM).
         bash_exe=bash
+        dart_exe=dart
         if [[ "$RUNNER_OS" == Windows ]]; then
           git_root=$(cygpath -m /)
           bash_exe="${git_root%/}/bin/bash.exe"
+          sdk_dart="$(dirname "$(command -v dart)")/cache/dart-sdk/bin/dart.exe"
+          if [[ -f "$sdk_dart" ]]; then dart_exe=$sdk_dart; fi
         fi
         out="$RUNNER_TEMP/web_driver_run.log"
         for attempt in 1 2 3; do
           status=0
-          dart "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
+          "$dart_exe" "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
             -- "$bash_exe" -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
           grep -q "SessionNotCreatedException" "$out" || break
           echo "::warning::$BROWSER: the driver could not start a session (attempt $attempt)"

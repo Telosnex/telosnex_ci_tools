@@ -40,15 +40,21 @@ runs:
         WATCH_ON_STALL: ${{ inputs.on-stall }}
       # The script uses only dart:io, so it needs no pub get.
       run: |
-        # On Windows, the bash of GitHub's steps: Git\bin\bash.exe sets up the
-        # MSYS environment. Git\usr\bin\bash.exe, started from dart, broke
-        # flutter's scripts (run 40241296726); "bash" from cmd can be WSL's.
+        # On Windows: Git\bin\bash.exe, the bash of GitHub's steps ("bash"
+        # from cmd can be WSL's), and dart.exe itself. Flutter's `dart`
+        # wrapper (bin/dart, then dart.bat) leaves OS=MINGW64... and its
+        # cmd variables in the environment, and every flutter that watch then
+        # started failed: "bash: C:Usersjpodevflutter/bin/internal/
+        # exit_with_errorlevel.bat" (reproduced in a Windows 11 VM).
         bash_exe=bash
+        dart_exe=dart
         if [[ "$RUNNER_OS" == Windows ]]; then
           git_root=$(cygpath -m /)
           bash_exe="${git_root%/}/bin/bash.exe"
+          sdk_dart="$(dirname "$(command -v dart)")/cache/dart-sdk/bin/dart.exe"
+          if [[ -f "$sdk_dart" ]]; then dart_exe=$sdk_dart; fi
         fi
-        dart "$GITHUB_ACTION_PATH/watch.dart" \
+        "$dart_exe" "$GITHUB_ACTION_PATH/watch.dart" \
           --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
           --ignore "$WATCH_IGNORE" --on-stall "$WATCH_ON_STALL" \
           -- "$bash_exe" -eo pipefail -c "$WATCH_RUN"
