@@ -24,7 +24,9 @@ fllama spike: branch `spike/test-cells`, workflow
 - [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
 - [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
 - [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
-- [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
+- [x] Turn the spike into `.github/workflows/test.yml` (spike 9cb7c49, first run 40239617201). PR: linux-x64, macos-arm64, Chrome dart2js and dart2wasm. main, nightly, manual: every cell. The spike workflow is manual only.
+- [ ] Before merging test.yml: remove `spike/test-cells` from its push branches (TODO in the file).
+- [ ] Watch test.yml's first nightly runs for flakes (iOS connect, Safari session).
 - [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
 - [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
 - [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix. CI: Chrome 185/128 s to 46 s, Firefox 215 s to 52 s.
