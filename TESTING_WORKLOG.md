@@ -27,7 +27,7 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
 - [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
 - [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
-- [ ] Firefox `image_title` took 65 s locally; the other image cases 1-2 s. Check whether the mmproj cache fix downloads the model again, and whether test order matters.
+- [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix.
 - [ ] iOS: from the `flutter test -v` log, find why flutter_tools does not connect to the app's VM service (port forwarding? mDNS?), and fix it.
 - [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
 - [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
