@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:telosnex_ci_tools/src/lint.dart';
 import 'package:test/test.dart';
 
@@ -231,6 +233,95 @@ jobs:
 
     test('not a Flutter page', () {
       expect(rules('<html><body>Hello</body></html>'), isEmpty);
+    });
+  });
+
+  group('tee-pipefail', () {
+    String step(String run, {String shell = ''}) =>
+        '      - run: $run\n${shell.isEmpty ? '' : '        shell: $shell\n'}';
+
+    test('a pipe into tee in the default shell', () {
+      final text = _workflow(job: step('flutter drive | tee drive.log'));
+      expect(_rules('native_release.yml', text), ['tee-pipefail']);
+    });
+
+    test('shell: bash on the step', () {
+      final text = _workflow(
+        job: step('flutter drive | tee drive.log', shell: 'bash'),
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
+    test('shell: bash in the workflow defaults', () {
+      final text = _workflow(
+        extra: 'defaults:\n  run:\n    shell: bash\n',
+        job: step('flutter drive 2>&1 | tee drive.log'),
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
+    test('set -o pipefail in the script', () {
+      final text = _workflow(
+        job:
+            '      - run: |\n          set -o pipefail\n          flutter drive | tee drive.log\n',
+      );
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
+    test('a pipe into another command', () {
+      final text = _workflow(job: step('ls | head -3'));
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+  });
+
+  group('drive-test-widgets', () {
+    List<String> rules(String dart) => [
+      for (final f in lintDriveTarget('integration_test/a_test.dart', dart))
+        f.rule,
+    ];
+
+    test('test() in a driven file', () {
+      expect(
+        rules(
+          "void main() {\n  test('a', () {});\n  testWidgets('b', (t) async {});\n}\n",
+        ),
+        ['drive-test-widgets'],
+      );
+    });
+
+    test('testWidgets only', () {
+      expect(
+        rules(
+          "void main() {\n  group('g', () {\n    testWidgets('b', (t) async {});\n  });\n}\n",
+        ),
+        isEmpty,
+      );
+    });
+
+    test('lintRepository finds the --target of flutter drive', () {
+      final repo = Directory.systemTemp.createTempSync('lint_drive');
+      addTearDown(() => repo.deleteSync(recursive: true));
+      File('${repo.path}/.github/workflows/web_test.yml')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(
+          _workflow(
+            name: 'Web test',
+            extra: 'defaults:\n  run:\n    shell: bash\n',
+            job:
+                '      - run: flutter drive --driver test_driver/d.dart --target integration_test/web_test.dart\n'
+                '        working-directory: example\n',
+          ),
+        );
+      File('${repo.path}/example/integration_test/web_test.dart')
+        ..createSync(recursive: true)
+        ..writeAsStringSync("void main() {\n  test('a', () {});\n}\n");
+      expect(
+        [
+          for (final f in lintRepository(repo.path))
+            '${f.path}:${f.line} ${f.rule}',
+        ],
+        ['example/integration_test/web_test.dart:2 drive-test-widgets'],
+      );
     });
   });
 }

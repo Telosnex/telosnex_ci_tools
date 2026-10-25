@@ -44,6 +44,51 @@ List<Finding> lintRepository(String repo) {
         p.relative(file.path, from: repo),
         file.readAsStringSync(),
       ),
+    for (final file in _driveTargets(repo, files))
+      ...lintDriveTarget(
+        p.relative(file.path, from: repo),
+        file.readAsStringSync(),
+      ),
+  ];
+}
+
+/// The `--target` files of the `flutter drive` commands of [workflows],
+/// found at the repository root or in `example/`.
+List<File> _driveTargets(String repo, List<File> workflows) {
+  final targets = <String>{};
+  for (final workflow in workflows) {
+    final text = workflow.readAsStringSync();
+    if (!text.contains('flutter drive')) continue;
+    for (final m in _driveTarget.allMatches(text)) {
+      if (!m[1]!.contains(r'$')) targets.add(m[1]!);
+    }
+  }
+  final files = <String, File>{};
+  for (final target in targets) {
+    for (final root in [repo, p.join(repo, 'example')]) {
+      final file = File(p.join(root, target));
+      if (file.existsSync()) files[p.normalize(file.path)] = file;
+    }
+  }
+  return files.values.toList()..sort((a, b) => a.path.compareTo(b.path));
+}
+
+/// The findings of a test file that `flutter drive` runs.
+///
+/// integration_test reports only testWidgets results to the driver: a
+/// failing test() still ends with "All tests passed".
+List<Finding> lintDriveTarget(String path, String text) {
+  final lines = text.split('\n');
+  return [
+    for (var i = 0; i < lines.length; i++)
+      if (_plainTest.hasMatch(lines[i]))
+        Finding(
+          path,
+          i + 1,
+          'drive-test-widgets',
+          'Use testWidgets: flutter drive does not get the results of '
+              'test(), and a failing test() passes.',
+        ),
   ];
 }
 
@@ -167,6 +212,31 @@ List<Finding> lintWorkflow(String path, String text) {
             'defaults: without it, steps run in sh or PowerShell.',
       );
     }
+    final jobShell = _defaultShell(value) ?? workflowShell;
+    final steps = value.nodes['steps'];
+    if (steps is YamlList) {
+      for (final step in steps.nodes) {
+        if (step is! YamlMap) continue;
+        final run = step.nodes['run'];
+        if (run is! YamlScalar || run.value is! String) continue;
+        final script = run.value as String;
+        if (!_pipeToTee.hasMatch(script) || script.contains('pipefail')) {
+          continue;
+        }
+        final shell = step['shell'] ?? jobShell;
+        if (shell == 'bash' ||
+            (shell is String && shell.contains('pipefail'))) {
+          continue;
+        }
+        add(
+          _line(run),
+          'tee-pipefail',
+          'A pipe into tee hides the exit code of the command before it. '
+              'Set shell: bash (bash -eo pipefail) on the step, job or '
+              'workflow defaults.',
+        );
+      }
+    }
     final uses = value['uses'];
     if (uses is String) {
       if (uses.startsWith('$selfRepository/')) {
@@ -241,6 +311,9 @@ String? nameProblem(String name) {
 final _uses = RegExp(r'''^\s*(?:-\s+)?uses:\s*['"]?([^\s'"]+)['"]?(.*)$''');
 final _pinned = RegExp(r'^[\w.-]+/[\w.-]+(/[^@]+)?@[0-9a-f]{40}$');
 final _versionComment = RegExp(r'^\s*#\s*\S+');
+final _driveTarget = RegExp(r'(?:--target[ =]|\s-t\s+)(\S+\.dart)');
+final _plainTest = RegExp(r'^\s*test\(');
+final _pipeToTee = RegExp(r'\|\s*tee\b');
 final _cacheSubaction = RegExp(r'^actions/cache/(restore|save)@');
 final _flutterClone = RegExp(r'github\.com/flutter/flutter(\.git)?\b');
 
