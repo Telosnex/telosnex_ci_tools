@@ -27,6 +27,11 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
 - [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
 - [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
+- [ ] Firefox `image_title` took 65 s locally; the other image cases 1-2 s. Check whether the mmproj cache fix downloads the model again, and whether test order matters.
+- [ ] iOS: from the `flutter test -v` log, find why flutter_tools does not connect to the app's VM service (port forwarding? mDNS?), and fix it.
+- [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
+- [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
+- [ ] Remove `/tmp/wip_backup.patch` once the uncommitted ggml-metal work in the fllama checkout is confirmed intact.
 - [ ] Merge to main: `fllamaWebRuntimeInfoJs`, the mmproj cache fix in `fllama_web_init.js`, `scripts/fetch_web_release.dart`, the reporting driver.
 - [x] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
@@ -48,6 +53,8 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] Later: a shared `kiln_test.yml`, when a second package uses the actions.
 
 ### kiln
+- [ ] The web files must not depend on the native source key. A change to `src/` makes kiln refuse the released wllama files although they did not change; fllama's web tests broke on it. `scripts/fetch_web_release.dart` is the workaround. Needs a design: a separate key for the web sources.
+- [ ] Select `web_build: local` (and `native_build`) without editing the pubspec: a command-line or environment option. CI edits `example/pubspec.yaml` with a Python snippet today.
 - [ ] `native_build: local` with `native_build_dir`, as `web_build: local`. Then `kiln_release` can test the binaries it built before it uploads them.
 - [ ] `kiln:build` writes unstripped libraries to a fixed directory in `--out`, so the release workflow need not know the cache layout of each package.
 
