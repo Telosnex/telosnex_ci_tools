@@ -20,7 +20,7 @@ fllama spike: branch `spike/test-cells`, workflow
 
 ### fllama
 - [ ] **iOS simulator stall.** Read the `ios-diagnostics` artifact of run 40231960707: simulator log, app list, screenshot. Find out whether install, launch or the connection to `flutter test` stalls.
-- [x] Thread count: no fllama change (owner, 2026-10-25). llama.cpp's default is never more than the physical cores. The slow tokens came from the tests asking for 4 threads on 3-4 CPU runners; tests pick their own count (web: CPUs - 1, at most 4; native pause test: FLLAMA_TEST_PAUSE_THREADS).
+- [x] Thread count: owner changed mind (2026-10-25). Default (numThreads <= 0) is physical cores - 1, at least 1; web CPUs - 1, at most 4. A set value is used as is. fllama spike a6760c8.
 - [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
 - [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
 - [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
@@ -34,7 +34,7 @@ fllama spike: branch `spike/test-cells`, workflow
 - [x] iOS watchdog false stall (run 40235095714): attempt 1 was killed during the Xcode build, silent for 500 s against the 480 s limit. Attempt 2 passed (32 tests, 4 min). So the original stall (VM service listens, flutter test never connects) has not been seen again yet. Fix: build in a separate step (`flutter build ios --simulator --debug`) before `flutter test`, or a longer limit until the first test starts. Done: spike 63ca01c builds in its own step (run 40237842614).
 - [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
 - [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
-- [ ] Remove `/tmp/wip_backup.patch` once the uncommitted ggml-metal work in the fllama checkout is confirmed intact.
+- [x] ggml-metal WIP is in fllama `git stash` ("ggml-metal WIP (not PR-able yet)"); `/tmp/wip_backup.patch` is a second copy.
 - [ ] Merge to main: `fllamaWebRuntimeInfoJs`, the mmproj cache fix in `fllama_web_init.js`, `scripts/fetch_web_release.dart`, the reporting driver.
 - [x] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
 - [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
