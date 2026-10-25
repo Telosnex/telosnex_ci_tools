@@ -59,6 +59,8 @@ fllama spike: branch `spike/test-cells`, workflow
 
 ### kiln
 - [ ] The web files must not depend on the native source key. A change to `src/` makes kiln refuse the released wllama files although they did not change; fllama's web tests broke on it. `scripts/fetch_web_release.dart` is the workaround. Needs a design: a separate key for the web sources.
+  - Research (2026-10-25): fllama's web build (`tool/kiln/build_web.dart`) reads only `web_build/wllama.json`, `web_build/wllama.patch` and itself. It clones wllama and llama.cpp at the commits in wllama.json, with the Dawn zip and emsdk image pinned there. It never reads `src/`. So no change under `src/` can change the web files, but kiln's one source key (kiln `lib/src/source_key.dart`: every git file minus excludes) covers `src/`, and `web_install.dart:151` refuses the release on a mismatch.
+  - Options: (a) a web key over a package-declared list (fllama: `web_build/`, `tool/kiln/build_web.dart`), stored in web.json and checked instead of the native key; (b) a `web_source` glob list in the kiln config, defaulting to today's behaviour; (c) leave the native key and add a `web_build: release` mode that skips the check. (a)/(b) keep the safety; (c) does not.
 - [ ] Select `web_build: local` (and `native_build`) without editing the pubspec: a command-line or environment option. CI edits `example/pubspec.yaml` with a Python snippet today.
 - [ ] `native_build: local` with `native_build_dir`, as `web_build: local`. Then `kiln_release` can test the binaries it built before it uploads them.
 - [ ] `kiln:build` writes unstripped libraries to a fixed directory in `--out`, so the release workflow need not know the cache layout of each package.
