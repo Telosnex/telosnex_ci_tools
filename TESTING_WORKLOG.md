@@ -79,7 +79,7 @@ fllama spike: branch `spike/test-cells`, workflow
   - Mobile: `tool/test_android_device.sh` / `test_android_artifact.sh` and `tool/test_ios_simulator*.sh` exist, not in CI.
   - `tool/test_all.*` and `tool/test_native_sanitizers.sh` (local gates).
   - No PR test workflow: tests run only in a release.
-- [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`.
+- [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): confirmed. Upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
 - [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests.
 - [ ] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). The first survey missed most of fllama's tests.
 
