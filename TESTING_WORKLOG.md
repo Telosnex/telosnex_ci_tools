@@ -62,7 +62,11 @@ fllama spike: branch `spike/test-cells`, workflow
 - [ ] `kiln:build` writes unstripped libraries to a fixed directory in `--out`, so the release workflow need not know the cache layout of each package.
 
 ### Other packages (after fllama)
-- [ ] telosnex_audio: Firefox and Safari (AudioWorklet), Android, iOS, Dart tests on Linux and Windows. A `realtime` tag with one retry for timing tests.
+- [ ] telosnex_audio. Survey (2026-10-25, main de64d41): CI already runs native gtest on macOS (with TSan), Linux x64 and arm64, Windows x64; `flutter test` engine/licenses/hook on macOS; example builds (desktop, apk); web engine cases in Chrome plus the AudioWorklet check (`tool/kiln/test_web.dart`, JS and Wasm). Gaps:
+  - Web: Firefox and Safari. `tool/web_check.dart` already supports both, but Safari needs a click (AudioContext user gesture): with safaridriver, the click can be scripted.
+  - Android emulator and iOS simulator: `example/lib/device_check.dart` is an app entry that prints `TSNX_DEVICE` lines and PASS/FAIL to logcat/console. Run it with `flutter run --release -t lib/device_check.dart` on the emulator/simulator, read the log. The emulator has no earpiece (routes differ).
+  - `flutter test` on Linux and Windows (only macOS today).
+  - Uses `Telosnex/flutter-action` and old checkout pins, not `setup-flutter`; lint finds nothing because ci.yml is not a kiln workflow name. Move to ci_tools actions when tests are added.
 - [ ] fonnx: Firefox and Safari, mobile, model cache.
 - [ ] zxing_dart, image_ffmpeg: unit and web cells with the default commands.
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`.
