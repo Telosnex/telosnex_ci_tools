@@ -20,7 +20,7 @@ fllama spike: branch `spike/test-cells`, workflow
 
 ### fllama
 - [ ] **iOS simulator stall.** Read the `ios-diagnostics` artifact of run 40231960707: simulator log, app list, screenshot. Find out whether install, launch or the connection to `flutter test` stalls.
-- [ ] Decide: fllama's default thread count. Checked 2026-10-25: llama.cpp's default (`-1`) is never more than the cores: `common_cpu_get_num_math()` = physical cores (macOS: performance cores; x86 Linux hybrid: P-cores). The slow cases were the tests' own fixed 4 threads on 3-4 CPU runners, so nothing was left for the app and the other threads. Question: should fllama's default leave one core free (physical cores - 1), or keep llama-server's default?
+- [x] Thread count: no fllama change (owner, 2026-10-25). llama.cpp's default is never more than the physical cores. The slow tokens came from the tests asking for 4 threads on 3-4 CPU runners; tests pick their own count (web: CPUs - 1, at most 4; native pause test: FLLAMA_TEST_PAUSE_THREADS).
 - [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
 - [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
 - [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
