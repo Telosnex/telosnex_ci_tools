@@ -73,7 +73,12 @@ fllama spike: branch `spike/test-cells`, workflow
   - `example/integration_test`: 2 files, 3 tests (plugin, keyword spotter). Not run anywhere.
   - Web: 3 `@TestOn('browser')` files (web runtime, kokoro web, misaki web), Chrome only if at all.
   - `codemagic.yaml` still in the repo (builds and signing only, no tests).
-- [ ] zxing_dart, image_ffmpeg: unit and web cells with the default commands.
+- [ ] zxing_dart, image_ffmpeg. Survey (2026-10-25): the same shape. CI is only kiln: `kiln_check.yml` and `kiln_release.yml`, which runs `tool/kiln/test_build.dart` (Dart API tests on macos-arm64) and `tool/kiln/test_web.dart` (browser tests in Chrome, dart2js and dart2wasm). These are `dart test -p` browser tests, not `flutter drive`. Not in CI:
+  - Firefox and Safari: `dart_test.yaml` already overrides Safari with `tool/safari_test_launcher.sh` (Safari refuses package:test's redirect file). `dart test -p firefox,safari` on the runners is the cell.
+  - Dart tests on Linux and Windows, and arm64: only macos-arm64. Local docker/Wine scripts exist (`tool/test_linux_*docker.sh`, `tool/test_windows_*wine*.sh`); native runners replace them.
+  - Mobile: `tool/test_android_device.sh` / `test_android_artifact.sh` and `tool/test_ios_simulator*.sh` exist, not in CI.
+  - `tool/test_all.*` and `tool/test_native_sanitizers.sh` (local gates).
+  - No PR test workflow: tests run only in a release.
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`.
 - [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests.
 - [ ] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). The first survey missed most of fllama's tests.
