@@ -21,9 +21,9 @@ fllama spike: branch `spike/test-cells`, workflow
 ### fllama
 - [ ] **iOS simulator stall.** Read the `ios-diagnostics` artifact of run 40231960707: simulator log, app list, screenshot. Find out whether install, launch or the connection to `flutter test` stalls.
 - [ ] Decide: cap `numThreads` at the number of CPU cores? More threads than cores makes each token take seconds (llama.cpp threads spin at barriers).
-- [ ] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Raise the minimum, or make it relative to token speed only.
+- [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
 - [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
-- [ ] `scripts/serve_test_models.dart` died twice locally after a failed test. Check whether a dropped client connection crashes it.
+- [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
 - [ ] Turn the spike into `.github/workflows/test.yml`: PR cells (linux-x64, macos-arm64, Chrome dart2js and dart2wasm), all cells nightly and on demand.
 - [ ] Port the 4 Playwright smoke cases (`dev/web_smoke`) to `example/integration_test/web_llm_integration_test.dart`, run with `flutter drive` and stock browsers.
 - [ ] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
