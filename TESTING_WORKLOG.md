@@ -43,7 +43,7 @@ fllama spike: branch `spike/test-cells`, workflow
 - [x] Lint: a workflow `run:` that pipes into `tee` needs `pipefail` (workflow `defaults.run.shell: bash`). Without it a failed `flutter drive` passed.
 - [x] Lint or check: an integration test run with `flutter drive` uses `testWidgets`. `test()` failures are not reported to the driver.
 - [ ] Never `git commit -a` in a package checkout that has someone's local work (fllama: uncommitted ggml-metal changes went into 73898ff and started CUDA pack / publish; cancelled before it published).
-- [ ] Release the 5 new lint rules (committed locally, not pushed): allowed-actions (cache subactions), job-defaults-shell, flutter-bootstrap, tee-pipefail, drive-test-widgets. First run found 3 legacy `index.html` in super_native_extensions examples (super_context_menu, super_drag_and_drop, super_keyboard_layout). Fix them before the repo's CI runs the new lint.
+- [x] Lint rules released on main (7c9f879, c23e4fd). super_native_extensions' 3 legacy `index.html`: fixed on local branch `example-flutter-bootstrap` (8bc1a43), not pushed; `flutter build web` of super_drag_and_drop/example passes.
 - [x] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
 - [x] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
 - [x] Lint: an example's `web/index.html` loads `flutter_bootstrap.js`. The legacy loader runs `main.dart.js` in a `--wasm` build.
