@@ -1,6 +1,7 @@
 # Starts the WebDriver server of a stock browser on a GitHub-hosted runner,
 # for `flutter drive -d web-server --browser-name <browser>`:
-# chromedriver and geckodriver (Linux), safaridriver (macOS).
+# chromedriver and geckodriver (Linux), safaridriver (macOS). ios-safari is
+# Safari in a booted iOS simulator, through the same safaridriver.
 #
 # With `run`, it also runs that command (flutter drive) with a watchdog, and
 # runs it again, up to 3 times, only when the driver could not start a
@@ -11,7 +12,7 @@ description: Starts chromedriver, geckodriver or safaridriver, and runs flutter 
 
 inputs:
   browser:
-    description: chrome, firefox or safari.
+    description: chrome, firefox, safari or ios-safari (boot a simulator first).
     required: true
   port:
     description: The driver port. flutter drive uses 4444.
@@ -54,12 +55,15 @@ runs:
           firefox)
             version="$(firefox --version), $("$GECKOWEBDRIVER/geckodriver" --version | head -1)"
             "$GECKOWEBDRIVER/geckodriver" --port "$PORT" > "$log" 2>&1 & ;;
-          safari)
+          safari|ios-safari)
             version="Safari $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' /Applications/Safari.app/Contents/Info.plist)"
+            if [[ "$BROWSER" == ios-safari ]]; then
+              version="$version, simulator $(xcrun simctl list devices booted | grep -m1 -oE '[A-Za-z0-9 ]+ \([0-9A-F-]{36}\) \(Booted\)' || echo 'none booted')"
+            fi
             sudo safaridriver --enable
             safaridriver --port "$PORT" > "$log" 2>&1 & ;;
           *)
-            echo "::error::browser must be chrome, firefox or safari, not $BROWSER."
+            echo "::error::browser must be chrome, firefox, safari or ios-safari, not $BROWSER."
             exit 1 ;;
         esac
         for _ in $(seq 1 30); do
