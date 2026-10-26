@@ -2,6 +2,10 @@
 # for `flutter drive -d web-server --browser-name <browser>`:
 # chromedriver and geckodriver (Linux), safaridriver (macOS). ios-safari is
 # Safari in a booted iOS simulator, through the same safaridriver.
+# android-chrome is Chrome on a running Android emulator (adb on PATH): the
+# chromedriver of its milestone comes from Chrome for Testing. Run flutter
+# drive with --no-android-emulator and a fixed --web-port, and forward the
+# port with `adb reverse` (the page must stay on localhost, the same origin).
 #
 # With `run`, it also runs that command (flutter drive) with a watchdog, and
 # runs it again, up to 3 times, only when the driver could not start a
@@ -12,7 +16,7 @@ description: Starts chromedriver, geckodriver or safaridriver, and runs flutter 
 
 inputs:
   browser:
-    description: chrome, firefox, safari or ios-safari (boot a simulator first).
+    description: chrome, firefox, safari, ios-safari (boot a simulator first) or android-chrome (start an emulator first).
     required: true
   port:
     description: The driver port. flutter drive uses 4444.
@@ -62,8 +66,28 @@ runs:
             fi
             sudo safaridriver --enable
             safaridriver --port "$PORT" > "$log" 2>&1 & ;;
+          android-chrome)
+            device_chrome=$(adb shell dumpsys package com.android.chrome | tr -d '\r' | grep -m1 -oE 'versionName=[0-9.]+' | cut -d= -f2)
+            if [[ -z "$device_chrome" ]]; then
+              echo "::error::The emulator has no com.android.chrome."
+              exit 1
+            fi
+            milestone=${device_chrome%%.*}
+            url=$(curl -sf https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json |
+              jq -r --arg m "$milestone" '.milestones[$m].downloads.chromedriver[] | select(.platform == "linux64") | .url')
+            if [[ -z "$url" ]]; then
+              echo "::error::Chrome for Testing has no chromedriver for Chrome $milestone."
+              exit 1
+            fi
+            curl -sfL -o "$RUNNER_TEMP/chromedriver.zip" "$url"
+            unzip -qo "$RUNNER_TEMP/chromedriver.zip" -d "$RUNNER_TEMP/chromedriver"
+            driver="$RUNNER_TEMP/chromedriver/chromedriver-linux64/chromedriver"
+            # No first-run screens: they would cover the page.
+            adb shell 'echo "chrome --disable-fre --no-default-browser-check --no-first-run" > /data/local/tmp/chrome-command-line'
+            version="Chrome $device_chrome (emulator), $("$driver" --version)"
+            "$driver" --port="$PORT" > "$log" 2>&1 & ;;
           *)
-            echo "::error::browser must be chrome, firefox, safari or ios-safari, not $BROWSER."
+            echo "::error::browser must be chrome, firefox, safari, ios-safari or android-chrome, not $BROWSER."
             exit 1 ;;
         esac
         for _ in $(seq 1 30); do
