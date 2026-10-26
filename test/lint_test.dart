@@ -356,4 +356,56 @@ jobs:
       );
     });
   });
+
+  group('job names', () {
+    for (final name in [
+      'Windows ARM64',
+      'Windows x64',
+      'Linux ARM64',
+      'macOS ARM64 Metal',
+      'iOS ARM64 simulator',
+      'Android x64 API 37',
+      'Web Linux ARM64 Chrome',
+      'Web Linux x64 Chrome dart2wasm',
+      'Web iOS ARM64 Safari',
+      'Unit',
+      'Web files',
+      'Kiln check',
+    ]) {
+      test('accepts "$name"', () => expect(jobNameProblem(name), isNull));
+    }
+    for (final name in [
+      'desktop / linux-x64',
+      'web / chrome / dart2js',
+      'Linux arm64',
+      'Web Chrome',
+      'MacOS desktop / Chrome',
+      'Android emulator',
+      'iPhone simulator',
+    ]) {
+      test('rejects "$name"', () => expect(jobNameProblem(name), isNotNull));
+    }
+    test('checks matrix names', () {
+      const workflow = '''
+name: Integration
+permissions: {}
+jobs:
+  desktop:
+    name: \${{ matrix.name }}
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        include:
+          - name: Windows ARM64
+          - name: linux-x64
+    runs-on: ubuntu-24.04
+    steps: []
+''';
+      final findings = lintWorkflow('integration.yml', workflow)
+          .where((f) => f.rule == 'job-name')
+          .toList();
+      expect(findings, hasLength(1));
+      expect(findings.single.message, contains('linux-x64'));
+    });
+  });
 }

@@ -219,6 +219,10 @@ List<Finding> lintWorkflow(String path, String text) {
             'defaults: without it, steps run in sh or PowerShell.',
       );
     }
+    for (final (line, jobName) in _jobNames(value)) {
+      final problem = jobNameProblem(jobName);
+      if (problem != null) add(line, 'job-name', problem);
+    }
     final jobShell = _defaultShell(value) ?? workflowShell;
     final steps = value.nodes['steps'];
     if (steps is YamlList) {
@@ -274,6 +278,73 @@ List<Finding> lintWorkflow(String path, String text) {
     );
   }
   return findings;
+}
+
+/// The names of a job: its `name`, or for `${{ matrix.X }}` names, X of each
+/// `strategy.matrix.include` entry (and of each value of a list `X:`).
+/// Names with other expressions are not checked.
+Iterable<(int, String)> _jobNames(YamlMap job) sync* {
+  final node = job.nodes['name'];
+  final name = node?.value;
+  if (name is! String) return;
+  final matrixName = RegExp(r'^\$\{\{\s*matrix\.([\w-]+)\s*\}\}$').firstMatch(name);
+  if (matrixName == null) {
+    if (!name.contains(r'${{')) yield (_line(node!), name);
+    return;
+  }
+  final key = matrixName[1]!;
+  final strategy = job['strategy'];
+  final matrix = strategy is YamlMap ? strategy.nodes['matrix'] : null;
+  if (matrix is! YamlMap) return;
+  final include = matrix.nodes['include'];
+  if (include is YamlList) {
+    for (final entry in include.nodes) {
+      if (entry is! YamlMap) continue;
+      final value = entry.nodes[key];
+      if (value is YamlScalar && value.value is String) {
+        yield (_line(value), value.value as String);
+      }
+    }
+  }
+  final list = matrix.nodes[key];
+  if (list is YamlList) {
+    for (final value in list.nodes) {
+      if (value is YamlScalar && value.value is String) {
+        yield (_line(value), value.value as String);
+      }
+    }
+  }
+}
+
+const _platforms = ['Linux', 'macOS', 'Windows', 'iOS', 'Android'];
+const _archs = ['x64', 'ARM64', 'ARM', 'x86'];
+const _browsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
+final _platformWord = RegExp(
+  '\\b(${[..._platforms, ..._browsers, 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64'].join('|')})\\b',
+);
+final _nativeJob = RegExp(
+  '^(${_platforms.join('|')}) (${_archs.join('|')})( \\S.*)?\$',
+);
+final _webJob = RegExp(
+  '^Web (${_platforms.join('|')}) (${_archs.join('|')}) '
+  '(${_browsers.join('|')})( \\S.*)?\$',
+);
+
+/// Null if a job name is in the Telosnex form (README, "Job names"):
+/// `<Platform> <Arch> [detail]` (`Windows ARM64`, `iOS ARM64 simulator`) or
+/// `Web <Platform> <Arch> <Browser> [detail]` (`Web Linux x64 Chrome
+/// dart2wasm`). Names without a platform or browser (`Unit`, `Web files`)
+/// only need sentence case.
+String? jobNameProblem(String name) {
+  if (_nativeJob.hasMatch(name) || _webJob.hasMatch(name)) return null;
+  if (_platformWord.hasMatch(name)) {
+    return 'Name the job "<Platform> <Arch> [detail]" or '
+        '"Web <Platform> <Arch> <Browser> [detail]", e.g. "Windows ARM64", '
+        '"Web Linux x64 Chrome dart2wasm" (platforms: ${_platforms.join(', ')}; '
+        'archs: ${_archs.join(', ')}; browsers: ${_browsers.join(', ')}), '
+        'not "$name".';
+  }
+  return nameProblem(name);
 }
 
 /// `defaults.run.shell` of a workflow or job map, or null.

@@ -132,3 +132,23 @@ The preset, `default.json`, updates only the pinned GitHub Actions:
 - Other actions: one grouped pull request, before 6am on Mondays.
 
 This repository pins its own actions with `pin_self`; its `renovate.json` makes Renovate ignore them.
+
+## Job names
+
+`bin/lint.dart` checks them (rule `job-name`). A job that runs on one
+platform is named `<Platform> <Arch> [detail]`; a browser job is
+`Web <Platform> <Arch> <Browser> [detail]`:
+
+- platforms: Linux, macOS, Windows, iOS, Android
+- archs: x64, ARM64, ARM, x86
+- browsers: Chrome, Firefox, Safari, Edge
+
+Examples: `Windows ARM64`, `macOS ARM64 Metal`, `iOS ARM64 simulator`,
+`Android x64 API 37`, `Web Linux x64 Chrome dart2wasm`,
+`Web iOS ARM64 Safari`. Jobs without a platform (`Unit`, `Web files`) only
+need sentence case.
+
+Workflows of a Kiln package: `unit.yml` (Unit: analyze, format, host VM
+tests; every pull request), `integration.yml` (Integration: every platform
+and browser; main, nightly, manual), `kiln_check.yml`, `kiln_release.yml`.
+
