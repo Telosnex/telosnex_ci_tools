@@ -119,6 +119,8 @@ Standard (README "Job names", lint rule job-name): unit.yml "Unit" (PRs), integr
 - prlctl.dart (telosnex/dev): retry on "PrlJob_GetResult" too; left uncommitted in telosnex main (owner's WIP there). In prlctl exec, ProgramFiles(x86) is unset, so fonnx source builds fail there.
 - flutter_inappwebview: fork detached from p-mazhnik network (owner, Danger zone). Current with upstream (0 behind, 49 ahead; upstream silent since 2026-02-10). WPE watch red since 10-24: 2.54.2 out (WSA-2026-0006), pinned 2.54.1.
 - fonnx example uses telosnex_audio (git main) for mic and playback; permission_handler for Android/iOS mic; owner checked Kokoro playback and keyword spotter mic on macOS.
+- flutter_inappwebview macOS "teardown hang" was NOT a plugin bug: the test app's window was covered (owner's full-screen app), macOS reported it occluded, Flutter's lifecycle went hidden and framesEnabled=false, so tester.pump waited for a frame forever. Shown by markers: lifecycle 'hidden frames=false' exactly when it stalled. Local macOS widget/integration runs are only valid with the test window visible; CI runners have nothing covering it. Earlier HeadlessInAppWebView 'flake' is probably the same.
+- Long local runs: keep each command under ~4 min (tool/run_integration_group.sh in flutter_inappwebview kills a launch at a limit via perl alarm; macOS has no timeout). Background nohup jobs died silently here.
 - Open: audio Firefox/Safari (web_check.dart); webcrypto publish.yml untested (tags only).
 - fllama drop/llama-cpp-5aeac37, run 40344069820: all green except **web Firefox**: hung in mmproj_hi at "Downloading model files", then solid_red waited on it (new wllama head; Firefox only). Investigate before the release.
 
