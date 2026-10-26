@@ -26,10 +26,11 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 ## TODO
 
 ### Next (in order)
-- [ ] **web-driver android-chrome: `tr: write error: Broken pipe`, exit 1** (run 40258278183). `adb shell dumpsys package ... | tr -d '\r' | grep -m1 -oE ...` under `pipefail`: grep -m1 exits, tr gets SIGPIPE. Read the version without an early-exit pipe (awk to the end), then rerun.
+- [x] web-driver android-chrome `tr: write error: Broken pipe` (grep -m1 under pipefail): awk instead (ci_tools 3e7fbb4).
+- [ ] **API 37.0 emulator keeps restarting Android** (fllama run 40260614748, logcat artifact): surfaceflinger aborts every ~40 s, `Abort message: 'Assertion failed: !rcEnc->featureInfo()->hasReadColorBufferDma'` (RegionSampling thread), and system_server restarts each time (4 starts in 2.5 min). Effects: `adb install` "Failure calling service package: Broken pipe"; `Activity class {...MainActivity} does not exist`; Chrome's activity missing for chromedriver. The emulator is 37.2.12 with `-gpu swiftshader_indirect`. API 35 never did this. ci_tools 35f07bf: `gpu` input; settled = system_server keeps its pid for 60 s. Probe: ci_tools branch `probe/emulator` (workflow probe_emulator.yml, run 40263066674): API 37.0 and 36 x swiftshader_indirect / guest / swangle_indirect, counts aborts over 3 min. Pick the mode (or API) without aborts, then delete the branch.
 - [ ] Finish run 40258278183: ios-safari on CI (first run), Android tests on API 37.0, Safari.
 - [ ] Two more full runs green in a row before the merge.
-- [ ] Merge to `main`, hand-crafted commit by commit (owner): separate commits for each fix, one commit for the new test flow. Cleanup at merge: the spike workflow, `web_spike_test.dart`, `spike/test-cells` in test.yml's push branches (TODO in the file), the spike-only commits. See "Merge plan".
+- [ ] Merge to `main`, hand-crafted commit by commit (owner). **Draft ready**: local branch `merge/test-cells` (worktree `/tmp/fllama_merge`, not pushed), 8 commits on origin/main 015ff36; its tree = spike minus `spike_test_cells.yml`, minus the kiln_check/kiln_release pin changes, test.yml push branches `[main]`. Rebuild it from the spike when the spike changes (the steps are in "Merge plan"). Open: the kiln_check.yml / kiln_release.yml ci_tools pins (spike has 7c9f879 # main; main has v0.2.2): tag ci_tools and pin the tag at the merge?: separate commits for each fix, one commit for the new test flow. Cleanup at merge: the spike workflow, `web_spike_test.dart`, `spike/test-cells` in test.yml's push branches (TODO in the file), the spike-only commits. See "Merge plan".
 
 ### fllama
 - [ ] **Carry llama.cpp PR 29150** ("mtmd : check ggml_backend_sched_reserve result", open since 2026-09-19, no review). Owner: "we will want to carry this eventually". In `src/llama.cpp` (native, needs a native release) and `web_build/wllama.patch` (needs a web rebuild: emsdk in docker). Then drop the log-text check in `fllama_web_init.js`. Maybe comment on the PR with our iOS case.
@@ -81,16 +82,18 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
 - [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests. Survey (2026-10-25, native-prebuilt ec61bda): upstream runs `melos exec flutter test` (Linux), cargo clippy (host, Android, iOS) and `cargo test` on an OS matrix. Dart tests are few and shallow; no integration tests. Clipboard and drag-and-drop need a desktop session: a smoke test is an example app on macOS/Windows/Linux (xvfb) that writes and reads the clipboard. The 3 legacy `index.html` files: fixed on local branch `example-flutter-bootstrap` (8bc1a43), not pushed.
 
-## Merge plan (fllama, draft)
+## Merge plan (fllama)
 
-Hand-crafted from `spike/test-cells`, not a squash. Proposed commits:
-1. Native: skip a GPU that cannot run matrix multiply, RMS norm and softmax; `mmproj_use_gpu` follows `numGpuLayers`; `params.devices` ends with nullptr (5487175).
-2. Thread defaults: native physical cores - 1, web logical CPUs - 1, a set value as is (a6760c8, aee2ac8).
-3. Web: mmproj from the wllama cache (cache keyed by URL only), `fllamaWebRuntimeInfoJs`, error reporting (from d19f341 and earlier).
-4. Web: load again after a WebAssembly out-of-memory; reject an mmproj load without its compute buffer (8563988, the code part).
-5. llama.cpp pin check (44bc091).
-6. The test flow: `test.yml`, `example/integration_test/web_llm_integration_test.dart`, the reporting driver, `scripts/fetch_web_release.dart`, `scripts/serve_test_models.dart`, test assets, test changes (pause test, tearDown cancels, pack test timeout), kiln 0.1.2 in the lock.
-Leave out: `spike_test_cells.yml`, `web_spike_test.dart`, spike-only commits (`[x only]` tags, probes).
+Draft branch `merge/test-cells` (local). Built from origin/main by applying only the `lib/` and `src/` parts of the spike commits that touch them (`git diff C^ C -- lib src | git apply --3way`, then `dart run kiln:web stamp`), then whole files at the spike's final state:
+1. Native: skip a GPU that cannot run the ops of every model; the image encoder follows numGpuLayers (5487175).
+2. Web: fllamaWebRuntimeInfoJs (7f33590, lib part).
+3. Web: load the mmproj from the wllama cache; the cache keys a model by URL only (d19f341, lib part).
+4. Thread defaults (a6760c8 + aee2ac8).
+5. Web: load again after a WebAssembly out-of-memory; reject an mmproj load without its compute buffer (8563988).
+6. Test: llama.cpp pin check (test/llama_cpp_pin_test.dart).
+7. Example: index.html loads flutter_bootstrap.js.
+8. CI: test.yml and every test file (push branches `[main]`).
+Checked: `lib/`, `src/`, `native_artifacts/` equal the spike's; the JS of every commit parses; analyze clean. Left out: `spike_test_cells.yml`, the kiln_check/kiln_release pin changes (decide at merge).
 
 ## Investigation: iOS Safari out of memory (2026-10-25)
 
