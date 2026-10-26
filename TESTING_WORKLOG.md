@@ -33,6 +33,8 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
   - Probe 3: 37.0 google_atd and aosp_atd: stable, 0 aborts, but no Chrome (headless test images). 37.0 google_apis_playstore: pending.
   - Decision (fllama 7aea8a6, not pushed until run 40265398700 ends): native Android tests on 37.0 google_atd; Android Chrome on 36 (Chrome 133), the newest stable image with Chrome. Revisit 37.x google_apis when a new image revision appears. Maybe report to the emulator tracker.
 - Xcode: CI's simulator is iOS 26.2 (Xcode 26.2); this Mac has Xcode 26.0.1 / iOS 26.0.1 on macOS 15.7.1. App Store has only Xcode 27.1 (needs macOS 26.6). `xcodes` sign-in said "account locked" (account is fine): not used, uninstalled. Owner may download Xcode 26.2 .xip + iOS 26.2 runtime .dmg from developer.apple.com; then install as /Applications/Xcode-26.2.app and use DEVELOPER_DIR for repro runs only.
+- [x] **iOS Safari OOM, round 2: fixed by loading in the same worker** (fllama b0c74d4). See "Investigation: iOS Safari out of memory", round 2.
+- [ ] **iOS simulator (native): flutter test misses the VM service line** (run 40265398700, both attempts): the app logged "The Dart VM service is listening" 2 s after launch (our own log stream has it), but flutter_tools' `simctl spawn log stream` never delivered it; flutter waits forever. fllama a677a7a (not pushed yet): an attempt ends 150 s after "Waiting for VM Service port", 3 attempts, `connect_N.txt` diagnostics (log stream processes, `log show` of the line). Real fix candidates: start our own log stream and pass `--host-vmservice-port`? Or report to flutter (simulators.dart starts the log reader on listen, after `simctl launch` is called).
 - [ ] **iOS Safari on CI hangs in the first request** (run 40260614748): progress shows `bare_hi`, last console line `attach_threadpool` for 15 min, then the next request waits behind it; the page sometimes did not answer the 20 s progress script. Locally (8-CPU Mac) 1, 2, 4-7 threads all pass. CI simulator: 3 CPUs, default 2 threads. Next run (fllama ca355f9+): matrix default / 1 thread, and `build/web_console.log` in the artifact (the driver now writes the console as it goes).
 - [ ] iOS simulator (native) attempt 1 again never got a VM service (8 min); attempt 2 passed (run 40260614748). 2 of the last 4 runs. The retry works; the cause is still unknown.
 - [ ] Finish run 40258278183: ios-safari on CI (first run), Android tests on API 37.0, Safari.
@@ -125,6 +127,19 @@ Second bug found on the way: with no memory for the mmproj compute buffer (161 M
 Fix (fllama 8563988): `fllama_web_init.js` loads again after 1, 2, 4 s on a WebAssembly memory error, and fails a load whose log has `failed to allocate` / `insufficient memory`. Result: iOS Safari passes with 7 threads, 2 of 2 runs (each reload after a model switch: retry at 1 s fails, at 2 s succeeds). Chrome: no retries.
 
 Temporary experiment edits were all reverted (`/tmp/fllama_web` restored from `/tmp/fllama_web_index.js.orig` and `/tmp/compat_wllama.js.orig`; the probe test removed).
+
+### Round 2 (2026-10-25 evening): iOS 26.3.1
+
+- Xcode 26.2 (owner downloaded the .xip) at `/Applications/Xcode-26.2.app`, only via `DEVELOPER_DIR`. Apple no longer offers the iOS 26.2 simulator; Xcode 26.2 installs iOS 26.3.1 (23D8133). Simulator `fl-263`.
+- On 26.3.1 the fix of round 1 fails: the 3rd load and every later one cannot reserve memory (`getWasmMemory`), retries at 1/2/4 s do not help, and the next request hangs ("Downloading model files", no progress): this is the CI hang.
+- Measured: free memory after each ended wllama worker 4096, 3840, 2816, 768, 0 MB; waiting 90 s or forcing GC does not bring it back. A plain worker with a 1.5 GB shared memory and 7 threads in `Atomics.wait`, ended 4 times: memory comes back every time. So it is specific to the wllama/emscripten worker, not plain workers.
+- Most reloads were only `nParallel` 1 <-> 2 (same files).
+- wllama head (ngxson 3bb2a46) has the same teardown: `exit()` = `worker.terminate()`; `wllama_exit()` only `llama_backend_free()`, `app.unload()` commented out. Head has, from PR 270: one wasm call at a time (`runWasmCall`), `noWebGPU` with n_gpu_layers 0, n_parallel/kv_unified upstream, a cancel action. Rebase on head later.
+- Fix (fllama b0c74d4, in web_build/wllama.patch): `wllama_unload` (C++; `app` is a pointer, deleted and made new; a JSPI/Asyncify export, as WebGPU teardown suspends: without it Chrome aborted in `llama_free`); `ProxyToWorker.replaceFiles` (async file reads only: files are read from the blobs, no heap copy); `Wllama.reuseWorker`: `loadModel()` on a live instance unloads and loads in the same worker; refuses (before unloading) more threads or another build (compat). fllama sets `reuseWorker`, reuses when GPU layers are the same and threads not more, else (or on a failure) a new worker as before. The start/load key is now logged in full.
+- Results, 7 threads, all pass: iOS 26.3.1 2 of 2 (1-2 workers per run, no retries), iOS 26.0, Chrome (6 same-worker loads; 2 new workers: the compat test, the invalid-URL test).
+- Local web build: OrbStack, image `fllama-emsdk-dart` (the pinned emsdk image + Dart 3.13.1), `/tmp/build_web.sh <out> [patch]` (~4-5 min). JS output is byte-identical to the release; the .wasm files differ (paths?).
+- CI: job `web-files` builds the wllama files of the commit in the emsdk image (cache key: web_build/** and build_web.dart); the web jobs download them. `scripts/fetch_web_release.dart` is now only for local use.
+- Open: the 4.0 retry code stays as a fallback. A new mmproj (other files) still uses the same worker now (replaceFiles), so only a build/thread change ends a worker.
 
 ## Mobile browsers (fllama web)
 
