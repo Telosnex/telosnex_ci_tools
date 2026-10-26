@@ -377,9 +377,12 @@ String? nameProblem(String name) {
   if (name.endsWith('.')) return 'Remove the period at the end of "$name".';
   final words = name.split(RegExp(r'\s+'));
   final acronym = RegExp(r'^[A-Z0-9]+$');
+  // Capitalized words only: product names with inner capitals (BoringSSL,
+  // macOS, WebGPU) and acronyms are not Title Case.
+  final capitalized = RegExp(r'^[A-Z][a-z0-9.\-]*$');
   final titleWords = words
       .skip(1)
-      .where((w) => startsUpper.hasMatch(w) && !acronym.hasMatch(w));
+      .where((w) => capitalized.hasMatch(w) && !acronym.hasMatch(w));
   if (words.length > 1 && titleWords.length == words.length - 1) {
     return 'Write the name "$name" in sentence case.';
   }

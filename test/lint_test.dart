@@ -372,6 +372,7 @@ jobs:
       'Unit',
       'Web files',
       'Kiln check',
+      'Roll BoringSSL',
     ]) {
       test('accepts "$name"', () => expect(jobNameProblem(name), isNull));
     }
