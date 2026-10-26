@@ -57,17 +57,18 @@ runs:
             version="$(google-chrome --version), $("$CHROMEWEBDRIVER/chromedriver" --version)"
             "$CHROMEWEBDRIVER/chromedriver" --port="$PORT" > "$log" 2>&1 & ;;
           firefox)
-            version="$(firefox --version), $("$GECKOWEBDRIVER/geckodriver" --version | head -1)"
+            version="$(firefox --version), $("$GECKOWEBDRIVER/geckodriver" --version | awk 'NR == 1')"
             "$GECKOWEBDRIVER/geckodriver" --port "$PORT" > "$log" 2>&1 & ;;
           safari|ios-safari)
             version="Safari $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' /Applications/Safari.app/Contents/Info.plist)"
             if [[ "$BROWSER" == ios-safari ]]; then
-              version="$version, simulator $(xcrun simctl list devices booted | grep -m1 -oE '[A-Za-z0-9 ]+ \([0-9A-F-]{36}\) \(Booted\)' || echo 'none booted')"
+              version="$version, simulator $(xcrun simctl list devices booted | awk '/\(Booted\)/ && !found { sub(/^ +/, ""); print; found = 1 } END { if (!found) print "none booted" }')"
             fi
             sudo safaridriver --enable
             safaridriver --port "$PORT" > "$log" 2>&1 & ;;
           android-chrome)
-            device_chrome=$(adb shell dumpsys package com.android.chrome | tr -d '\r' | grep -m1 -oE 'versionName=[0-9.]+' | cut -d= -f2)
+            # awk reads to the end: an early exit (grep -m1) breaks the pipe under pipefail.
+            device_chrome=$(adb shell dumpsys package com.android.chrome | awk -F= '/versionName=/ && !v { v = $2; sub(/\r$/, "", v) } END { print v }')
             if [[ -z "$device_chrome" ]]; then
               echo "::error::The emulator has no com.android.chrome."
               exit 1
