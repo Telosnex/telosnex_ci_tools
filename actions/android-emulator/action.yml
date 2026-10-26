@@ -28,6 +28,10 @@ inputs:
     description: The CPU cores of the emulator.
     required: false
     default: '4'
+  gpu:
+    description: The emulator's -gpu mode.
+    required: false
+    default: swiftshader_indirect
   boot-timeout-minutes:
     description: Minutes for the boot, with the system image download.
     required: false
@@ -72,6 +76,7 @@ runs:
         RAM_MB: ${{ inputs.ram-mb }}
         CORES: ${{ inputs.cores }}
         BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
+        GPU: ${{ inputs.gpu }}
       run: |
         start=$(date +%s)
         deadline=$(( start + BOOT_TIMEOUT_MINUTES * 60 ))
@@ -92,7 +97,7 @@ runs:
         log="$RUNNER_TEMP/emulator.log"
         echo "log=$log" >> "$GITHUB_OUTPUT"
         "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim \
-          -gpu swiftshader_indirect -no-snapshot > "$log" 2>&1 &
+          -gpu "$GPU" -no-snapshot > "$log" 2>&1 &
         timeout "$(( deadline - $(date +%s) ))" adb wait-for-device
         until [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]]; do
           if (( $(date +%s) > deadline )); then
@@ -102,27 +107,33 @@ runs:
           fi
           sleep 5
         done
-        # Settled: boot_completed and the package manager answer for 30 s in a
-        # row. The android-37.0 image restarted Android once after its first
-        # boot_completed (two "Boot completed" lines), and an install during
-        # the restart failed: "Failure calling service package: Broken pipe".
+        # Settled: boot_completed, the package manager answers and
+        # system_server keeps its pid for 60 s. On android-37.0 with
+        # swiftshader_indirect, surfaceflinger aborted every ~40 s
+        # (hasReadColorBufferDma) and each abort restarted system_server: an
+        # install then failed ("Failure calling service package: Broken pipe").
         logcat="$RUNNER_TEMP/logcat.txt"
         echo "logcat=$logcat" >> "$GITHUB_OUTPUT"
         nohup adb logcat -v threadtime > "$logcat" 2>&1 &
         settled=0
-        while (( settled < 6 )); do
+        server_pid=""
+        while (( settled < 12 )); do
           if (( $(date +%s) > deadline )); then
             echo "::error::The emulator booted but did not settle in $BOOT_TIMEOUT_MINUTES minutes."
             tail -50 "$log"
             exit 1
           fi
           sleep 5
+          pid_now=$(adb shell pidof system_server 2> /dev/null | tr -d '\r' || true)
           if [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]] &&
-            adb shell pm path android > /dev/null 2>&1; then
+            adb shell pm path android > /dev/null 2>&1 &&
+            [[ -n "$pid_now" && ( -z "$server_pid" || "$pid_now" == "$server_pid" ) ]]; then
+            server_pid=$pid_now
             settled=$(( settled + 1 ))
           else
             if (( settled > 0 )); then echo "Android restarted after boot; waiting again."; fi
             settled=0
+            server_pid=""
           fi
         done
         echo "Boot lines in the emulator log: $(grep -c 'Boot completed' "$log" || true)"
