@@ -139,6 +139,7 @@ Temporary experiment edits were all reverted (`/tmp/fllama_web` restored from `/
 - Results, 7 threads, all pass: iOS 26.3.1 2 of 2 (1-2 workers per run, no retries), iOS 26.0, Chrome (6 same-worker loads; 2 new workers: the compat test, the invalid-URL test).
 - Local web build: OrbStack, image `fllama-emsdk-dart` (the pinned emsdk image + Dart 3.13.1), `/tmp/build_web.sh <out> [patch]` (~4-5 min). JS output is byte-identical to the release; the .wasm files differ (paths?).
 - CI: job `web-files` builds the wllama files of the commit in the emsdk image (cache key: web_build/** and build_web.dart); the web jobs download them. `scripts/fetch_web_release.dart` is now only for local use.
+- Rebase on wllama head: our patch has conflicts in CMakeLists.txt, glue.hpp, wllama-context.h, types.ts, wllama.ts; head pins another llama.cpp, and native and web pin one llama.cpp (llama-cpp-pin test), so it is a llama.cpp update for native too. A separate change.
 - Open: the 4.0 retry code stays as a fallback. A new mmproj (other files) still uses the same worker now (replaceFiles), so only a build/thread change ends a worker.
 
 ## Mobile browsers (fllama web)
