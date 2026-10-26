@@ -1,0 +1,24 @@
+# Lets `dart test -p safari` run unattended on a macOS runner. package:test
+# opens Safari on a local redirect.html, and Safari asks the user to confirm
+# local files: the run waits forever. This action sets DART_TEST_CONFIG to a
+# global package:test configuration whose override_platforms runs
+# launcher.sh: it opens the loopback test URL through Launch Services.
+#
+# A package's own dart_test.yaml override_platforms.safari wins over it.
+name: dart test Safari
+description: Makes `dart test -p safari` open its test page without the local-file prompt.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        config="$RUNNER_TEMP/dart_test_global.yaml"
+        cat > "$config" <<YAML
+        override_platforms:
+          safari:
+            settings:
+              executable: /bin/bash
+              arguments: $GITHUB_ACTION_PATH/launcher.sh
+        YAML
+        echo "DART_TEST_CONFIG=$config" >> "$GITHUB_ENV"
