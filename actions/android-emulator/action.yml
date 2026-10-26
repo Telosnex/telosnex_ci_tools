@@ -32,6 +32,10 @@ inputs:
     description: The emulator's -gpu mode.
     required: false
     default: swiftshader_indirect
+  emulator-args:
+    description: More emulator options, split on spaces (for example -feature -Name).
+    required: false
+    default: ''
   boot-timeout-minutes:
     description: Minutes for the boot, with the system image download.
     required: false
@@ -77,6 +81,7 @@ runs:
         CORES: ${{ inputs.cores }}
         BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
         GPU: ${{ inputs.gpu }}
+        EMULATOR_ARGS: ${{ inputs.emulator-args }}
       run: |
         start=$(date +%s)
         deadline=$(( start + BOOT_TIMEOUT_MINUTES * 60 ))
@@ -96,8 +101,9 @@ runs:
           >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
         log="$RUNNER_TEMP/emulator.log"
         echo "log=$log" >> "$GITHUB_OUTPUT"
+        # shellcheck disable=SC2086 # EMULATOR_ARGS splits on spaces.
         "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim \
-          -gpu "$GPU" -no-snapshot > "$log" 2>&1 &
+          -gpu "$GPU" -no-snapshot $EMULATOR_ARGS > "$log" 2>&1 &
         timeout "$(( deadline - $(date +%s) ))" adb wait-for-device
         until [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]]; do
           if (( $(date +%s) > deadline )); then
