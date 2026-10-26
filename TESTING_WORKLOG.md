@@ -45,7 +45,7 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 
 ### fllama
 - [ ] Product question: `contextSize: 0` (the trained size) on Android made a 178,688-token context, a 2 GB KV cache; in a 4 GB emulator (API 37) the low-memory killer ended the app. On a 4 GB phone the same. Should native cap context 0 by free RAM? (CI: 6 GB RAM, fllama test.yml.)
-- [ ] **Carry llama.cpp PR 29150** ("mtmd : check ggml_backend_sched_reserve result", open since 2026-09-19, no review). Owner: "we will want to carry this eventually". In `src/llama.cpp` (native, needs a native release) and `web_build/wllama.patch` (needs a web rebuild: emsdk in docker). Then drop the log-text check in `fllama_web_init.js`. Maybe comment on the PR with our iOS case.
+- [x] Carry llama.cpp PR 29150: local branch `carry/llama-cpp-29150` (fllama 6c21e0e, worktree /tmp/fllama_carry, not pushed). `patches/llama.cpp/*.patch`, applied in src/llama.cpp and by build_web.dart; the pin test checks it; the JS log check is gone; web-files cache key covers patches/. Chrome and iOS 26.3.1 pass locally. Push it after the spike run is green; it changes the source key (native jobs build from source, `native_build: auto`) and touches no ggml path (no CUDA pack). Native needs a release before main. Maybe comment on the PR with our iOS case (ask owner).
 - [ ] Report the iOS teardown delay to wllama (ngxson), with the repro numbers below. A fix there lets fllama drop the load retry. Ask the owner first.
 - [ ] Each load after a model switch costs about 3 s on iOS Safari (retry at 1 s fails, at 2 s succeeds). Find a cheaper signal than retrying: for example avoid the exit/reload (same instance, new params), or poll for free memory as the probe did (`new WebAssembly.Memory` with a 2 GB maximum, ~250 ms per try).
 - [ ] **iOS WebGPU support.** Today every iOS Safari test runs on the CPU. In the iOS 26.0 simulator `navigator.gpu` exists, but `requestAdapter()` returns null (`ggml_webgpu: Failed to get an adapter: WebGPU not available on this browser`), so wllama falls back to CPU silently and the report says `webGpu: true`. To find out and do:
@@ -96,16 +96,18 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 
 ## Merge plan (fllama)
 
-Draft branch `merge/test-cells` (local). Built from origin/main by applying only the `lib/` and `src/` parts of the spike commits that touch them (`git diff C^ C -- lib src | git apply --3way`, then `dart run kiln:web stamp`), then whole files at the spike's final state:
+Draft branch `merge/test-cells` (local, worktree /tmp/fllama_merge), made by `/tmp/build_merge.sh` (rerun it after each spike change; copy it into the repo's dev/ if it must last). From origin/main it applies only the `lib/`/`src/`/`web_build/` parts of the spike's library commits (`git diff C^ C -- paths | git apply --3way`, then `kiln:web stamp`), whole files at the spike's state for the rest, then the carry branch. 10 commits (2026-10-26):
 1. Native: skip a GPU that cannot run the ops of every model; the image encoder follows numGpuLayers (5487175).
-2. Web: fllamaWebRuntimeInfoJs (7f33590, lib part).
-3. Web: load the mmproj from the wllama cache; the cache keys a model by URL only (d19f341, lib part).
-4. Thread defaults (a6760c8 + aee2ac8).
-5. Web: load again after a WebAssembly out-of-memory; reject an mmproj load without its compute buffer (8563988).
-6. Test: llama.cpp pin check (test/llama_cpp_pin_test.dart).
-7. Example: index.html loads flutter_bootstrap.js.
-8. CI: test.yml and every test file (push branches `[main]`).
-Checked: `lib/`, `src/`, `native_artifacts/` equal the spike's; the JS of every commit parses; analyze clean. Left out: `spike_test_cells.yml`, the kiln_check/kiln_release pin changes (decide at merge).
+2. Web: fllamaWebRuntimeInfoJs (7f33590).
+3. Web: mmproj from the wllama cache (d19f341).
+4. Thread defaults (a6760c8, aee2ac8).
+5. Web: load again after an out-of-memory; reject an mmproj load without its compute buffer (8563988).
+6. Web: load in the same worker (b0c74d4).
+7. Test: llama.cpp pin check.
+8. Example: index.html loads flutter_bootstrap.js.
+9. CI: test.yml and the test files (push branches `[main]`).
+10. Carry llama.cpp PR 29150 (6c21e0e).
+Checked: lib/src/native_artifacts/web_build/patches/tool/test/docs equal the spike + carry; the JS of every commit parses; analyze clean. Left out: spike_test_cells.yml, the kiln_check/kiln_release pin changes, generated_plugins.cmake (a spike commit swept in a regenerated file; main's is kept). Open: tag ci_tools and pin the tag in kiln_check/kiln_release at the merge? A native release before the merge (src changed).
 
 ## Investigation: iOS Safari out of memory (2026-10-25)
 
