@@ -111,6 +111,7 @@ Standard (README "Job names", lint rule job-name): unit.yml "Unit" (PRs), integr
 - Don't wrap local commands in `(sleep N; pkill ...) &`: it keeps the tool's output open for N seconds after the tests finish.
 - fonnx MiniLM correction: 1e-2 is NOT enough. Every non-M4 CPU gives the same values (CI Linux ARM64, macOS ARM64 (M1), Windows x64, Windows ARM64, and OrbStack tsnx-build x64 under Rosetta, SSE only); only this M4 Max (where the goldens were recorded) differs. Drift: MiniLM similarity up to 0.023, embeddings 0.013; MS MARCO similarity up to 0.017. My earlier "~0.007" came from reading only the first failures. Reproduce: git archive to /private/tmp, run in `orb -m tsnx-build` with ~/sdk/flutter (vms skill). Ubuntu ARM64 Parallels VM won't start: needs ~20 GB free disk, 13 GB free.
 - fonnx Safari web_runtime_test: same cached-.mjs fix as zxing (8a8697b); local Safari 20/20.
+- fonnx goldens re-recorded (e8ba3d9) from the CI baseline, computed in tsnx-build; strict tolerances kept (1e-4 components, 1e-3 similarities), with a note. VM: 18/18 pass. M4: 12 fail, expected (component drift up to 0.037, similarities 0.023).
 - Open: audio Firefox/Safari (web_check.dart); webcrypto publish.yml untested (tags only).
 - fllama drop/llama-cpp-5aeac37, run 40344069820: all green except **web Firefox**: hung in mmproj_hi at "Downloading model files", then solid_red waited on it (new wllama head; Firefox only). Investigate before the release.
 
