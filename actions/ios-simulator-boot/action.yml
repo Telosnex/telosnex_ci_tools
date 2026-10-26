@@ -1,0 +1,46 @@
+# Boots a fresh iPhone simulator on a macOS runner and outputs its UDID.
+# Both native app tests (ios-flutter-test) and iOS Safari web tests
+# (web-driver, browser: ios-safari) start with it.
+#
+# Use macos-26 or newer. On macos-15 the Xcode 26 simulators stalled in
+# GitHub's macOS VMs: Safari's first launch did not return, flutter test
+# missed the VM service, and a page stopped answering
+# (actions/runner-images 13264).
+name: iOS simulator boot
+description: Creates and boots a fresh iPhone simulator; outputs its UDID.
+
+inputs:
+  fresh:
+    description: >-
+      true: create a new device (the newest runtime, a Pro model). false:
+      reuse a booted phone or boot an existing one.
+    required: false
+    default: 'true'
+
+outputs:
+  udid:
+    description: The UDID of the booted simulator.
+    value: ${{ steps.boot.outputs.udid }}
+
+runs:
+  using: composite
+  steps:
+    # The first simctl call starts CoreSimulatorService, which can take
+    # longer than the 1-minute simctl timeouts of boot.dart.
+    - name: Start CoreSimulator
+      shell: bash
+      run: |
+        # Runs "$@" with a limit of $1 seconds (macOS has no timeout(1)).
+        limit() { local s=$1; shift; "$@" & local p=$!; ( sleep "$s"; kill "$p" 2> /dev/null ) & local w=$!; local rc=0; wait "$p" || rc=$?; kill "$w" 2> /dev/null || true; return "$rc"; }
+        limit 300 xcrun simctl list runtimes > /dev/null
+    - id: boot
+      name: Boot
+      shell: bash
+      env:
+        FRESH: ${{ inputs.fresh }}
+      run: |
+        args=()
+        if [[ "$FRESH" == true ]]; then args+=(--fresh); fi
+        udid=$(dart "$GITHUB_ACTION_PATH/boot.dart" "${args[@]}")
+        echo "udid=$udid" >> "$GITHUB_OUTPUT"
+        echo "iOS simulator: $(xcrun simctl list devices | grep "$udid" | sed 's/^ *//')" | tee -a "$GITHUB_STEP_SUMMARY"

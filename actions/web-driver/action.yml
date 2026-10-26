@@ -7,10 +7,16 @@
 # drive with --no-android-emulator and a fixed --web-port, and forward the
 # port with `adb reverse` (the page must stay on localhost, the same origin).
 #
+# ios-safari opens Safari once in the simulator first: its first launch on a
+# fresh simulator is slow (18-90 s), and safaridriver can time out finding
+# it. Boot the simulator with ios-simulator-boot (macos-26 or newer).
+#
 # With `run`, it also runs that command (flutter drive) with a watchdog, and
 # runs it again, up to 3 times, only when the driver could not start a
 # browser session (safaridriver sometimes times out launching Safari). The
-# app never ran then. Other failures are final.
+# app never ran then. Other failures are final, except one: when the run
+# printed "All tests passed." and only closing the browser session failed
+# afterwards (an adb timeout on Android), it passes with a warning.
 name: Web driver
 description: Starts chromedriver, geckodriver or safaridriver, and runs flutter drive.
 
@@ -63,6 +69,18 @@ runs:
             version="Safari $(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' /Applications/Safari.app/Contents/Info.plist)"
             if [[ "$BROWSER" == ios-safari ]]; then
               version="$version, simulator $(xcrun simctl list devices booted | awk '/\(Booted\)/ && !found { sub(/^ +/, ""); print; found = 1 } END { if (!found) print "none booted" }')"
+            fi
+            if [[ "$BROWSER" == ios-safari ]]; then
+              # Runs "$@" with a limit of $1 seconds (macOS has no timeout(1)).
+              limit() { local s=$1; shift; "$@" & local p=$!; ( sleep "$s"; kill "$p" 2> /dev/null ) & local w=$!; local rc=0; wait "$p" || rc=$?; kill "$w" 2> /dev/null || true; return "$rc"; }
+              start=$(date +%s)
+              if limit 300 xcrun simctl launch booted com.apple.mobilesafari > /dev/null; then
+                echo "Safari's first launch: $(( $(date +%s) - start )) s"
+                sleep 20
+              else
+                echo "::warning::Safari did not launch in 300 s; safaridriver will try."
+              fi
+              xcrun simctl terminate booted com.apple.mobilesafari 2> /dev/null || true
             fi
             sudo safaridriver --enable
             safaridriver --port "$PORT" > "$log" 2>&1 & ;;
@@ -134,4 +152,9 @@ runs:
           echo "::warning::$BROWSER: the driver could not start a session (attempt $attempt)"
           sleep 10
         done
+        if [[ "$status" != 0 ]] && grep -q '^All tests passed\.' "$out" &&
+          grep -qE 'parseDeleteSessionResponse|WebDriver\.quit' "$out"; then
+          echo "::warning::$BROWSER: all tests passed; only closing the browser session failed."
+          status=0
+        fi
         exit "$status"
