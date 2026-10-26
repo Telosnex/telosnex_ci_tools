@@ -3,85 +3,61 @@
 Tests of kiln packages on GitHub-hosted runners: what we learned, and what
 to follow up on. The fllama MVP comes first; the other packages follow.
 
+Goal (owner, 2026-10-25): prove fllama **fully** before the next package.
+That includes iOS Safari in the simulator and the newest Android. No
+"it works, leave it" shortcuts.
+
 ## Status (2026-10-25)
 
-fllama spike: branch `spike/test-cells`, workflow
-`.github/workflows/spike_test_cells.yml`. A commit message with
-`[ios only]` runs only the iOS job.
+fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
+(the spike workflow `spike_test_cells.yml` is manual only). Last full run:
+40258278183 (fllama 958cf75, ci_tools 1e4c4ce), in progress.
 
 | Job | Status |
 |---|---|
-| desktop: linux-x64, linux-arm64, macos-arm64 (CPU), macos-arm64-metal, windows-x64, windows-arm64 | Pass, 2 runs in a row |
-| android-x64 emulator (ubuntu-24.04, KVM) | Pass, about 23 min |
-| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | Pass with `web_llm_integration_test.dart` (run 40235700903): default build in Chrome and Firefox, compat in Safari, `compat_solid_red` in Chrome and Safari, all cross-origin isolated. |
-| ios simulator | **Open.** Passed twice, then stalled 18 min after `Xcode build done`, before any test. Run 40231960707 has the diagnostics. |
+| desktop: linux-x64, linux-arm64, macos-arm64 (CPU), macos-arm64-metal, windows-x64, windows-arm64 | Pass (run 40248984708, Windows included after the watch fix) |
+| android / emulator | Pass on API 35 (run 40248984708). Now API 37.0: running |
+| ios / simulator | Pass, first attempt, runs 40239617201 and 40248984708. The old stall has not come back |
+| web: Chrome dart2js and dart2wasm, Firefox dart2js, Safari dart2js | Pass (run 40248984708; again in 40258278183 except Safari, running) |
+| web / ios-safari / dart2js | New. Passes locally (iOS 26.0 simulator, 7 threads) after fllama 8563988. CI: running |
+| web / android-chrome / dart2js | New. Passes locally (API 36, Chrome 133). **CI failed** in 40258278183: my bug in web-driver, see TODO |
+| llama-cpp-pin | Pass |
 
 ## TODO
 
+### Next (in order)
+- [ ] **web-driver android-chrome: `tr: write error: Broken pipe`, exit 1** (run 40258278183). `adb shell dumpsys package ... | tr -d '\r' | grep -m1 -oE ...` under `pipefail`: grep -m1 exits, tr gets SIGPIPE. Read the version without an early-exit pipe (awk to the end), then rerun.
+- [ ] Finish run 40258278183: ios-safari on CI (first run), Android tests on API 37.0, Safari.
+- [ ] Two more full runs green in a row before the merge.
+- [ ] Merge to `main`, hand-crafted commit by commit (owner): separate commits for each fix, one commit for the new test flow. Cleanup at merge: the spike workflow, `web_spike_test.dart`, `spike/test-cells` in test.yml's push branches (TODO in the file), the spike-only commits. See "Merge plan".
+
 ### fllama
-- [ ] test.yml run 40241296726: Firefox stalled (no output 600 s after the build; the previous Firefox drive step took 167 s). Watch for a repeat; flutter drive prints nothing while tests run, so web-driver's idle limit is also the test-time limit.
-- [x] Windows: `watch` broke flutter (`bash: D:a_tempflutter/bin/internal/exit_with_errorlevel.bat`). Cause, reproduced in the Parallels Windows 11 VM: the step ran `dart` through Flutter's wrapper (bin/dart -> dart.bat), which leaves OS=MINGW64_NT..., FLUTTER_ROOT, EXIT_WITH_ERRORLEVEL etc. in the environment; every flutter that watch's bash started then took the wrong path in flutter.bat. Fix ci_tools e1d108c: start `bin/cache/dart-sdk/bin/dart.exe` directly. The action's real script passes in the VM; fllama bc292ca uses it (push after run 40245072960).
-- [ ] **iOS simulator stall.** Read the `ios-diagnostics` artifact of run 40231960707: simulator log, app list, screenshot. Find out whether install, launch or the connection to `flutter test` stalls.
-- [x] Thread count: owner changed mind (2026-10-25). Default (numThreads <= 0) is physical cores - 1, at least 1; web CPUs - 1, at most 4. A set value is used as is. fllama spike a6760c8.
-- [x] Pause test: the macOS run had a 394 ms gap against a 400 ms limit. Minimum now 750 ms (spike `c38a93c`, not pushed). Good runs: 30-394 ms; a decode thread on every CPU: 605-1012 ms.
-- [ ] Safari dart2js was 0.26 tok/s on Qwen 0.8B. Check the thread count against the 3-CPU runner.
-- [x] `scripts/serve_test_models.dart` "died" twice locally: the agent's shell ends background processes when a command ends. It survives dropped downloads. No change needed; on CI it runs in the same step as the tests.
-- [x] Turn the spike into `.github/workflows/test.yml` (spike 9cb7c49, first run 40239617201). PR: linux-x64, macos-arm64, Chrome dart2js and dart2wasm. main, nightly, manual: every cell. The spike workflow is manual only.
-- [ ] Before merging test.yml: remove `spike/test-cells` from its push branches (TODO in the file).
-- [ ] Watch test.yml's first nightly runs for flakes (iOS connect, Safari session).
-- [x] Port the dev/web_smoke cases (9 of 10; not `compat_solid_red`) to `example/integration_test/web_llm_integration_test.dart`.
-- [ ] Force the compat build on Chrome (`compat_solid_red`): Safari covers compat today.
-- [x] `image_title` was slow (2-5 min on CI): fllama_header.png at 1280 x 640 is 800 image tokens. Now `test/assets/test_title.png`, 640 x 320, 200 tokens (fllama e4c7424). Not the mmproj cache fix. CI: Chrome 185/128 s to 46 s, Firefox 215 s to 52 s.
-- [ ] iOS: from the `flutter test -v` log, find why flutter_tools does not connect to the app's VM service (port forwarding? mDNS?), and fix it.
-- [x] iOS watchdog false stall (run 40235095714): attempt 1 was killed during the Xcode build, silent for 500 s against the 480 s limit. Attempt 2 passed (32 tests, 4 min). So the original stall (VM service listens, flutter test never connects) has not been seen again yet. Fix: build in a separate step (`flutter build ios --simulator --debug`) before `flutter test`, or a longer limit until the first test starts. Done: spike 63ca01c builds in its own step (run 40237842614).
-- [ ] The real `test.yml` keeps the reporting driver, `pipefail`, and the check that the report has a result for the last test.
-- [ ] Check web tests in Chrome and Safari before relying on CI (delegate).
-- [x] ggml-metal WIP is in fllama `git stash` ("ggml-metal WIP (not PR-able yet)"); `/tmp/wip_backup.patch` is a second copy.
-- [ ] Merge to main: `fllamaWebRuntimeInfoJs`, the mmproj cache fix in `fllama_web_init.js`, `scripts/fetch_web_release.dart`, the reporting driver.
-- [x] Make the web cells check the wllama build (default or compat), cross-origin isolation and thread count, and fail on a mismatch.
-- [ ] Merge the fllama fixes of the spike to `main` (see Decisions). Leave out the spike workflow and `web_spike_test.dart`.
+- [ ] **Carry llama.cpp PR 29150** ("mtmd : check ggml_backend_sched_reserve result", open since 2026-09-19, no review). Owner: "we will want to carry this eventually". In `src/llama.cpp` (native, needs a native release) and `web_build/wllama.patch` (needs a web rebuild: emsdk in docker). Then drop the log-text check in `fllama_web_init.js`. Maybe comment on the PR with our iOS case.
+- [ ] Report the iOS teardown delay to wllama (ngxson), with the repro numbers below. A fix there lets fllama drop the load retry. Ask the owner first.
+- [ ] Each load after a model switch costs about 3 s on iOS Safari (retry at 1 s fails, at 2 s succeeds). Find a cheaper signal than retrying: for example avoid the exit/reload (same instance, new params), or poll for free memory as the probe did (`new WebAssembly.Memory` with a 2 GB maximum, ~250 ms per try).
+- [ ] **iOS WebGPU support.** Today every iOS Safari test runs on the CPU. In the iOS 26.0 simulator `navigator.gpu` exists, but `requestAdapter()` returns null (`ggml_webgpu: Failed to get an adapter: WebGPU not available on this browser`), so wllama falls back to CPU silently and the report says `webGpu: true`. To find out and do:
+  - Is WebGPU on by default in iOS 26 Safari on devices, and is the simulator's null adapter a simulator limit (no Metal device passthrough?) or a setting (Feature Flags)? Check WebKit release notes / bug tracker before testing.
+  - reeselevine's wllama fork caps iOS WebGPU buffers at 384 MB (d605117, "Lower safari iOS limit further"; also "max(4gb, supported size)"): read why, and whether fllama's wllama build needs the same.
+  - The web test should report whether a GPU adapter was found (not only `navigator.gpu`), and a GPU cell should fail when it ran on the CPU.
+  - Memory: WebGPU buffers count against the same tab limit as the WebAssembly heap; recheck the teardown retry with WebGPU.
+  - Likely needs a real device (no Metal in CI simulators, see the paravirtual GPU fact): decide with the owner.
+- [ ] Real iPhones: hardwareConcurrency is 6, so 5 threads; real-device tab limits are stricter than the simulator (WebKit 291677). Out of the MVP, but the retry/thread default should be checked on a device once.
+- [ ] Firefox stalled once (run 40241296726: no output 600 s after the build; normally 167 s). Not seen again in 40245072960, 40248984708, 40258278183. flutter drive prints nothing while tests run, so web-driver's idle limit is also the test-time limit.
+- [ ] Watch the first nightly runs for flakes (iOS connect, Safari session, Firefox stall).
+- [ ] Force the compat build on Chrome is `compat_solid_red`: done. Safari dart2js tok/s (0.26 on Qwen 0.8B, 3-CPU runner): recheck now that the web default is CPUs - 1.
+- [ ] The uncommitted ggml-metal WIP is in fllama `git stash` ("ggml-metal WIP (not PR-able yet)"); `/tmp/wip_backup.patch` is a second copy. Owner: cannot PR it now.
 
 ### telosnex_ci_tools
-- [x] drive-test-widgets flagged `flutter build -t` targets (35 false findings in fllama). Fixed in c23e4fd; fllama still pins 7c9f879, bump with the next pin.
-- [ ] Prove `actions/watch`, `android-emulator` and `web-driver` on runners. fllama spike ad4048c switched web and android to them (run 40238004336). `watch` runs inside `web-driver`; iOS still has its inline watchdog.
-- [x] Lint: a workflow `run:` that pipes into `tee` needs `pipefail` (workflow `defaults.run.shell: bash`). Without it a failed `flutter drive` passed.
-- [x] Lint or check: an integration test run with `flutter drive` uses `testWidgets`. `test()` failures are not reported to the driver.
+- [ ] Action `ios-simulator`: start CoreSimulator, a fresh simulator, log stream, watchdog, one retry only if no test started, cleanup. Now also needed by web / ios-safari (fllama uses `scripts/boot_ios_simulator.dart --fresh`).
 - [ ] Never `git commit -a` in a package checkout that has someone's local work (fllama: uncommitted ggml-metal changes went into 73898ff and started CUDA pack / publish; cancelled before it published).
-- [x] Lint rules released on main (7c9f879, c23e4fd). super_native_extensions' 3 legacy `index.html`: fixed on local branch `example-flutter-bootstrap` (8bc1a43), not pushed; `flutter build web` of super_drag_and_drop/example passes.
-- [x] Lint: no `actions/cache/restore` or `actions/cache/save`. The org allow list has only `actions/cache`, and the run fails at startup with no message.
-- [x] Lint: a job-level `defaults.run` sets `shell: bash`. Job defaults replace workflow defaults (the v0.3.0 bug).
-- [x] Lint: an example's `web/index.html` loads `flutter_bootstrap.js`. The legacy loader runs `main.dart.js` in a `--wasm` build.
-- [x] `actions/watch` (`watch.dart`, dart:io only, no pub get; was planned as `bin/watch.dart`): stops a command after N minutes with no output, and runs a diagnostics hook first.
-- [x] Action `android-emulator`: KVM permissions, `ANDROID_AVD_HOME`, `adb` on `PATH`, system image, boot wait, emulator log.
-- [ ] Action `ios-simulator`: start CoreSimulator, a fresh simulator, log stream, watchdog, one retry only if no test started, cleanup. Wait until the iOS stall is fixed.
-- [x] Action `web-driver`: start chromedriver, geckodriver or safaridriver, wait for `/status`, run `flutter drive`, retry only on `SessionNotCreatedException`.
 - [ ] Maybe: an action that caches test downloads by URL and SHA-256 (GGUF models, GPU packs, fonnx models).
 - [ ] README: the runner facts below.
 - [ ] Later: a shared `kiln_test.yml`, when a second package uses the actions.
 
 ### kiln
-- [ ] The web files must not depend on the native source key. A change to `src/` makes kiln refuse the released wllama files although they did not change; fllama's web tests broke on it. `scripts/fetch_web_release.dart` is the workaround. Needs a design: a separate key for the web sources.
-  - Research (2026-10-25): fllama's web build (`tool/kiln/build_web.dart`) reads only `web_build/wllama.json`, `web_build/wllama.patch` and itself. It clones wllama and llama.cpp at the commits in wllama.json, with the Dawn zip and emsdk image pinned there. It never reads `src/`. So no change under `src/` can change the web files, but kiln's one source key (kiln `lib/src/source_key.dart`: every git file minus excludes) covers `src/`, and `web_install.dart:151` refuses the release on a mismatch.
-  - Options: (a) a web key over a package-declared list (fllama: `web_build/`, `tool/kiln/build_web.dart`), stored in web.json and checked instead of the native key; (b) a `web_source` glob list in the kiln config, defaulting to today's behaviour; (c) leave the native key and add a `web_build: release` mode that skips the check. (a)/(b) keep the safety; (c) does not.
-  - Owner (2026-10-25): web does depend on llama.cpp. Fact: `src/llama.cpp` is a vendored copy at ece963f, the same commit `wllama.json` pins, but the web build clones its own copy: local patches in `src/llama.cpp` (for example the uncommitted ggml-metal work) do not reach web. A key that ignores `src/` hides that. Owner chose the check: fllama 44bc091 `test/llama_cpp_pin_test.dart`, job llama-cpp-pin in test.yml (local, not pushed). `src/fllama*.cpp` (native-only glue) stays out of the web key.
-- [x] Select `web_build: local` without editing the pubspec: kiln 4cbb363 (local, not pushed) reads web_build and web_build_dir from `<cache root>/defaults.json`, as native_build already did. Next: CI writes defaults.json instead of the Python pubspec edit, once fllama uses that kiln.
+- [ ] The web files and the native source key. A change to `src/` makes kiln refuse the released wllama files. Owner: web *does* depend on llama.cpp, so no key that ignores `src/`. Done so far: fllama 44bc091 `test/llama_cpp_pin_test.dart` (job llama-cpp-pin) checks that `src/llama.cpp/FLLAMA_LLAMA_CPP_DROP.txt` and `web_build/wllama.json` pin one commit. Open: a web key that covers `src/llama.cpp` and `web_build/` but not `src/fllama*.cpp` (native-only glue). Background: `tool/kiln/build_web.dart` reads only `web_build/` and itself, and clones its own llama.cpp at the pinned commit; local patches in `src/llama.cpp` do not reach web.
 - [ ] `native_build: local` with `native_build_dir`, as `web_build: local`. Then `kiln_release` can test the binaries it built before it uploads them.
 - [ ] `kiln:build` writes unstripped libraries to a fixed directory in `--out`, so the release workflow need not know the cache layout of each package.
-
-### Mobile browsers (fllama web)
-- 2026-10-25 iOS Safari OOM, chased (fllama 8563988):
-  - Cause: after `wllama.exit()` (worker terminate), the old instance's shared WebAssembly memory comes back only seconds later in iOS WebKit. The next load's memory cannot grow (grow fails at 1330-1441 MB, `RangeError: Out of memory`), so llama.cpp aborts (`ggml_aligned_malloc: insufficient memory`) or getWasmMemory throws. More threads = more pthread workers = more often. A 5 s wait before each load fixed all; waiting 1 s did not, 1+2 s did. Related: WebKit 250569 (terminated worker memory leak), Kandelo's JSC-TERMINATE-ATOMICS-WAIT-LEAK note, wllama #18/#23 (iOS shared-memory maximum; getWasmMemory loop).
-  - Ruled out: the 4 GB reservation (getWasmMemory reserves 4096 MB on try 1), idle workers (28 idle workers do not change headroom), pthread pool 1x vs 2x, a 2 MB pthread stack (16 MB is STACK_SIZE, also the pthread default; did not fix it). Terminating emscripten's pthreads (PThread.terminateAllThreads) before the worker: no change.
-  - Fix: fllama_web_init.js loads again after 1, 2, 4 s on a WebAssembly memory error.
-  - Second bug: clip.cpp ignores ggml_backend_sched_reserve's result (llama.cpp PR 29150, open). With no memory for the mmproj compute buffer (161 MB), the load reported success and every image request aborted (GGML_ASSERT(buffer)). fllama now fails such a load (log has 'failed to allocate'/'insufficient memory'). Better: carry PR 29150 in web_build/wllama.patch at the next web rebuild (needs docker/OrbStack).
-  - Upstream wllama (ngxson) has 19 commits since our pin 766d28e; none about memory or exit. reeselevine's fork caps WebGPU buffers on iOS at 384 MB (d605117), not CPU.
-- Android Chrome, local (API 36 Play image, arm64): passes. Needs `adb reverse tcp:P tcp:P` + `--web-port P --no-android-emulator` (Flutter's emulator mode rewrites to 10.0.2.2, which is not same-origin... it failed with 'No supported storage backend' = not cross-origin isolated) and `/data/local/tmp/chrome-command-line` with `--disable-fre --no-first-run`. chromedriver: Chrome for Testing latest of the milestone (exact build may be missing). Chrome 133 = compat (no JSPI); Chrome 154 failed only on a full emulator disk (QuotaExceededError in OPFS): the AVD needs disk.dataPartition.size 8G (the action sets it).
-- 2026-10-25 test.yml run 40248984708: every job passed, Windows included (watch fix e1d108c).
-- iOS Safari, local (iOS 26.0 simulator, `flutter drive --browser-name ios-safari`, safaridriver): runs end to end in about 1 min, compat build, cross-origin isolated. hardwareConcurrency is the Mac's 8. Failures by thread count (the test's count; default is now CPUs - 1 = 7): 7 threads, mmproj_hi ABORT, then every later load "Cannot allocate WebAssembly.Memory" (memory not freed after the abort); 5 and 6, only compat_solid_red (the 7th load) ABORTs; 4, all pass. Desktop Safari on the same Mac, 7 threads: all pass (twice). So the old cap of 4 hid an iOS WebKit memory limit.
-- sdkmanager (2026-10-25): newest stable x86_64 images are android-37.0 google_apis / google_apis_playstore (rev 8); 37.2 is arm64 beta only. Local arm64 37.0 images segfault on boot on this Mac (QEMU threads hang), with and without swiftshader. Local API 36 Play image: ships Chrome 133, was updated to 154 by the Play Store. CI probe (run 40245072960): x86_64 android-37.0 google_apis has Chrome 145.0.7632.218 (WebView same) and the Play Store (com.android.vending); booted in 108 s.
-- [ ] iOS Safari: `flutter drive --browser-name ios-safari` (safaridriver with `safari:useSimulator`). Reuses the iOS simulator setup; localhost is shared with the Mac. Same WebKit as desktop Safari, so likely the compat build again. The simulator does not enforce iPhone tab memory limits (WebKit bug 291677: iOS kills WebContent at its high-water mark; three.js #30047, WebKit 284752: crashes on device only), so it cannot catch out-of-memory reloads. It does catch some iOS WebAssembly bugs (emscripten #24600 reproduced in the 18.0 simulator).
-- [ ] Android Chrome: `flutter drive --browser-name android-chrome` (chromedriver `androidPackage: com.android.chrome`). Unknown: whether the google_apis image has Chrome, and which version. Spike 5a5752e lists it. Emulator Chrome can be very old (Bitrise: 83 against chromedriver 104); the usual fix installs an APK from APKMirror, which needs the owner's OK. chromedriver must match the device Chrome; the page needs `adb reverse` for localhost unless flutter drive does it. Result (test.yml run 40239617201): the google_apis API 35 image has `com.android.chrome` 124.0.6367.219 (WebView the same). No APK needed. chromedriver 124 comes from Chrome for Testing (official). Chrome 124 predates JSPI and Memory64 shipping, so this cell would run the compat build on an Android browser. The Android job passed: emulator booted in 75 s, 32 tests in 6:50.
-- Real-device memory, thermals and GPU need real devices: out of the MVP.
 
 ### Other packages (after fllama)
 - [ ] telosnex_audio. Survey (2026-10-25, main de64d41): CI already runs native gtest on macOS (with TSan), Linux x64 and arm64, Windows x64; `flutter test` engine/licenses/hook on macOS; example builds (desktop, apk); web engine cases in Chrome plus the AudioWorklet check (`tool/kiln/test_web.dart`, JS and Wasm). Gaps:
@@ -101,44 +77,100 @@ fllama spike: branch `spike/test-cells`, workflow
   - Mobile: `tool/test_android_device.sh` / `test_android_artifact.sh` and `tool/test_ios_simulator*.sh` exist, not in CI.
   - `tool/test_all.*` and `tool/test_native_sanitizers.sh` (local gates).
   - No PR test workflow: tests run only in a release.
-- [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): confirmed. Upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
-- [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests. Survey (2026-10-25, native-prebuilt ec61bda): upstream `check_and_lint.yml` runs `melos exec flutter test` (Linux), cargo clippy (host, Android, iOS) and `cargo test` on an OS matrix. Dart tests are few and shallow (one file per package, 2 web drop tests); no integration tests. Clipboard and drag-and-drop need a desktop session: a smoke test is an example app on macOS/Windows/Linux (xvfb) that writes and reads the clipboard.
-- [x] Before a design for each package, survey `example/`, `dev/` and removed CI configs (Codemagic). Done 2026-10-25 for all 6 (above). Common gaps: Firefox/Safari, Linux/Windows/arm Dart tests, mobile scripts that exist but are not in CI, and no PR test workflow outside kiln.
+- [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
+- [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests. Survey (2026-10-25, native-prebuilt ec61bda): upstream runs `melos exec flutter test` (Linux), cargo clippy (host, Android, iOS) and `cargo test` on an OS matrix. Dart tests are few and shallow; no integration tests. Clipboard and drag-and-drop need a desktop session: a smoke test is an example app on macOS/Windows/Linux (xvfb) that writes and reads the clipboard. The 3 legacy `index.html` files: fixed on local branch `example-flutter-bootstrap` (8bc1a43), not pushed.
+
+## Merge plan (fllama, draft)
+
+Hand-crafted from `spike/test-cells`, not a squash. Proposed commits:
+1. Native: skip a GPU that cannot run matrix multiply, RMS norm and softmax; `mmproj_use_gpu` follows `numGpuLayers`; `params.devices` ends with nullptr (5487175).
+2. Thread defaults: native physical cores - 1, web logical CPUs - 1, a set value as is (a6760c8, aee2ac8).
+3. Web: mmproj from the wllama cache (cache keyed by URL only), `fllamaWebRuntimeInfoJs`, error reporting (from d19f341 and earlier).
+4. Web: load again after a WebAssembly out-of-memory; reject an mmproj load without its compute buffer (8563988, the code part).
+5. llama.cpp pin check (44bc091).
+6. The test flow: `test.yml`, `example/integration_test/web_llm_integration_test.dart`, the reporting driver, `scripts/fetch_web_release.dart`, `scripts/serve_test_models.dart`, test assets, test changes (pause test, tearDown cancels, pack test timeout), kiln 0.1.2 in the lock.
+Leave out: `spike_test_cells.yml`, `web_spike_test.dart`, spike-only commits (`[x only]` tags, probes).
+
+## Investigation: iOS Safari out of memory (2026-10-25)
+
+Setup: iOS 26.0 simulator (iPhone 16), `flutter drive --browser-name ios-safari`, safaridriver, web files from `/tmp/fllama_web` (`web_build: local`). Runner script `/tmp/ios_run.sh <tag> [--dart-define=FLLAMA_TEST_THREADS=n]`; the report has the page console under `console`. hardwareConcurrency is the Mac's 8.
+
+Symptoms (before the fix), by the test's thread count:
+- 7 (the new default): `mmproj_hi` ABORT, then every later load "Cannot allocate WebAssembly.Memory". Sometimes only `compat_solid_red` fails: it varies run to run.
+- 5 and 6: only `compat_solid_red` (the 7th load) ABORTs. 4: all pass. The old cap of 4 (made up in 727e779; wllama's own default is CPUs / 2) hid this.
+- Desktop Safari, same Mac, 7 threads: all pass. Chrome, 15 threads: all pass, no retries.
+
+Measured:
+- Fresh page: one shared memory can grow to ~2624 MB; a second one while the first is alive cannot be created. After dropping the first, space is back only later (5 s later: a 4 GB maximum is reservable again).
+- Logged in the compat glue: with 7 threads the heap fails to grow at 1330-1441 MB (`RangeError: Out of memory`), so `ggml_aligned_malloc: insufficient memory` / ABORT. With 4 threads it reaches 1790 MB.
+- `getWasmMemory` reserves the full 4096 MB on the first try: not the old wllama #18/#23 problem.
+
+Ruled out, one at a time: the 4 GB reservation; idle workers (28 idle workers do not change headroom); pthread pool 1x vs 2x the threads; a 2 MB pthread stack instead of 16 MB (`STACK_SIZE=16MB` is also emscripten's pthread default); `PThread.terminateAllThreads()` before `worker.terminate()`.
+
+Cause: after `wllama.exit()` (worker terminate) iOS WebKit returns the old instance's shared WebAssembly memory only some seconds later; fllama exits and reloads whenever the request needs other load params. A 5 s wait before each load fixed every case; 1 s did not; 1 + 2 s did. Fits WebKit bug 250569 (terminated worker memory) and Kandelo's note on JSC not freeing workers blocked in `Atomics.wait`. Upstream wllama (ngxson, 19 commits after our pin 766d28e) has nothing about memory or exit; reeselevine's fork caps iOS *WebGPU* buffers at 384 MB (d605117), not CPU.
+
+Second bug found on the way: with no memory for the mmproj compute buffer (161 MB), clip.cpp ignores `ggml_backend_sched_reserve`'s result, the load reports success, and every image request aborts (`GGML_ASSERT(buffer)`). llama.cpp PR 29150, open. Native has the same bug.
+
+Fix (fllama 8563988): `fllama_web_init.js` loads again after 1, 2, 4 s on a WebAssembly memory error, and fails a load whose log has `failed to allocate` / `insufficient memory`. Result: iOS Safari passes with 7 threads, 2 of 2 runs (each reload after a model switch: retry at 1 s fails, at 2 s succeeds). Chrome: no retries.
+
+Temporary experiment edits were all reverted (`/tmp/fllama_web` restored from `/tmp/fllama_web_index.js.orig` and `/tmp/compat_wllama.js.orig`; the probe test removed).
+
+## Mobile browsers (fllama web)
+
+- iOS Safari: `flutter drive --browser-name ios-safari` (safaridriver, `safari:useSimulator`), in a booted simulator; localhost is the Mac's. Compat build, cross-origin isolated, about 1 min locally. ci_tools 1e4c4ce `web-driver` takes `ios-safari`; fllama test.yml job `web-ios-safari` boots with `scripts/boot_ios_simulator.dart --fresh`. The simulator does not enforce iPhone tab memory limits (WebKit 291677), so it catches less than a device.
+- Android Chrome: works locally (API 36 Play image, arm64, Chrome 133: compat build, 3 threads, all pass). Needs:
+  - `adb reverse tcp:P tcp:P` with `--web-port P --no-android-emulator`. Flutter's `--android-emulator` mode rewrites the URL to 10.0.2.2: not cross-origin isolated ("No supported storage backend").
+  - `/data/local/tmp/chrome-command-line` with `--disable-fre --no-first-run`.
+  - chromedriver: Chrome for Testing, latest of the device's milestone (the exact build can be missing: 133.0.6943.137 was, 133.0.6943.141 works).
+  - An 8 GB data partition: Chrome 154 on the default AVD failed with QuotaExceededError in OPFS (model copy).
+  - ci_tools 1e4c4ce `web-driver` takes `android-chrome`; fllama job `web-android-chrome` on API 37.0 (Chrome 145).
+- Emulator images (sdkmanager, 2026-10-25): newest stable x86_64 is android-37.0 google_apis / google_apis_playstore (rev 8); 37.2 is arm64 beta only. Chrome built in: API 35 124, API 36 133, API 37.0 145. Local arm64 37.0 images segfault on boot on this Mac (QEMU threads hang), with and without swiftshader.
+- Play Store image: has the Play Store, but updating Chrome needs a Google sign-in. Not a CI path. Owner: track the newest Android image instead.
+- Real-device memory, thermals and GPU need real devices: out of the MVP.
 
 ## Runner facts
 
-- Windows debugging: the Parallels `Windows 11` VM (ARM64). Send scripts with `powershell -EncodedCommand` (prlctl mangles quotes; long commands fail), clone repos there from GitHub.
-
 - macos-15 has 3 CPUs. ubuntu-24.04, ubuntu-24.04-arm and the Windows runners have 4.
 - macos-15's GPU is "Apple Paravirtual device": no Apple6-9 or Metal3 family, so ggml-metal has no simdgroup kernels.
-- ubuntu-24.04 has `/dev/kvm`. ubuntu-24.04-arm has none (run 40226383012), so no Android emulator cell there.
+- ubuntu-24.04 has `/dev/kvm`. ubuntu-24.04-arm has none, so no Android emulator cell there.
 - Preinstalled: Chrome 155 with `$CHROMEWEBDRIVER`, Firefox 157 with `$GECKOWEBDRIVER` (Linux), Safari 26.6.1 with `safaridriver` (needs `sudo safaridriver --enable`).
 - On a fresh macOS runner the first `simctl` call starts CoreSimulator, and can take more than 1 minute.
 - `adb` is not on `PATH` on ubuntu-24.04: use `$ANDROID_HOME/platform-tools`.
 - Flutter runs dart2wasm builds only in Chromium unless the app sets `wasmAllowList`. Firefox and Safari users get dart2js.
-- `flutter drive -d web-server` reads `web_dev_config.yaml`, so it can send COOP/COEP headers.
+- `flutter drive -d web-server` reads `web_dev_config.yaml`, so it can send COOP/COEP headers. `flutter drive` does not capture the browser console: the web test keeps it itself.
 - Playwright's Firefox runs WebAssembly about 10 times slower than stock Firefox and has no JSPI. Use stock browsers.
+- Windows: on a `shell: bash` step, `dart` is Flutter's wrapper (bin/dart, then dart.bat). It leaves `OS=MINGW64_NT...`, `FLUTTER_ROOT` etc. in the environment, and every `flutter` started below it then fails in flutter.bat (`bash: D:a_tempflutter/bin/internal/exit_with_errorlevel.bat`). Start `bin/cache/dart-sdk/bin/dart.exe` directly (ci_tools e1d108c).
+- kiln reads `web_build` / `web_build_dir` from `<kiln cache>/defaults.json` since 0.1.2 (`~/Library/Caches/kiln` on macOS, `~/.cache/kiln` on Linux). `web_build_dir` there must be absolute.
+
+## Local machine facts
+
+- Windows debugging: the Parallels `Windows 11` VM (ARM64), Git and Flutter installed. Use telosnex `dev/prlctl.dart run --vm "Windows 11" ...` (base64 scripts and files; `prlctl exec` mangles quotes and fails over ~4,000 characters). Clone repos there from GitHub.
+- Desktop Safari automation takes over the whole Mac: avoid it unless it settles a Safari question (owner). Remote automation is enabled in Safari's settings.
+- iOS simulator: iOS 26.0 runtime, `xcrun simctl create fl-safari "iPhone 16"` (4BD400A8-...).
+- Android: SDK at `~/Library/Android/sdk`; AVD `Medium_Phone_API_36.0` (Play image, 1 core, small disk); `/tmp/avd36` has `ci36` (4 cores, 8 GB disk). The emulator dies when the agent's command ends: boot and test in one command. Downloaded arm64 37.0 images (8 GB) do not boot here; can be deleted.
+- wllama checkouts: `~/dev/wllama` and `~/dev/wllama-stock` track reeselevine's fork; `~/dev/wllama-stock` has remote `ngxson` (upstream, where our pin is).
 
 ## Decisions
 
 - 2026-10-25: No version tag for telosnex_ci_tools until the first consumer (fllama) is through. Consumers pin the commit SHA with `# main`.
-
 - 2026-10-25: Web tests use `flutter drive` with stock browsers, not Playwright.
 - 2026-10-25: No dart2wasm cells for Firefox and Safari, also not nightly. Flutter needs an opt-in for them; revisit when Flutter supports them by default.
-- 2026-10-25: Android arm emulators, real devices, Edge and mobile browsers are out of the MVP.
-- 2026-10-25: fllama fixes from the spike, to merge:
-  - Skip a GPU that cannot run matrix multiply, RMS norm and softmax (macOS VM Metal crashed in the image encoder).
-  - `mmproj_use_gpu` follows `numGpuLayers`.
-  - `params.devices` ends with nullptr.
-  - Tests: the pause test leaves a CPU free; long requests are cancelled in tearDown; GPU pack test timeout 10 min, with pack files in the model cache.
+- 2026-10-25: Android arm emulators, real devices and Edge are out of the MVP. Mobile browsers are **in** (owner changed this): iOS Safari in the simulator, Chrome on the newest Android emulator image.
+- 2026-10-25: Track the newest Android emulator image (37.0 today); no Play Store updates, no third-party APKs.
+- 2026-10-25: Thread default: native physical cores - 1 (at least 1), web logical CPUs - 1, no cap. A set `numThreads` is used as is.
+- 2026-10-25: Native and web pin one llama.cpp commit, checked by a test (not a web key that ignores `src/`).
+- 2026-10-25: `web_build: local` for CI comes from kiln's `defaults.json`, as `native_build` (kiln 0.1.2, published).
+- 2026-10-25: Carry llama.cpp PR 29150 eventually.
+- 2026-10-25: Merge to `main` commit by commit, with cleanup at the merge.
 
 ## Log
-
-- 2026-10-25: web tests were not testing. `test()` results do not reach `flutter drive`, and the job's `| tee` hid a compile failure for 3 runs. Found with the port. Real fllama bug found: wllama's model cache keys by URL only, so a model cached for a text request loaded again without mmproj and images were ignored.
-- 2026-10-25: iOS stall diagnosed: the app launches and its Dart VM service listens 3 s later, but `flutter test` never connects. Next run has `flutter test -v`.
 
 - 2026-10-25: fllama spike started. The failures it found and their causes:
   - A `--wasm` build with the legacy `index.html` stalled: the loader ran `main.dart.js`.
   - The Firefox and Safari Wasm stalls: Flutter's loader rejects Wasm outside Chromium.
   - The linux-arm64 1 s pause and the earlier iOS hang: 4 decode threads on 4 or 3 CPUs.
   - Metal on macos-15: a paravirtual GPU without the kernels, then a crash in the image encoder.
+- 2026-10-25: web tests were not testing. `test()` results do not reach `flutter drive`, and the job's `| tee` hid a compile failure for 3 runs. Real fllama bug found: wllama's model cache keys by URL only, so a model cached for a text request loaded again without mmproj and images were ignored.
+- 2026-10-25: iOS simulator stall: once, the app's VM service listened but `flutter test` never connected; a later false stall was the watchdog timing the Xcode build. Fix: build in its own step (63ca01c). Not seen since.
+- 2026-10-25: Windows `watch` failures: two wrong fixes (which bash) before the VM reproduced it; the cause was Flutter's dart wrapper environment (above).
+- 2026-10-25: iOS Safari OOM: the deep dive above. Lesson: read the upstream repos, issues and history first (owner).
