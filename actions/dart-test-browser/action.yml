@@ -1,12 +1,10 @@
 # `dart test -p <browser> -c <compiler>` on a GitHub runner:
 # - firefox on Linux runs under xvfb-run (Firefox needs a display; package:test
 #   starts it without --headless);
-# - safari (macOS) opens the test page through safari_launcher.sh (set with
-#   DART_TEST_CONFIG; a package's own dart_test.yaml override wins). Without
-#   it, package:test opens a local redirect.html, and Safari asks the user to
-#   confirm the file: the run waits forever. Needs package:test < 1.33: 1.33
-#   drives Safari through safaridriver instead, runs the launcher as
-#   safaridriver (exit 64), and without the launcher hung at "loading".
+# - safari (macOS) enables safaridriver: package:test 1.33 and newer drive
+#   Safari through it. Older package:test opened a local redirect.html that
+#   Safari refuses without a prompt; use 1.33+, and remove override_platforms
+#   Safari launchers (1.33 runs them as safaridriver, and they exit 64).
 # - chrome needs nothing.
 name: dart test browser
 description: dart test -p chrome|firefox|safari on a runner, with what each browser needs.
@@ -49,10 +47,7 @@ runs:
             run=(xvfb-run -a "${run[@]}")
             ;;
           safari-macOS)
-            config="$RUNNER_TEMP/dart_test_global.yaml"
-            printf 'override_platforms:\n  safari:\n    settings:\n      executable: /bin/bash\n      arguments: %s\n' \
-              "$GITHUB_ACTION_PATH/safari_launcher.sh" > "$config"
-            export DART_TEST_CONFIG="$config"
+            sudo safaridriver --enable
             ;;
         esac
         echo "+ ${run[*]}"

@@ -12,7 +12,7 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `actions/watch` | Composite action | Runs a bash command; stops it after N minutes without output, runs an `on-stall` command first, and exits 124. |
 | `actions/android-emulator` | Composite action | Boots an x86_64 Android emulator with KVM on ubuntu-24.04, and puts `adb` on `PATH`. |
 | `actions/web-driver` | Composite action | Starts chromedriver, geckodriver or safaridriver (`ios-safari`: opens Safari once in the simulator first). Optionally runs `flutter drive` with a watchdog, and again only when the driver could not start a session; passes with a warning when all tests passed and only closing the session failed. |
-| `actions/dart-test-browser` | Composite action | `dart test -p chrome/firefox/safari`: Firefox on Linux under xvfb-run; Safari through a launcher that skips its local-file prompt (package:test < 1.33). |
+| `actions/dart-test-browser` | Composite action | `dart test -p chrome/firefox/safari`: Firefox on Linux under xvfb-run; Safari with safaridriver enabled (package:test 1.33+). |
 | `actions/ios-simulator-boot` | Composite action | Creates and boots a fresh iPhone simulator (newest runtime) and outputs its UDID. For native and iOS Safari jobs; use macos-26 or newer. |
 | `actions/ios-flutter-test` | Composite action | `flutter test` on a fresh iOS simulator: a connect watchdog (flutter test sometimes never sees the VM service), a stall watchdog, and up to 3 attempts while no test has started. Never starts Safari. |
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
