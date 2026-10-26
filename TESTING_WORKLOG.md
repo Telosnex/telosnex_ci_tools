@@ -95,6 +95,15 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 - [ ] webcrypto.dart: Safari and the arm runners only. Keep the upstream `test.yml`. Survey (2026-10-25): upstream `test.yml` runs `dart test -p vm,chrome,firefox -c dart2js,dart2wasm` on Linux (xvfb), vm+chrome on macos-15, vm+chrome+firefox on Windows, plus iOS and Android jobs. No Safari, no arm runners.
 - [ ] super_native_extensions: upstream `check_and_lint.yml` fails (`actions/cache@v3` is blocked, a clippy rule). Fix or replace it, then add smoke tests. Survey (2026-10-25, native-prebuilt ec61bda): upstream runs `melos exec flutter test` (Linux), cargo clippy (host, Android, iOS) and `cargo test` on an OS matrix. Dart tests are few and shallow; no integration tests. Clipboard and drag-and-drop need a desktop session: a smoke test is an example app on macOS/Windows/Linux (xvfb) that writes and reads the clipboard. The 3 legacy `index.html` files: fixed on local branch `example-flutter-bootstrap` (8bc1a43), not pushed.
 
+## Kiln packages: Unit / Integration (2026-10-26)
+
+Standard (README "Job names", lint rule job-name): unit.yml "Unit" (PRs), integration.yml "Integration" (main, ci/**, nightly, manual), jobs `<Platform> <Arch> [detail]` / `Web <Platform> <Arch> <Browser> [detail]`. Branch `ci/unit-integration` in zxing_dart, image_ffmpeg, fonnx, telosnex_audio, webcrypto.dart. Status: /tmp/ci_status.sh; failures: /tmp/ci_why.sh, /tmp/ci_tail.sh.
+- New in ci_tools: ios-simulator-boot, ios-flutter-test, dart-test-browser (Firefox under xvfb-run; Safari via a launcher set with DART_TEST_CONFIG, no local-file prompt), lint job names (+ universal arch, product names like BoringSSL).
+- package:test 1.33 drives Safari through safaridriver: with the old launcher override it exits 64, without it the run hangs at loading (and locally Safari still showed the confirm-file dialog). Packages pin test '>=1.28.0 <1.33.0'. Revisit when 1.33's safaridriver path works.
+- Round 1 fixes: dart pub get --no-example (Flutter examples); analyze the package dirs only; zxing iOS/Android download the released libs first; fonnx web tests need the models (test/web_models -> example/assets/models); image_ffmpeg jpeg_diagnostics test skipped on Windows (subprocess cannot replace the loaded DLL).
+- Open: audio Firefox/Safari (web_check.dart); webcrypto publish.yml untested (tags only).
+- fllama drop/llama-cpp-5aeac37, run 40344069820: all green except **web Firefox**: hung in mmproj_hi at "Downloading model files", then solid_red waited on it (new wllama head; Firefox only). Investigate before the release.
+
 ## Merge plan (fllama)
 
 **MERGED 2026-10-26:** main 015ff36..14be8d8 (fast-forward, the 11 draft commits). First main run: 40340468816. Deleted: kiln-release, kiln-manifest/native-3741625c6cb9b61d, local carry/merge branches and /tmp worktrees. Keep spike/test-cells until main's run is green, then delete it.
