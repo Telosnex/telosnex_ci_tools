@@ -365,6 +365,7 @@ jobs:
       'macOS ARM64 Metal',
       'iOS ARM64 simulator',
       'Android x64 API 37',
+      'Android universal example build',
       'Web Linux ARM64 Chrome',
       'Web Linux x64 Chrome dart2wasm',
       'Web iOS ARM64 Safari',

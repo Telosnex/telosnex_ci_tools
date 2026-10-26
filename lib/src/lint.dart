@@ -317,7 +317,7 @@ Iterable<(int, String)> _jobNames(YamlMap job) sync* {
 }
 
 const _platforms = ['Linux', 'macOS', 'Windows', 'iOS', 'Android'];
-const _archs = ['x64', 'ARM64', 'ARM', 'x86'];
+const _archs = ['x64', 'ARM64', 'ARM', 'x86', 'universal'];
 const _browsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
 final _platformWord = RegExp(
   '\\b(${[..._platforms, ..._browsers, 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64'].join('|')})\\b',

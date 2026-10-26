@@ -140,7 +140,7 @@ platform is named `<Platform> <Arch> [detail]`; a browser job is
 `Web <Platform> <Arch> <Browser> [detail]`:
 
 - platforms: Linux, macOS, Windows, iOS, Android
-- archs: x64, ARM64, ARM, x86
+- archs: x64, ARM64, ARM, x86, universal (a job for every arch, e.g. an Android build of all ABIs)
 - browsers: Chrome, Firefox, Safari, Edge
 
 Examples: `Windows ARM64`, `macOS ARM64 Metal`, `iOS ARM64 simulator`,
