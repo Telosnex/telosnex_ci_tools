@@ -97,6 +97,8 @@ fllama: branch `spike/test-cells`, workflow `.github/workflows/test.yml`
 
 ## Merge plan (fllama)
 
+**Status 2026-10-26:** ci_tools tagged v0.4.0 (c77f43a); fllama pins it in test.yml, kiln_check.yml, kiln_release.yml (spike 3b0d1c5-ish, "Workflows: Telosnex/telosnex_ci_tools v0.4.0"). Two full green runs (40285438371, 40290245554). Release native-3741625c6cb9b61d published from the draft tree 7ac88b0 (run 40335981965, all jobs green incl. web-test); its manifest commit 14be8d8 is on the local draft, `kiln:check` ok. The draft (11 commits on origin/main 015ff36) is ready for the owner to merge; not pushed to main. contextSize 0 stays as is (owner). No upstream contact (owner).
+
 Draft branch `merge/test-cells` (local, worktree /tmp/fllama_merge), made by `/tmp/build_merge.sh` (rerun it after each spike change; copy it into the repo's dev/ if it must last). From origin/main it applies only the `lib/`/`src/`/`web_build/` parts of the spike's library commits (`git diff C^ C -- paths | git apply --3way`, then `kiln:web stamp`), whole files at the spike's state for the rest, then the carry branch. 10 commits (2026-10-26):
 1. Native: skip a GPU that cannot run the ops of every model; the image encoder follows numGpuLayers (5487175).
 2. Web: fllamaWebRuntimeInfoJs (7f33590).
