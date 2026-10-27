@@ -403,9 +403,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps: []
 ''';
-      final findings = lintWorkflow('integration.yml', workflow)
-          .where((f) => f.rule == 'job-name')
-          .toList();
+      final findings = lintWorkflow(
+        'integration.yml',
+        workflow,
+      ).where((f) => f.rule == 'job-name').toList();
       expect(findings, hasLength(1));
       expect(findings.single.message, contains('linux-x64'));
     });

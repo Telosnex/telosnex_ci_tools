@@ -287,7 +287,9 @@ Iterable<(int, String)> _jobNames(YamlMap job) sync* {
   final node = job.nodes['name'];
   final name = node?.value;
   if (name is! String) return;
-  final matrixName = RegExp(r'^\$\{\{\s*matrix\.([\w-]+)\s*\}\}$').firstMatch(name);
+  final matrixName = RegExp(
+    r'^\$\{\{\s*matrix\.([\w-]+)\s*\}\}$',
+  ).firstMatch(name);
   if (matrixName == null) {
     if (!name.contains(r'${{')) yield (_line(node!), name);
     return;
