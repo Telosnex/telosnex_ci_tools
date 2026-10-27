@@ -1,0 +1,70 @@
+name: Dashboard
+
+# The CI dashboard of the packages in dashboard.yaml: README.md and
+# dashboard.json on the dashboard branch, one commit that each run replaces
+# (https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard), and the job
+# summary of each run.
+#
+# GitHub turns off the schedule of a public repository after 60 days without
+# activity in it; run it by hand to turn it back on.
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - dashboard.yaml
+      - bin/dashboard.dart
+      - lib/src/dashboard*.dart
+      - lib/src/job_names.dart
+      - .github/workflows/dashboard.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dashboard
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dashboard:
+    name: Dashboard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The packages are public repositories: any token reads their runs and
+    # jobs. A private one would need a token with actions: read on it.
+    permissions:
+      # Pushes the dashboard branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - run: dart pub get
+      - name: Build the dashboard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          dart run telosnex_ci_tools:dashboard --out "$RUNNER_TEMP/dashboard"
+          cat "$RUNNER_TEMP/dashboard/README.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the dashboard branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          cd "$RUNNER_TEMP/dashboard"
+          git init -q -b dashboard
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md dashboard.json
+          git commit -q -m "Dashboard $(date -u +%Y-%m-%dT%H:%MZ)"
+          auth=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" \
+            push -q --force "https://github.com/$REPOSITORY.git" dashboard

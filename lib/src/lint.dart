@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import 'job_names.dart';
+
 /// The prefix of every action and reusable workflow of this repository.
 const selfRepository = 'Telosnex/telosnex_ci_tools';
 
@@ -318,18 +320,8 @@ Iterable<(int, String)> _jobNames(YamlMap job) sync* {
   }
 }
 
-const _platforms = ['Linux', 'macOS', 'Windows', 'iOS', 'Android'];
-const _archs = ['x64', 'ARM64', 'ARM', 'x86', 'universal'];
-const _browsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
 final _platformWord = RegExp(
-  '\\b(${[..._platforms, ..._browsers, 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64'].join('|')})\\b',
-);
-final _nativeJob = RegExp(
-  '^(${_platforms.join('|')}) (${_archs.join('|')})( \\S.*)?\$',
-);
-final _webJob = RegExp(
-  '^Web (${_platforms.join('|')}) (${_archs.join('|')}) '
-  '(${_browsers.join('|')})( \\S.*)?\$',
+  '\\b(${[...platforms, ...browsers, 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64'].join('|')})\\b',
 );
 
 /// Null if a job name is in the Telosnex form (README, "Job names"):
@@ -338,12 +330,12 @@ final _webJob = RegExp(
 /// dart2wasm`). Names without a platform or browser (`Unit`, `Web files`)
 /// only need sentence case.
 String? jobNameProblem(String name) {
-  if (_nativeJob.hasMatch(name) || _webJob.hasMatch(name)) return null;
+  if (parseJobName(name) != null) return null;
   if (_platformWord.hasMatch(name)) {
     return 'Name the job "<Platform> <Arch> [detail]" or '
         '"Web <Platform> <Arch> <Browser> [detail]", e.g. "Windows ARM64", '
-        '"Web Linux x64 Chrome dart2wasm" (platforms: ${_platforms.join(', ')}; '
-        'archs: ${_archs.join(', ')}; browsers: ${_browsers.join(', ')}), '
+        '"Web Linux x64 Chrome dart2wasm" (platforms: ${platforms.join(', ')}; '
+        'archs: ${archs.join(', ')}; browsers: ${browsers.join(', ')}), '
         'not "$name".';
   }
   return nameProblem(name);
