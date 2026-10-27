@@ -59,6 +59,51 @@ void main() {
     });
   });
 
+  group('matrix', () {
+    final text = _workflow(job: '').replaceFirst(
+      '    timeout-minutes: 10\n',
+      '    timeout-minutes: 10\n'
+          '    strategy:\n'
+          '      matrix:\n'
+          '        include:\n'
+          '          - { name: Linux x64, runner: ubuntu-24.04 }\n',
+    );
+
+    test('no-matrix', () {
+      expect(_rules('native_release.yml', text), ['no-matrix']);
+    });
+
+    test('allowed in telosnex_ci_tools', () {
+      expect(
+        lintWorkflow('native_release.yml', text, allowMatrix: true),
+        isEmpty,
+      );
+    });
+
+    test('anchors are fine', () {
+      final anchored = _workflow(
+        job: '''
+  other:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps: *steps
+''',
+      ).replaceFirst('    steps:\n', '    steps: &steps\n');
+      expect(_rules('native_release.yml', anchored), isEmpty);
+    });
+  });
+
+  test('no-merge-key', () {
+    final text = _workflow(
+      job: '''
+  other:
+    <<: *defaults
+    steps: []
+''',
+    ).replaceFirst('  build:\n', '  build: &defaults\n');
+    expect(_rules('native_release.yml', text), contains('no-merge-key'));
+  });
+
   test('permissions', () {
     final text = _workflow().replaceFirst(
       'permissions:\n  contents: read\n',

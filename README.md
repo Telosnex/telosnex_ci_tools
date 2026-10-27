@@ -37,6 +37,8 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `pinned-uses` | Each `uses:` names a full commit SHA, then a version comment: `@<sha> # v7.0.1`. |
 | `setup-flutter` | Jobs install Flutter with `actions/setup-flutter`. |
 | `shared-concurrency` | A caller of a shared workflow does not set `concurrency`. The same group in the caller and in the shared workflow deadlocks. |
+| `no-matrix` | No `strategy.matrix` (except in this repository's reusable workflows). GitHub draws a matrix as one box in the run graph; write the jobs out and share their steps with a YAML anchor: `steps: &desktop_steps` in the first job, `steps: *desktop_steps` in the others, and what differs in job `env:` and step `if:`. |
+| `no-merge-key` | No YAML merge key (`<<: *anchor`). GitHub rejects it at startup; alias whole values. |
 
 ## Call a shared workflow
 
@@ -155,3 +157,4 @@ Workflows of a Kiln package: `unit.yml` (Unit: analyze, format, host VM
 tests; every pull request), `integration.yml` (Integration: every platform
 and browser; main, nightly, manual), `kiln_check.yml`, `kiln_release.yml`.
 
+Job IDs (the boxes of the run graph) are by platform family: `desktop-<platform>-<arch>`, `ios`, `android`, `web-<platform>-<browser>[-<compiler>]`; jobs without a platform can use any ID.

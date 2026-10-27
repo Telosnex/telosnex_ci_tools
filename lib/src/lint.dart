@@ -30,6 +30,7 @@ final class Finding {
 /// The findings of every workflow file in `<repo>/.github/workflows`, and
 /// of the `web/index.html` of each Flutter app in the repository.
 List<Finding> lintRepository(String repo) {
+  final allowMatrix = _isSelf(repo);
   final dir = Directory(p.join(repo, '.github', 'workflows'));
   final files = dir.existsSync()
       ? (dir.listSync().whereType<File>().toList()
@@ -40,6 +41,7 @@ List<Finding> lintRepository(String repo) {
       ...lintWorkflow(
         p.relative(file.path, from: repo),
         file.readAsStringSync(),
+        allowMatrix: allowMatrix,
       ),
     for (final file in _webIndexFiles(repo))
       ...lintWebIndex(
@@ -52,6 +54,17 @@ List<Finding> lintRepository(String repo) {
         file.readAsStringSync(),
       ),
   ];
+}
+
+/// Whether [repo] is telosnex_ci_tools: its reusable workflows may use a
+/// matrix (a caller sees them in a box of their own anyway).
+bool _isSelf(String repo) {
+  final pubspec = File(p.join(repo, 'pubspec.yaml'));
+  return pubspec.existsSync() &&
+      RegExp(
+        r'^name:\s*telosnex_ci_tools\s*$',
+        multiLine: true,
+      ).hasMatch(pubspec.readAsStringSync());
 }
 
 /// The `--target` files of the `flutter drive` commands of [workflows],
@@ -150,7 +163,11 @@ List<Finding> lintWebIndex(String path, String text) {
 }
 
 /// The findings of one workflow file. [path] is relative to the repository.
-List<Finding> lintWorkflow(String path, String text) {
+List<Finding> lintWorkflow(
+  String path,
+  String text, {
+  bool allowMatrix = false,
+}) {
   final findings = <Finding>[];
   void add(int line, String rule, String message) =>
       findings.add(Finding(path, line, rule, message));
@@ -219,6 +236,17 @@ List<Finding> lintWorkflow(String path, String text) {
         'Set shell: $workflowShell in the defaults.run of job '
             '${(key as YamlNode).value}. Job defaults replace the workflow '
             'defaults: without it, steps run in sh or PowerShell.',
+      );
+    }
+    final strategy = value.nodes['strategy'];
+    final matrix = strategy is YamlMap ? strategy.nodes['matrix'] : null;
+    if (!allowMatrix && matrix != null) {
+      add(
+        _line(matrix),
+        'no-matrix',
+        'Write each job of the matrix of job ${(key as YamlNode).value} '
+            'out: GitHub puts a matrix in one box of the run graph. Share '
+            'the steps with a YAML anchor (steps: &name, then steps: *name).',
       );
     }
     for (final (line, jobName) in _jobNames(value)) {
@@ -397,6 +425,14 @@ void _lintLines(String text, void Function(int, String, String) add) {
   for (var i = 0; i < lines.length; i++) {
     final line = lines[i];
     if (line.trimLeft().startsWith('#')) continue;
+    if (_mergeKey.hasMatch(line)) {
+      add(
+        i + 1,
+        'no-merge-key',
+        'GitHub Actions rejects the YAML merge key <<: the run fails at '
+            'startup. Alias whole values instead (steps: *name).',
+      );
+    }
     final uses = _uses.firstMatch(line);
     if (uses != null) {
       final ref = uses[1]!;
@@ -427,6 +463,8 @@ void _lintLines(String text, void Function(int, String, String) add) {
     }
   }
 }
+
+final _mergeKey = RegExp(r'^\s*(- )?<<\s*:');
 
 const _setupFlutter =
     'Install Flutter with $selfRepository/actions/setup-flutter.';

@@ -11,7 +11,8 @@
 #   has started. Once a test has started, a failure is final.
 #
 # Diagnostics in $RUNNER_TEMP/ios-flutter-test (simulator log stream, test
-# output, screenshots); upload them with if: always().
+# output, screenshots, connect diagnostics), uploaded as an artifact
+# (`upload`, default on failure).
 #
 # Build the app first (flutter build ios --simulator --debug -t <target>,
 # same defines): the Xcode build is silent for minutes, and built ahead, the
@@ -51,11 +52,25 @@ inputs:
     description: Minutes without output before an attempt is stopped.
     required: false
     default: '8'
+  upload:
+    description: When to upload the diagnostics as an artifact, always, failure or never.
+    required: false
+    default: failure
+  artifact-name:
+    description: The artifact name. Empty: ios-flutter-test-<job id>.
+    required: false
+    default: ''
+
+outputs:
+  logs:
+    description: The diagnostics directory.
+    value: ${{ steps.test.outputs.logs }}
 
 runs:
   using: composite
   steps:
     - name: flutter test
+      id: test
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -71,6 +86,7 @@ runs:
         tools="$GITHUB_ACTION_PATH/.."
         diag="$RUNNER_TEMP/ios-flutter-test"
         mkdir -p "$diag"
+        echo "logs=$diag" >> "$GITHUB_OUTPUT"
         read -r -a extra <<< "$ARGS"
         limit 300 xcrun simctl list runtimes > /dev/null
         status=1
@@ -141,3 +157,11 @@ runs:
           if (( started )) || [[ "$status" == 0 ]]; then break; fi
         done
         exit "$status"
+    - name: Upload the diagnostics
+      if: always() && (inputs.upload == 'always' || (inputs.upload == 'failure' && (failure() || cancelled())))
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name || format('ios-flutter-test-{0}', github.job) }}
+        path: ${{ runner.temp }}/ios-flutter-test
+        if-no-files-found: ignore
+        overwrite: true
