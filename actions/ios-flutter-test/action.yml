@@ -57,7 +57,7 @@ inputs:
     required: false
     default: failure
   artifact-name:
-    description: The artifact name. Empty: ios-flutter-test-<job id>.
+    description: The artifact name; empty for ios-flutter-test-<job id>.
     required: false
     default: ''
 

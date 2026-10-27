@@ -104,6 +104,18 @@ void main() {
     expect(_rules('native_release.yml', text), contains('no-merge-key'));
   });
 
+  test('action files must parse', () {
+    expect(
+      lintAction('a/action.yml', 'name: A\nruns:\n  using: composite\n'),
+      isEmpty,
+    );
+    final bad = lintAction(
+      'a/action.yml',
+      'inputs:\n  x:\n    description: The name. Empty: the job id.\n',
+    );
+    expect([for (final f in bad) f.rule], ['yaml']);
+  });
+
   test('permissions', () {
     final text = _workflow().replaceFirst(
       'permissions:\n  contents: read\n',

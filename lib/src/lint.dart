@@ -43,6 +43,8 @@ List<Finding> lintRepository(String repo) {
         file.readAsStringSync(),
         allowMatrix: allowMatrix,
       ),
+    for (final file in _actionFiles(repo))
+      ...lintAction(p.relative(file.path, from: repo), file.readAsStringSync()),
     for (final file in _webIndexFiles(repo))
       ...lintWebIndex(
         p.relative(file.path, from: repo),
@@ -54,6 +56,31 @@ List<Finding> lintRepository(String repo) {
         file.readAsStringSync(),
       ),
   ];
+}
+
+/// The `action.yml` files of the composite actions in `<repo>/actions`.
+List<File> _actionFiles(String repo) {
+  final dir = Directory(p.join(repo, 'actions'));
+  if (!dir.existsSync()) return [];
+  return [
+    for (final sub in dir.listSync().whereType<Directory>())
+      if (File(p.join(sub.path, 'action.yml')) case final file
+          when file.existsSync())
+        file,
+  ]..sort((a, b) => a.path.compareTo(b.path));
+}
+
+/// An action file must parse: GitHub fails every job that uses an action
+/// with invalid YAML at setup, and actionlint does not read action files.
+List<Finding> lintAction(String path, String text) {
+  try {
+    if (loadYamlNode(text, sourceUrl: Uri.file(path)) is! YamlMap) {
+      return [Finding(path, 1, 'yaml', 'The action is not a YAML map.')];
+    }
+  } on YamlException catch (e) {
+    return [Finding(path, (e.span?.start.line ?? 0) + 1, 'yaml', e.message)];
+  }
+  return [];
 }
 
 /// Whether [repo] is telosnex_ci_tools: its reusable workflows may use a
