@@ -39,6 +39,14 @@ inputs:
     description: Seconds to wait for the VM service after the app launch.
     required: false
     default: '150'
+  missed-line-seconds:
+    description: >-
+      Seconds flutter test gets to report the VM service after the app has
+      logged it (in our own simulator log stream). flutter_tools sometimes
+      never receives that line; then the attempt ends after this instead of
+      connect-seconds.
+    required: false
+    default: '30'
   idle-minutes:
     description: Minutes without output before an attempt is stopped.
     required: false
@@ -55,6 +63,7 @@ runs:
         ARGS: ${{ inputs.args }}
         ATTEMPTS: ${{ inputs.attempts }}
         CONNECT_SECONDS: ${{ inputs.connect-seconds }}
+        MISSED_LINE_SECONDS: ${{ inputs.missed-line-seconds }}
         IDLE_MINUTES: ${{ inputs.idle-minutes }}
       run: |
         # Runs "$@" with a limit of $1 seconds (macOS has no timeout(1)).
@@ -85,17 +94,33 @@ runs:
           pipeline=$!
           (
             waited=0
+            # Seconds since the app logged its VM service (our log stream)
+            # while flutter test has not reported it: flutter_tools' own
+            # simulator log reader sometimes never delivers that line (it
+            # starts after simctl launch), and then flutter waits forever.
+            missed=-1
             while kill -0 "$pipeline" 2> /dev/null; do
               if grep -q 'VM Service URL on device' "$out" 2> /dev/null; then exit 0; fi
               if grep -q 'Waiting for VM Service port' "$out" 2> /dev/null; then
                 waited=$(( waited + 5 ))
-                if (( waited >= CONNECT_SECONDS )); then
-                  echo "::warning::Attempt $attempt: no VM service $CONNECT_SECONDS s after launch; ending the attempt."
+                if (( missed < 0 )) && grep -q 'Dart VM service is listening' "$diag/simulator_$attempt.log" 2> /dev/null; then
+                  missed=0
+                elif (( missed >= 0 )); then
+                  missed=$(( missed + 5 ))
+                fi
+                reason=
+                if (( missed >= MISSED_LINE_SECONDS )); then
+                  reason="the app logged its VM service but flutter test did not see it in $MISSED_LINE_SECONDS s"
+                elif (( waited >= CONNECT_SECONDS )); then
+                  reason="no VM service $CONNECT_SECONDS s after launch"
+                fi
+                if [[ -n "$reason" ]]; then
+                  echo "::warning::Attempt $attempt: $reason; ending the attempt."
                   {
+                    echo "== $reason"
                     echo "== log stream processes"; pgrep -fl 'log stream' || true
-                    echo "== VM service lines the simulator logged"
-                    xcrun simctl spawn "$udid" log show --last 10m --style compact \
-                      --predicate 'eventMessage CONTAINS "Dart VM service is listening"' 2>&1 | tail -5
+                    echo "== VM service lines in our simulator log (simulator_$attempt.log)"
+                    grep 'Dart VM service is listening' "$diag/simulator_$attempt.log" | tail -5
                   } > "$diag/connect_$attempt.txt" 2>&1
                   # flutter_tools and watch.dart both have this in their command line.
                   pkill -f -- "-d $udid" || true
