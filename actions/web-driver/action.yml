@@ -22,9 +22,18 @@
 # integrationDriver reports only IntegrationTestWidgetsFlutterBinding.results,
 # which gets failures from testWidgets' exception reporter only. A plain
 # test() that fails or times out, or a failing setUp/tearDown, is reported as
-# passing. In the app, record every failed test there, as telosnex's
-# integration_test/web_test_reporting.dart does (installWebTestReporting,
-# called right after the binding is initialized).
+# passing. And flutter drive prints nothing of the browser console. Use
+# packages/telosnex_web_test of this repository: installWebTestSupport in the
+# app reports every test's result and keeps the console, and its driver
+# (webIntegrationDriver) saves the console while the tests run.
+#
+# Logs, in a new directory in $RUNNER_TEMP per use (the output `logs`),
+# uploaded as an artifact (`upload`; give each use in a job its own
+# `artifact-name` and `port`): driver.log (chromedriver, geckodriver or
+# safaridriver), run_<attempt>.log (the output of `run`), and from
+# webIntegrationDriver, web_console.log and integration_response_data.json:
+# `run` gets their paths in TELOSNEX_WEB_TEST_CONSOLE and
+# TELOSNEX_WEB_TEST_RESPONSE, which the driver reads.
 name: Web driver
 description: Starts chromedriver, geckodriver or safaridriver, and runs flutter drive.
 
@@ -50,22 +59,50 @@ inputs:
     description: The directory of `run`.
     required: false
     default: '.'
+  require-result:
+    description: >-
+      Optional. A jq expression that must be true of
+      integration_response_data.json after `run` passed, e.g.
+      '.telosnexWebTestSummary.passed >= 12' or '.web.last_case.done':
+      a run that skipped the tests fails.
+    required: false
+    default: ''
+  upload:
+    description: When to upload the logs as an artifact, always, failure or never.
+    required: false
+    default: always
+  artifact-name:
+    description: >-
+      The artifact name. Empty: web-driver-<job id>-<matrix job index>.
+    required: false
+    default: ''
 
 outputs:
   port:
     description: The driver port.
     value: ${{ inputs.port }}
+  logs:
+    description: The log directory.
+    value: ${{ steps.start.outputs.logs }}
 
 runs:
   using: composite
   steps:
     - name: Start the driver
+      id: start
       shell: bash
       env:
         BROWSER: ${{ inputs.browser }}
         PORT: ${{ inputs.port }}
+        UPLOAD: ${{ inputs.upload }}
       run: |
-        log="$RUNNER_TEMP/web_driver.log"
+        case "$UPLOAD" in
+          always|failure|never) ;;
+          *) echo "::error::upload must be always, failure or never, not $UPLOAD."; exit 1 ;;
+        esac
+        logs=$(mktemp -d "$RUNNER_TEMP/web-driver.XXXXXX")
+        echo "logs=$logs" >> "$GITHUB_OUTPUT"
+        log="$logs/driver.log"
         case "$BROWSER" in
           chrome)
             version="$(google-chrome --version), $("$CHROMEWEBDRIVER/chromedriver" --version)"
@@ -136,7 +173,11 @@ runs:
         BROWSER: ${{ inputs.browser }}
         WATCH_RUN: ${{ inputs.run }}
         WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
+        REQUIRE_RESULT: ${{ inputs.require-result }}
+        LOGS: ${{ steps.start.outputs.logs }}
       run: |
+        export TELOSNEX_WEB_TEST_CONSOLE="$LOGS/web_console.log"
+        export TELOSNEX_WEB_TEST_RESPONSE="$LOGS/integration_response_data.json"
         # On Windows: Git\bin\bash.exe, the bash of GitHub's steps ("bash"
         # from cmd can be WSL's), and dart.exe itself. Flutter's `dart`
         # wrapper (bin/dart, then dart.bat) leaves OS=MINGW64... and its
@@ -151,8 +192,8 @@ runs:
           sdk_dart="$(dirname "$(command -v dart)")/cache/dart-sdk/bin/dart.exe"
           if [[ -f "$sdk_dart" ]]; then dart_exe=$sdk_dart; fi
         fi
-        out="$RUNNER_TEMP/web_driver_run.log"
         for attempt in 1 2 3; do
+          out="$LOGS/run_$attempt.log"
           status=0
           "$dart_exe" "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
             -- "$bash_exe" -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
@@ -165,4 +206,22 @@ runs:
           echo "::warning::$BROWSER: all tests passed; only closing the browser session failed."
           status=0
         fi
+        if [[ "$status" == 0 && -n "$REQUIRE_RESULT" ]]; then
+          if [[ ! -f "$TELOSNEX_WEB_TEST_RESPONSE" ]]; then
+            echo "::error::$BROWSER: no $TELOSNEX_WEB_TEST_RESPONSE for require-result. Use webIntegrationDriver of telosnex_web_test."
+            status=1
+          elif ! jq -e "$REQUIRE_RESULT" "$TELOSNEX_WEB_TEST_RESPONSE" > /dev/null; then
+            echo "::error::$BROWSER: the run passed, but the response data fails require-result: $REQUIRE_RESULT"
+            status=1
+          fi
+        fi
         exit "$status"
+    - name: Upload the logs
+      if: always() && (inputs.upload == 'always' || (inputs.upload == 'failure' && failure()))
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name || format('web-driver-{0}-{1}', github.job, strategy.job-index) }}
+        path: ${{ steps.start.outputs.logs }}
+        if-no-files-found: ignore
+        # A re-run of the job replaces the logs of its first attempt.
+        overwrite: true

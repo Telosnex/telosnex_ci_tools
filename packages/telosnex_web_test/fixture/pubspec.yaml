@@ -1,0 +1,21 @@
+name: telosnex_web_test_fixture
+description: The web app that CI drives to test telosnex_web_test end to end.
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  lints: ^6.0.0
+  telosnex_web_test:
+    path: ..

@@ -1,0 +1,28 @@
+name: telosnex_web_test
+description: >-
+  Flutter web integration tests that keep their logs and do not pass by
+  mistake: browser console capture, progress, and every test's result.
+version: 0.1.0
+publish_to: none
+repository: https://github.com/Telosnex/telosnex_ci_tools/tree/main/packages/telosnex_web_test
+
+environment:
+  sdk: ^3.10.0
+  flutter: ">=3.38.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  # Pinned by flutter_test. The result reporting uses its LiveTest internals,
+  # as Flutter's own web test runner does.
+  test_api: any
+  web: ^1.1.0
+
+dev_dependencies:
+  lints: ^6.0.0

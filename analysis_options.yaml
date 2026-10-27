@@ -1,1 +1,6 @@
 include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    # Flutter packages, each with its own pub get and job in ci.yml.
+    - packages/**

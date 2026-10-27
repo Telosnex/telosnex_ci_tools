@@ -44,3 +44,82 @@ jobs:
           curl -sSfL "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
             | tar -xz -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
+
+  web-test-package:
+    name: Package telosnex_web_test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/telosnex_web_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - run: flutter pub get
+      - run: (cd fixture && flutter pub get)
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: flutter analyze --fatal-infos
+      - run: (cd fixture && flutter analyze --fatal-infos)
+      - run: flutter test
+      - name: flutter test --platform chrome
+        run: |
+          flutter test --platform chrome
+          flutter test --platform chrome --wasm
+
+  # The package and actions/web-driver together, with the fixture app.
+  web-test-fixture:
+    name: Web Linux x64 Chrome ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [dart2js, dart2wasm]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - name: Passing run
+        uses: ./actions/web-driver
+        with:
+          browser: chrome
+          working-directory: packages/telosnex_web_test/fixture
+          artifact-name: web-test-fixture-${{ matrix.compiler }}-pass
+          require-result: '.fixture == "pass" and .telosnexWebTestSummary.passed == 3'
+          run: |
+            flutter pub get
+            args=()
+            if [[ "${{ matrix.compiler }}" == dart2wasm ]]; then args+=(--wasm); fi
+            flutter drive --release -d web-server --browser-name chrome "${args[@]}" \
+              --driver test_driver/integration_test.dart \
+              --target integration_test/fixture_test.dart
+            # Every console line, also those after the last poll.
+            grep -q ' info ==== test plain test passes$' "$TELOSNEX_WEB_TEST_CONSOLE"
+            grep -q ' log fixture: last line$' "$TELOSNEX_WEB_TEST_CONSOLE"
+            lines=$(grep -c ' log fixture: line ' "$TELOSNEX_WEB_TEST_CONSOLE")
+            if [[ "$lines" != 6000 ]]; then
+              echo "::error::web_console.log has $lines of the 6000 fixture lines."
+              exit 1
+            fi
+      - name: Failing plain test()
+        uses: ./actions/web-driver
+        with:
+          browser: chrome
+          port: '4445'
+          working-directory: packages/telosnex_web_test/fixture
+          artifact-name: web-test-fixture-${{ matrix.compiler }}-fail-plain
+          require-result: '.fixture == "fail_plain" and .telosnexWebTestSummary.failed == 1'
+          run: |
+            args=(--dart-define=FIXTURE_CASE=fail_plain --driver-port 4445)
+            if [[ "${{ matrix.compiler }}" == dart2wasm ]]; then args+=(--wasm); fi
+            # integrationDriver() would pass this run.
+            if flutter drive --release -d web-server --browser-name chrome "${args[@]}" \
+              --driver test_driver/integration_test.dart \
+              --target integration_test/fixture_test.dart; then
+              echo "::error::A failing plain test() passed."
+              exit 1
+            fi
