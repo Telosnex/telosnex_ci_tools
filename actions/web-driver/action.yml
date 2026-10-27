@@ -17,6 +17,14 @@
 # app never ran then. Other failures are final, except one: when the run
 # printed "All tests passed." and only closing the browser session failed
 # afterwards (an adb timeout on Android), it passes with a warning.
+#
+# "All tests passed." from flutter drive is not enough on its own:
+# integrationDriver reports only IntegrationTestWidgetsFlutterBinding.results,
+# which gets failures from testWidgets' exception reporter only. A plain
+# test() that fails or times out, or a failing setUp/tearDown, is reported as
+# passing. In the app, record every failed test there, as telosnex's
+# integration_test/web_test_reporting.dart does (installWebTestReporting,
+# called right after the binding is initialized).
 name: Web driver
 description: Starts chromedriver, geckodriver or safaridriver, and runs flutter drive.
 
