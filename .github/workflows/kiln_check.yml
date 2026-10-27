@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@e1f6e61744fa93a45a1f27ecf488de632cab44c0 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@8f82cfcd54438b2858b8cc9566463f24d81941c9 # self
       - run: flutter pub get --no-example
       - name: Check the source key and every native and model URL
         env:
