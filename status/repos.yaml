@@ -8,6 +8,13 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: flutter_local_notifications
+    reason: >-
+      Keep the fork (flutter_local_notifications_linux only): notifications
+      through the portal in a Flatpak sandbox. Branch flatpak-portal-8.0.2,
+      rebased onto upstream hotfix/22.3.3 on 2026-10-28. Send upstream: open
+      issues #1757 and #1987 ask for it. Branch flatpak-portal is an older
+      copy on upstream master. Add CI.
   - repo: flutter_lite_camera
     reason: >-
       Keep the fork: the Linux camera through the Camera portal and PipeWire,
