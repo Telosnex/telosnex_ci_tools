@@ -297,7 +297,12 @@ Future<(List<OrgRepo>, Map<String, List<String>>)> _orgRepos(
 /// The ref read, every git dependency in the app's dependency files, the
 /// texts of its workflows, and the hosted packages of each pubspec.lock.
 Future<(String, List<RepoReference>, List<String>, Map<String, Set<String>>)>
-_appReferences(String app, String? appDir, String? token) async {
+_appReferences(
+  String app,
+  String? appDir,
+  String? appRef,
+  String? token,
+) async {
   final auth = token == null
       ? const <String>[]
       : [
