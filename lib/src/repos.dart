@@ -1,5 +1,5 @@
 /// Which repositories of an organization an app uses, and which of those
-/// use telosnex_ci_tools (bin/forks.dart).
+/// use telosnex_ci_tools (bin/repos.dart).
 library;
 
 import 'package:yaml/yaml.dart';
@@ -11,7 +11,11 @@ final class RepoReference {
     required this.repo,
     required this.file,
     required this.package,
+    this.hosted = false,
   });
+
+  /// From pub.dev (hosted), matched by package name; else a git URL.
+  final bool hosted;
 
   /// As written in the URL (case as written; GitHub ignores it).
   final String owner;
@@ -102,6 +106,35 @@ List<RepoReference> referencesIn(String file, String text) {
   return out;
 }
 
+/// The hosted (pub.dev) packages of a pubspec.lock.
+Set<String> hostedPackagesIn(String lock) {
+  final Object? root;
+  try {
+    root = loadYaml(lock);
+  } on YamlException {
+    return const {};
+  }
+  final packages = root is YamlMap ? root['packages'] : null;
+  if (packages is! YamlMap) return const {};
+  return {
+    for (final entry in packages.entries)
+      if (entry.value is YamlMap &&
+          (entry.value as YamlMap)['source'] == 'hosted')
+        '${entry.key}',
+  };
+}
+
+/// The `name:` of a pubspec.yaml, else null.
+String? pubspecName(String pubspec) {
+  try {
+    final root = loadYaml(pubspec);
+    final name = root is YamlMap ? root['name'] : null;
+    return name is String ? name : null;
+  } on YamlException {
+    return null;
+  }
+}
+
 /// Whether [path] is a file [referencesIn] reads.
 bool isDependencyFile(String path) {
   final name = path.split('/').last;
@@ -152,7 +185,11 @@ final class OrgRepo {
     this.pushedAt,
     this.references = const [],
     this.actionUsers = const {},
+    this.packageName,
   });
+
+  /// The `name:` of the root pubspec.yaml.
+  final String? packageName;
 
   /// The repositories whose workflows use it as an action or reusable
   /// workflow. Does not change [category]: a forked action needs no CI tools,
@@ -204,7 +241,8 @@ final class OrgRepo {
     'usesCiTools': usesCiTools,
     'usedTransitively': usedTransitively,
     'references': [
-      for (final r in references) {'file': r.file, 'package': r.package},
+      for (final r in references)
+        {'file': r.file, 'package': r.package, 'hosted': r.hosted},
     ],
     'actionUsers': [...actionUsers]..sort(),
   };
@@ -223,10 +261,18 @@ String renderForks(
     ..writeln(
       'Uses: git dependencies in the pubspec.yaml, pubspec_overrides.yaml '
       'and pubspec.lock files of $app at $appRef. "lock only": a dependency '
-      'of a dependency. CI tools: a workflow on the default branch uses '
+      'of a dependency. "pub.dev": not a fork, and the app uses its package '
+      'from pub.dev. CI tools: a workflow on the default branch uses '
       'Telosnex/telosnex_ci_tools. Action of: a workflow (of the app or of a '
       'repository of $org) uses it as an action or reusable workflow; that '
-      'does not change the category.',
+      'does not change the category. Fork of: — for a repository of '
+      '$org that is not a fork.',
+    )
+    ..writeln()
+    ..writeln(
+      '${[for (final c in ForkCategory.values) '${c.title}: ${repos.where((r) => r.category == c).length}'].join(' · ')} '
+      '(${repos.length} repositories, '
+      '${repos.where((r) => r.isFork).length} forks)',
     );
   for (final category in ForkCategory.values) {
     final rows = repos.where((r) => r.category == category).toList()
@@ -240,20 +286,26 @@ String renderForks(
     if (rows.isEmpty) continue;
     out
       ..writeln(
-        '| Repository | Upstream | Used by $app | Action of | Last push |',
+        '| Repository | Fork of | Used by $app | Action of | Last push |',
       )
       ..writeln('|---|---|---|---|---|');
     for (final repo in rows) {
       final packages = {for (final r in repo.references) r.package}.toList()
         ..sort();
+      final notes = [
+        if (repo.references.isNotEmpty &&
+            repo.references.every((r) => r.hosted))
+          'pub.dev',
+        if (repo.usedTransitively) 'lock only',
+      ];
       final use = !repo.used
           ? '—'
-          : '${packages.join(', ')}${repo.usedTransitively ? ' (lock only)' : ''}';
+          : '${packages.join(', ')}${notes.isEmpty ? '' : ' (${notes.join(', ')})'}';
       final name =
           '[${repo.name}](https://github.com/$org/${repo.name})'
           '${repo.isArchived ? ' (archived)' : ''}';
       final parent = repo.parent == null
-          ? (repo.isFork ? '?' : 'not a fork')
+          ? (repo.isFork ? '?' : '—')
           : '[${repo.parent}](https://github.com/${repo.parent})';
       final pushed = repo.pushedAt?.toIso8601String().substring(0, 10) ?? '?';
       final actions = repo.actionUsers.isEmpty

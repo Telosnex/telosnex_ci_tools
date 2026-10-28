@@ -1,12 +1,15 @@
-/// dart run telosnex_ci_tools:forks [--org Telosnex] [--app Telosnex/telosnex]
-///     [--app-dir <checkout>] [--all] [--json] [--out <file>]
+/// dart run telosnex_ci_tools:repos [--org Telosnex] [--app Telosnex/telosnex]
+///     [--app-dir <checkout>] [--forks-only] [--json] [--out <file>]
 ///
-/// Sorts the forks of the organization (with --all, every repository) into:
+/// Sorts every repository of the organization but the app (with
+/// --forks-only, its forks) into:
 /// - Live: a workflow on the default branch uses telosnex_ci_tools;
 /// - Missing CI: the app depends on it (a git dependency in a pubspec.yaml,
 ///   pubspec_overrides.yaml or pubspec.lock of the app's default branch),
 ///   without telosnex_ci_tools;
 /// - Unused: neither.
+/// A repository that is not a fork is also used when the app uses its
+/// package (the name in its root pubspec.yaml) from pub.dev.
 /// Also lists, per repository, the workflows (of the app, and of every
 /// repository of the organization) that use it as an action.
 /// Prints Markdown (or JSON with --json), or writes it to --out.
@@ -22,7 +25,7 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
-import 'package:telosnex_ci_tools/src/forks.dart';
+import 'package:telosnex_ci_tools/src/repos.dart';
 
 const _reposQuery = r'''
 query($org: String!, $after: String) {
@@ -35,6 +38,7 @@ query($org: String!, $after: String) {
         isArchived
         pushedAt
         parent { nameWithOwner }
+        pubspec: object(expression: "HEAD:pubspec.yaml") { ... on Blob { text } }
         workflows: object(expression: "HEAD:.github/workflows") {
           ... on Tree { entries { name object { ... on Blob { text } } } }
         }
@@ -49,7 +53,7 @@ Future<void> main(List<String> arguments) async {
     ..addOption('org', defaultsTo: 'Telosnex')
     ..addOption('app', defaultsTo: 'Telosnex/telosnex')
     ..addOption('app-dir', help: 'A checkout of the app; else a clone.')
-    ..addFlag('all', negatable: false, help: 'Not only forks.')
+    ..addFlag('forks-only', negatable: false, help: 'Only forks.')
     ..addFlag('json', negatable: false)
     ..addOption('out')
     ..addFlag('help', abbr: 'h', negatable: false);
@@ -62,7 +66,7 @@ Future<void> main(List<String> arguments) async {
   }
   if (args.flag('help')) {
     stdout.writeln(
-      'dart run telosnex_ci_tools:forks [options]\n\n${parser.usage}',
+      'dart run telosnex_ci_tools:repos [options]\n\n${parser.usage}',
     );
     return;
   }
@@ -70,7 +74,7 @@ Future<void> main(List<String> arguments) async {
   final app = args.option('app')!;
   final github = await GitHubReader.fromEnvironment();
   try {
-    final (appRef, references, appWorkflows) = await _appReferences(
+    final (appRef, references, appWorkflows, hosted) = await _appReferences(
       app,
       args.option('app-dir'),
       github.token,
@@ -114,10 +118,30 @@ Future<void> main(List<String> arguments) async {
       }
       (found[name] ??= []).add(reference);
     }
+    // Own packages from pub.dev (not forks: a fork has the name of the
+    // package on pub.dev the app may use instead).
+    for (final repo in repos) {
+      final package = repo.packageName;
+      if (repo.isFork || package == null) continue;
+      for (final MapEntry(key: lock, value: names) in hosted.entries) {
+        if (!names.contains(package)) continue;
+        (found[repo.name.toLowerCase()] ??= []).add(
+          RepoReference(
+            owner: org,
+            repo: repo.name,
+            file: lock,
+            package: package,
+            hosted: true,
+          ),
+        );
+      }
+    }
 
     final report = [
       for (final repo in repos)
-        if (repo.isFork || args.flag('all'))
+        // The app is not a dependency of itself.
+        if (repo.name.toLowerCase() != appName &&
+            (repo.isFork || !args.flag('forks-only')))
           repo.withUses(
             found[repo.name.toLowerCase()] ?? const [],
             actionUsers[repo.name.toLowerCase()] ?? const {},
@@ -189,6 +213,7 @@ Future<(List<OrgRepo>, Map<String, List<String>>)> _orgRepos(
       workflows[node['name'] as String] = texts;
       final usesCiTools = texts.any(workflowUsesCiTools);
       final pushedAt = node['pushedAt'];
+      final pubspec = (node['pubspec'] as Map?)?['text'];
       repos.add(
         OrgRepo(
           name: node['name'] as String,
@@ -197,6 +222,7 @@ Future<(List<OrgRepo>, Map<String, List<String>>)> _orgRepos(
           usesCiTools: usesCiTools,
           parent: (node['parent'] as Map?)?['nameWithOwner'] as String?,
           pushedAt: pushedAt is String ? DateTime.parse(pushedAt) : null,
+          packageName: pubspec is String ? pubspecName(pubspec) : null,
         ),
       );
     }
@@ -206,13 +232,10 @@ Future<(List<OrgRepo>, Map<String, List<String>>)> _orgRepos(
   return (repos, workflows);
 }
 
-/// The ref read, every git dependency in the app's dependency files, and
-/// the texts of its workflows.
-Future<(String, List<RepoReference>, List<String>)> _appReferences(
-  String app,
-  String? appDir,
-  String? token,
-) async {
+/// The ref read, every git dependency in the app's dependency files, the
+/// texts of its workflows, and the hosted packages of each pubspec.lock.
+Future<(String, List<RepoReference>, List<String>, Map<String, Set<String>>)>
+_appReferences(String app, String? appDir, String? token) async {
   final auth = token == null
       ? const <String>[]
       : [
@@ -230,7 +253,7 @@ Future<(String, List<RepoReference>, List<String>)> _appReferences(
     await _git(dir, [...auth, 'remote', 'set-head', 'origin', '--auto']);
     ref = 'origin/HEAD';
   } else {
-    temp = Directory.systemTemp.createTempSync('forks_app_');
+    temp = Directory.systemTemp.createTempSync('repos_app_');
     dir = temp.path;
     await _git(dir, [
       ...auth,
@@ -259,16 +282,18 @@ Future<(String, List<RepoReference>, List<String>)> _appReferences(
       ref,
     ])).split('\n');
     final references = <RepoReference>[];
+    final hosted = <String, Set<String>>{};
     for (final path in all.where(isDependencyFile)) {
       final text = await _git(dir, [...auth, 'show', '$ref:$path']);
       references.addAll(referencesIn(path, text));
+      if (path.endsWith('pubspec.lock')) hosted[path] = hostedPackagesIn(text);
     }
     final workflows = [
       for (final path in all)
         if (RegExp(r'^\.github/workflows/[^/]+\.ya?ml$').hasMatch(path))
           await _git(dir, [...auth, 'show', '$ref:$path']),
     ];
-    return ('$branch@$commit', references, workflows);
+    return ('$branch@$commit', references, workflows, hosted);
   } finally {
     temp?.deleteSync(recursive: true);
   }

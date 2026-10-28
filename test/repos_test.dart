@@ -1,4 +1,4 @@
-import 'package:telosnex_ci_tools/src/forks.dart';
+import 'package:telosnex_ci_tools/src/repos.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -120,5 +120,25 @@ jobs:
     expect(repo(used: true).category, ForkCategory.missingCi);
     expect(repo(used: true).usedTransitively, isTrue);
     expect(repo().category, ForkCategory.unused);
+  });
+
+  test('hostedPackagesIn and pubspecName', () {
+    const lock = '''
+packages:
+  kiln:
+    dependency: transitive
+    description:
+      name: kiln
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.1"
+  a:
+    description:
+      url: "https://github.com/Telosnex/a.git"
+    source: git
+''';
+    expect(hostedPackagesIn(lock), {'kiln'});
+    expect(pubspecName('name: kiln\nversion: 1.0.0\n'), 'kiln');
+    expect(pubspecName(': ['), isNull);
   });
 }
