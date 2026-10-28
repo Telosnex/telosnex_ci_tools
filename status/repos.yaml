@@ -9,3 +9,5 @@ skip:
     reason: The app's Supabase edge functions (TypeScript).
   - repo: telosnex_site
     reason: The public website (TypeScript).
+  - repo: minimp3_dart
+    reason: embedded in telosnex_audio
