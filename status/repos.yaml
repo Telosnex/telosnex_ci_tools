@@ -8,6 +8,23 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: alchemist
+    reason: >-
+      Keep the fork (setUp once, cross-OS golden fixes, material_ui imports).
+      Fix the setUp-once bug: setUp is registered only in the first group, so
+      a test of a later group run alone does not load fonts; call loadFonts()
+      in each test body instead (also a better upstream PR #175). Rebase
+      (4 behind). Add CI.
+  - repo: auto_updater
+    reason: >-
+      Keep the fork: the macOS app builds with Swift Package Manager and
+      upstream (SwiftPM support; pub.dev 1.0.0 is podspec-only) is about
+      dead: no commit since 2025-03, no release since 2024-10, open PRs
+      unreviewed (one is SwiftPM, #86). Add CI.
+  - repo: background_downloader
+    reason: >-
+      Keep the fork (cleanUpTempFiles, Windows database in Local AppData).
+      Rebase (81 behind). Add CI.
   - repo: archive
     reason: >-
       Drop the archive_40 rename (the app already uses archive 4 from
