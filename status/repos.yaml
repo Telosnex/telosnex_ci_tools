@@ -8,6 +8,12 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: flutter_lite_camera
+    reason: >-
+      Keep the fork: the Linux camera through the Camera portal and PipeWire,
+      which the Flatpak needs (no /dev/video*), and fixes for non-YUYV
+      cameras. Up to date with upstream (0 behind). Send the Linux work
+      upstream (active; 0.2.3 on 2026-09-02). Add CI.
   - repo: dart-vector-tile-renderer
     reason: >-
       Keep the fork: Protomaps styles without the GPU renderer (format and
