@@ -194,9 +194,9 @@ followup:
       follows Flutter (3.38+, the material_ui and cupertino_ui packages) and
       caches PixelSnap.of per subtree: about 1.5% of CPU in streaming chat.
     todo: >-
-      Add CI. Its tests failed to compile on Flutter 3.47; fixed on
-      2026-10-28 (c1f2025). The generator/ package does not resolve (no
-      pubspec dependencies); fix or delete it.
+      Add CI (its tests failed to compile on Flutter 3.47 and nobody saw;
+      fixed on 2026-10-28, c1f2025). On a Flutter update, regenerate the
+      forked widgets with generator/.
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
