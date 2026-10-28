@@ -1,7 +1,20 @@
-# Repositories of Telosnex that `dart run telosnex_ci_tools:repos` reports
-# as Skipped instead of Unused: not expected to be a dependency of the app or
-# to use telosnex_ci_tools. Every entry needs a reason. The script warns when
-# a skipped repository turns out to be used, or to use telosnex_ci_tools.
+# Notes for `dart run telosnex_ci_tools:repos`. Every entry needs a reason.
+#
+# followup: repositories the app uses without telosnex_ci_tools, with what is
+# left to do (reported as Follow-up instead of Missing CI). The script warns
+# when one is no longer used, or uses telosnex_ci_tools.
+#
+# skip: repositories not expected to be a dependency of the app or to use
+# telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
+# when one turns out to be used, or to use telosnex_ci_tools.
+followup:
+  - repo: sqlite3.dart
+    reason: >-
+      Upstream fixed our OPFS >2 GiB bug in sqlite3 3.5.2. Moving off the fork
+      means sqlite3 3.8 plus its sqlite3mc.wasm, and rebuilding
+      web/step_store_worker.dart.js, which fails on main: the worker imports
+      Flutter through step_store_chat_functions.dart -> chat_tool_text.dart ->
+      loom_reasoning_globals.dart -> loom_step.dart -> bucket_id.dart.
 skip:
   - repo: monet_gdt
     reason: Python training of libmonet's on-device wallpaper model, not a Dart package.

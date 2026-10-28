@@ -144,17 +144,24 @@ String? pubspecName(String pubspec) {
 /// ```
 ///
 /// Throws a [FormatException] on an entry without a repo or a reason.
-Map<String, String> parseSkips(String yaml) {
+Map<String, String> parseSkips(String yaml) => _parseReasons(yaml, 'skip');
+
+/// The follow-ups of status/repos.yaml (a `followup:` list of the same form
+/// as `skip:`), lowercase name to what is left to do.
+Map<String, String> parseFollowups(String yaml) =>
+    _parseReasons(yaml, 'followup');
+
+Map<String, String> _parseReasons(String yaml, String key) {
   final root = loadYaml(yaml);
-  final list = root is YamlMap ? root['skip'] : null;
+  final list = root is YamlMap ? root[key] : null;
   if (list == null) return const {};
-  if (list is! YamlList) throw const FormatException('skip: is not a list.');
+  if (list is! YamlList) throw FormatException('$key: is not a list.');
   final out = <String, String>{};
   for (final entry in list) {
     final repo = entry is YamlMap ? entry['repo'] : null;
     final reason = entry is YamlMap ? entry['reason'] : null;
     if (repo is! String || reason is! String || reason.trim().isEmpty) {
-      throw FormatException('Each skip needs a repo and a reason: $entry');
+      throw FormatException('Each $key needs a repo and a reason: $entry');
     }
     out[repo.toLowerCase()] = reason.trim();
   }
@@ -189,6 +196,13 @@ enum ForkCategory {
     'The app depends on it, but it does not use telosnex_ci_tools.',
   ),
 
+  /// Used, no CI tools, and status/repos.yaml says what is left to do.
+  followup(
+    'Follow-up',
+    'The app depends on it, it does not use telosnex_ci_tools, and '
+        'status/repos.yaml records what is left to do.',
+  ),
+
   /// Neither.
   unused(
     'Unused',
@@ -220,7 +234,11 @@ final class OrgRepo {
     this.actionUsers = const {},
     this.packageName,
     this.skipReason,
+    this.followup,
   });
+
+  /// What status/repos.yaml says is left to do; null when nothing.
+  final String? followup;
 
   /// Why status/repos.yaml skips it; null when it does not.
   final String? skipReason;
@@ -254,6 +272,8 @@ final class OrgRepo {
       ? ForkCategory.skipped
       : usesCiTools
       ? ForkCategory.live
+      : used && followup != null
+      ? ForkCategory.followup
       : used
       ? ForkCategory.missingCi
       : ForkCategory.unused;
@@ -262,6 +282,7 @@ final class OrgRepo {
     List<RepoReference> references,
     Set<String> actionUsers, {
     String? skipReason,
+    String? followup,
   }) => OrgRepo(
     name: name,
     isFork: isFork,
@@ -272,6 +293,7 @@ final class OrgRepo {
     references: references,
     actionUsers: actionUsers,
     skipReason: skipReason,
+    followup: followup,
   );
 
   Map<String, Object?> toJson() => {
@@ -289,6 +311,7 @@ final class OrgRepo {
     ],
     'actionUsers': [...actionUsers]..sort(),
     'skipReason': ?skipReason,
+    'followup': ?followup,
   };
 }
 
@@ -331,11 +354,9 @@ String renderForks(
     out
       ..writeln(
         '| Repository | Fork of | Used by $app | Action of | Last push |'
-        '${category == ForkCategory.skipped ? ' Reason |' : ''}',
+        '${_noted(category) ? ' Reason |' : ''}',
       )
-      ..writeln(
-        '|---|---|---|---|---|${category == ForkCategory.skipped ? '---|' : ''}',
-      );
+      ..writeln('|---|---|---|---|---|${_noted(category) ? '---|' : ''}');
     for (final repo in rows) {
       final packages = {for (final r in repo.references) r.package}.toList()
         ..sort();
@@ -358,11 +379,16 @@ String renderForks(
       final actions = repo.actionUsers.isEmpty
           ? '—'
           : ([...repo.actionUsers]..sort()).join(', ');
-      final reason = repo.skipReason == null
+      final note = repo.skipReason ?? repo.followup;
+      final reason = !_noted(category) || note == null
           ? ''
-          : ' ${repo.skipReason!.replaceAll('|', r'\|').replaceAll('\n', ' ')} |';
+          : ' ${note.replaceAll('|', r'\|').replaceAll('\n', ' ')} |';
       out.writeln('| $name | $parent | $use | $actions | $pushed |$reason');
     }
   }
   return out.toString();
 }
+
+/// Whether the category's table has a Reason column.
+bool _noted(ForkCategory category) =>
+    category == ForkCategory.skipped || category == ForkCategory.followup;

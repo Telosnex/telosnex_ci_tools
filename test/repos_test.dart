@@ -160,4 +160,24 @@ packages:
     );
     expect(repo.category, ForkCategory.skipped);
   });
+
+  test('category: a follow-up of a used repository', () {
+    const used = [
+      RepoReference(owner: 'o', repo: 'r', file: 'pubspec.yaml', package: 'r'),
+    ];
+    OrgRepo repo({bool ci = false, bool isUsed = true}) => OrgRepo(
+      name: 'r',
+      isFork: true,
+      isArchived: false,
+      usesCiTools: ci,
+      followup: 'later',
+      references: isUsed ? used : const [],
+    );
+    expect(repo().category, ForkCategory.followup);
+    expect(repo(ci: true).category, ForkCategory.live);
+    expect(repo(isUsed: false).category, ForkCategory.unused);
+    expect(parseFollowups('followup:\n  - repo: R\n    reason: x\n'), {
+      'r': 'x',
+    });
+  });
 }

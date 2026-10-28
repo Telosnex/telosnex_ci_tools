@@ -1,5 +1,5 @@
 /// dart run telosnex_ci_tools:repos [--org Telosnex] [--app Telosnex/telosnex]
-///     [--app-dir <checkout>] [--forks-only] [--json] [--out <file>]
+///     [--app-dir <checkout> [--app-ref <ref>]] [--forks-only] [--json] [--out <file>]
 ///
 /// Sorts every repository of the organization but the app (with
 /// --forks-only, its forks) into:
@@ -8,6 +8,8 @@
 ///   pubspec_overrides.yaml or pubspec.lock of the app's default branch),
 ///   without telosnex_ci_tools;
 /// - Unused: neither;
+/// - Follow-up: used, without CI tools, with what is left to do in
+///   status/repos.yaml (followup:);
 /// - Skipped: listed in status/repos.yaml (or --skip-file) with a reason.
 ///   A skipped repository the app uses, or that uses telosnex_ci_tools, is
 ///   reported as a warning: the skip is out of date.
@@ -57,6 +59,12 @@ Future<void> main(List<String> arguments) async {
     ..addOption('org', defaultsTo: 'Telosnex')
     ..addOption('app', defaultsTo: 'Telosnex/telosnex')
     ..addOption('app-dir', help: 'A checkout of the app; else a clone.')
+    ..addOption(
+      'app-ref',
+      help:
+          'With --app-dir: the ref to read (e.g. HEAD for the branch you '
+          'are on). Default: the default branch of origin.',
+    )
     ..addFlag('forks-only', negatable: false, help: 'Only forks.')
     ..addOption(
       'skip-file',
@@ -88,9 +96,12 @@ Future<void> main(List<String> arguments) async {
         Uri.parse('package:telosnex_ci_tools/'),
       ))!.resolve('../status/repos.yaml').toFilePath();
   final Map<String, String> skips;
+  final Map<String, String> followups;
   try {
     final file = File(skipPath);
-    skips = file.existsSync() ? parseSkips(file.readAsStringSync()) : const {};
+    final text = file.existsSync() ? file.readAsStringSync() : '';
+    skips = parseSkips(text);
+    followups = parseFollowups(text);
   } on FormatException catch (e) {
     stderr.writeln('$skipPath: ${e.message}');
     exit(2);
@@ -100,6 +111,7 @@ Future<void> main(List<String> arguments) async {
     final (appRef, references, appWorkflows, hosted) = await _appReferences(
       app,
       args.option('app-dir'),
+      args.option('app-ref'),
       github.token,
     );
     final (repos, orgWorkflows) = await _orgRepos(github, org);
@@ -176,13 +188,24 @@ Future<void> main(List<String> arguments) async {
             found[repo.name.toLowerCase()] ?? const [],
             actionUsers[repo.name.toLowerCase()] ?? const {},
             skipReason: skips[repo.name.toLowerCase()],
+            followup: followups[repo.name.toLowerCase()],
           ),
     ];
     for (final repo in report) {
-      if (repo.skipReason != null && (repo.used || repo.usesCiTools)) {
+      // A skip of a package the app gets from pub.dev (kiln) is fine.
+      final usedFromGit = repo.references.any((r) => !r.hosted);
+      if (repo.skipReason != null && (usedFromGit || repo.usesCiTools)) {
         stderr.writeln(
           'Warning: $skipPath skips ${repo.name}, but '
-          '${repo.used ? '$app depends on it' : 'it uses telosnex_ci_tools'}.',
+          '${usedFromGit ? '$app depends on it' : 'it uses telosnex_ci_tools'}.',
+        );
+      }
+    }
+    for (final repo in report) {
+      if (repo.followup != null && repo.category != ForkCategory.followup) {
+        stderr.writeln(
+          'Warning: $skipPath has a follow-up for ${repo.name}, but it is '
+          '${repo.category.title}: remove the follow-up.',
         );
       }
     }
@@ -290,7 +313,7 @@ _appReferences(String app, String? appDir, String? token) async {
     await _git(dir, [...auth, 'fetch', '-q', 'origin']);
     // origin/HEAD is set by clone; set it when a checkout lacks it.
     await _git(dir, [...auth, 'remote', 'set-head', 'origin', '--auto']);
-    ref = 'origin/HEAD';
+    ref = appRef ?? 'origin/HEAD';
   } else {
     temp = Directory.systemTemp.createTempSync('repos_app_');
     dir = temp.path;
@@ -312,7 +335,7 @@ _appReferences(String app, String? appDir, String? token) async {
     final branch = (await _git(dir, [
       'rev-parse',
       '--abbrev-ref',
-      ref == 'HEAD' ? 'HEAD' : 'origin/HEAD',
+      ref,
     ])).trim().replaceFirst('origin/', '');
     final all = (await _git(dir, [
       'ls-tree',
