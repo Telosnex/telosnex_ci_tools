@@ -11,3 +11,5 @@ skip:
     reason: The public website (TypeScript).
   - repo: minimp3_dart
     reason: embedded in telosnex_audio
+  - repo: kiln
+    reason: The Kiln tool itself (the app gets it from pub.dev, through Kiln packages).
