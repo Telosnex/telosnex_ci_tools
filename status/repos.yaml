@@ -8,6 +8,14 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: google_fonts
+    reason: >-
+      Keep the fork (a copy of google_fonts 9.0.0 from pub.dev, not a GitHub
+      fork: upstream is a package of flutter/packages). One commit:
+      GoogleFontsConfig.fontBytesTransform, which telosnex uses to centre the
+      line box (ADR_font_line_height D10). When google_fonts releases, copy
+      the new version and apply the commit again. Could go upstream to
+      flutter/packages as a small, general hook. Add CI.
   - repo: flutter_tts
     reason: >-
       Keep the fork: a mirror of Persie0/flutter_tts (identical, 49609539),
