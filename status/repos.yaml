@@ -214,10 +214,10 @@ followup:
       ADR R11). Pure Dart runs everywhere, web included, in a squadron
       worker.
     todo: >-
-      License: the port translates Shine's C files (e.g. "Dart translation
-      of bitstream.c"), and Shine is LGPL 2.0 (COPYING; the telosnex_audio
-      ADR says so too), but the repository says CC0. Decide the license
-      with that in mind. Add CI. Pinned on 2026-10-28 (it floated on HEAD).
+      LGPL 2.0 since 2026-10-28 (it said CC0, but it translates Shine's
+      LGPL C code). The app is closed and compiled ahead of time, so the
+      LGPL's relinking terms are hard to meet: replace it (a permissive MP3
+      encoder, or a platform encoder) or keep it with legal advice. Add CI.
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
