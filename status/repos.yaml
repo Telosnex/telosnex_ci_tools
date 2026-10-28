@@ -12,6 +12,14 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: irondash
+    reason: >-
+      Keep the fork (irondash_engine_context only): branch telosnex_main is
+      upstream main (0.6 native assets, 0 behind) plus one commit, nil
+      guards in the Darwin plugin's registry getters (a startup race with
+      super_native_extensions segfaulted on macOS). Send upstream: small,
+      matches the other platforms, and the maintainer is active (#90,
+      2026-08). Delete branch main (an old mirror). Add CI.
   - repo: highlight.dart
     reason: >-
       Branch telosnex/limited-languages (0.7.0 plus 3 commits): a default
