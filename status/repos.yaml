@@ -10,11 +10,10 @@
 followup:
   - repo: alchemist
     reason: >-
-      Keep the fork (setUp once, cross-OS golden fixes, material_ui imports).
-      Fix the setUp-once bug: setUp is registered only in the first group, so
-      a test of a later group run alone does not load fonts; call loadFonts()
-      in each test body instead (also a better upstream PR #175). Rebase
-      (4 behind). Add CI.
+      Keep the fork (golden setup in the test body, not O(N²) setUps;
+      cross-OS golden fixes; material_ui imports). Rebased onto upstream
+      0.14.1 on 2026-10-28. Add CI. Its smoke tests fail on macOS before and
+      after the rebase (golden images).
   - repo: auto_updater
     reason: >-
       Keep the fork: the macOS app builds with Swift Package Manager and
@@ -24,7 +23,7 @@ followup:
   - repo: background_downloader
     reason: >-
       Keep the fork (cleanUpTempFiles, Windows database in Local AppData).
-      Rebase (81 behind). Add CI.
+      Rebased onto upstream 9.6.4 on 2026-10-28. Add CI.
   - repo: archive
     reason: >-
       Drop the archive_40 rename (the app already uses archive 4 from
