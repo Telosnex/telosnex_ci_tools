@@ -176,7 +176,13 @@ String _runCell(DashboardRun? run, DateTime now, {bool showBranch = false}) {
 }
 
 /// The dashboard: a status per workflow, then every test cell.
-String renderDashboard(List<PackageStatus> packages, DateTime now) {
+String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
+  // Alphabetical, ignoring case, in every section.
+  final packages = [...unsorted]
+    ..sort(
+      (a, b) =>
+          a.package.name.toLowerCase().compareTo(b.package.name.toLowerCase()),
+    );
   final out = StringBuffer()
     ..writeln('# CI dashboard')
     ..writeln()

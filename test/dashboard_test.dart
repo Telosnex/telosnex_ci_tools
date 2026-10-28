@@ -237,4 +237,19 @@ packages:
       expect(md, isNot(contains('Updated')));
     });
   });
+
+  test('renderDashboard: packages in alphabetical order', () {
+    PackageStatus status(String repo) =>
+        PackageStatus(DashboardPackage(repo: repo), 'main', const {});
+    final md = renderDashboard([
+      status('o/zxing'),
+      status('o/Fonnx'),
+      status('o/audio'),
+    ], DateTime.utc(2026));
+    final a = md.indexOf('[audio]');
+    final f = md.indexOf('[Fonnx]');
+    final z = md.indexOf('[zxing]');
+    expect(a, greaterThan(-1));
+    expect(a < f && f < z, isTrue);
+  });
 }
