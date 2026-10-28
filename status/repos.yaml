@@ -12,6 +12,15 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: pdfrx
+    reason: >-
+      Keep the fork. Why: PDF import needs only text, and loadText also
+      builds and sends every character's rectangle (slow on web); a stalled
+      PDFium web worker blocked every later import. Branch
+      telosnex/text-only: PdfPage.loadTextOnly (native and web), stopping
+      and restarting a stalled web worker, one cache key for the web
+      worker/WASM URLs. Rebased onto upstream (2.10.1) on 2026-10-28. Send
+      upstream (none sent; upstream active). Add CI.
   - repo: packages
     reason: >-
       Keep the fork (two branches of flutter/packages, rebased onto upstream
