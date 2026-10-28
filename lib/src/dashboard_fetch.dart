@@ -166,26 +166,62 @@ bool workflowUsesCiTools(String workflow) => RegExp(
   multiLine: true,
 ).hasMatch(workflow);
 
-/// Whether the default branch uses Kiln (the root pubspec) and CI tools
-/// (a workflow).
+/// The `working-directory` inputs of the calls of telosnex_ci_tools' Kiln
+/// workflows in [workflow]: where a repository keeps its Kiln package when
+/// not at the root.
+Set<String> kilnWorkingDirectories(String workflow) {
+  final Object? root;
+  try {
+    root = loadYaml(workflow);
+  } on YamlException {
+    return const {};
+  }
+  final jobs = root is YamlMap ? root['jobs'] : null;
+  if (jobs is! YamlMap) return const {};
+  return {
+    for (final job in jobs.values)
+      if (job is YamlMap &&
+          job['uses'] is String &&
+          RegExp(
+            r'^Telosnex/telosnex_ci_tools/\.github/workflows/kiln_',
+          ).hasMatch(job['uses'] as String) &&
+          job['with'] is YamlMap &&
+          (job['with'] as YamlMap)['working-directory'] is String)
+        ((job['with'] as YamlMap)['working-directory'] as String).replaceAll(
+          RegExp(r'^\./|/$'),
+          '',
+        ),
+  }..remove('');
+}
+
+/// Whether the default branch uses Kiln (the root pubspec, or the pubspec
+/// in the working-directory of a Kiln workflow call) and CI tools (a
+/// workflow).
 Future<({bool kiln, bool ciTools})> _adoption(
   GitHubReader github,
   String repo,
   String branch,
 ) async {
-  final pubspec = await github.file(repo, 'pubspec.yaml', branch);
-  final kiln = pubspec != null && pubspecUsesKiln(pubspec);
   final list = await github.getJson(
     'repos/$repo/contents/.github/workflows'
     '?ref=${Uri.encodeQueryComponent(branch)}',
   );
   var ciTools = false;
+  final kilnDirs = <String>{''};
   for (final entry in (list is List ? list : const []).cast<Map>()) {
     final name = entry['name'] as String;
     if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
     final text = await github.file(repo, '.github/workflows/$name', branch);
-    if (text != null && workflowUsesCiTools(text)) {
-      ciTools = true;
+    if (text == null) continue;
+    if (workflowUsesCiTools(text)) ciTools = true;
+    kilnDirs.addAll(kilnWorkingDirectories(text));
+  }
+  var kiln = false;
+  for (final dir in kilnDirs) {
+    final path = dir.isEmpty ? 'pubspec.yaml' : '$dir/pubspec.yaml';
+    final pubspec = await github.file(repo, path, branch);
+    if (pubspec != null && pubspecUsesKiln(pubspec)) {
+      kiln = true;
       break;
     }
   }

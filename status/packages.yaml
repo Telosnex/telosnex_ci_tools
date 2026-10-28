@@ -22,7 +22,10 @@ packages:
     checks: []
     releases: []
   - repo: Telosnex/zxing_dart
-  # CI tools on ci/unit-integration only, so far.
   - repo: Telosnex/riverpod
     checks: []
     releases: []
+  # Kiln; no unit.yml or integration.yml yet (check_and_lint.yml).
+  - repo: Telosnex/super_native_extensions
+    tests: [check_and_lint.yml]
+  - repo: Telosnex/webcrypto.dart

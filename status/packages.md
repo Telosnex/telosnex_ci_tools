@@ -9,6 +9,8 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [image_ffmpeg](https://github.com/Telosnex/image_ffmpeg) | ✅ | ✅ |
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
 | [riverpod](https://github.com/Telosnex/riverpod) | — | ✅ |
+| [super_native_extensions](https://github.com/Telosnex/super_native_extensions) | ✅ | ✅ |
 | [telosnex_audio](https://github.com/Telosnex/telosnex_audio) | ✅ | ✅ |
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
+| [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |

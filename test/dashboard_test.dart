@@ -252,4 +252,22 @@ packages:
     expect(a, greaterThan(-1));
     expect(a < f && f < z, isTrue);
   });
+
+  test('kilnWorkingDirectories: the Kiln calls only', () {
+    const workflow = '''
+jobs:
+  kiln:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/kiln_check.yml@abc
+    with:
+      working-directory: ./super_native_extensions/
+  other:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/other.yml@abc
+    with:
+      working-directory: nope
+  root:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/kiln_release.yml@abc
+''';
+    expect(kilnWorkingDirectories(workflow), {'super_native_extensions'});
+    expect(kilnWorkingDirectories(': ['), isEmpty);
+  });
 }
