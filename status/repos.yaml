@@ -12,6 +12,14 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: packages
+    reason: >-
+      Keep the fork (two branches of flutter/packages, rebased onto upstream
+      main on 2026-10-28). telosnex/sp-windows-local-appdata:
+      shared_preferences_windows keeps its file in Local AppData (our policy,
+      app_storage ADR 001 D5). telosnex/defer-gis-sdk: google_sign_in_web
+      loads Google's script at init, not at plugin registration; send
+      upstream. Branch main is an old mirror. Add CI.
   - repo: LuaDardo
     reason: >-
       Keep the fork; we own it. Branch develop is lua_dardo_plus 0.3.0 plus
