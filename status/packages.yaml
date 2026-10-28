@@ -13,7 +13,6 @@
 # Only public repositories: the views are public.
 packages:
   - repo: Telosnex/fllama
-    tests: [test.yml]
     checks: [kiln_check.yml, cuda_pack.yml]
   - repo: Telosnex/fonnx
   - repo: Telosnex/image_ffmpeg
