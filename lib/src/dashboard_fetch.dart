@@ -96,6 +96,43 @@ final class GitHubReader {
     }
   }
 
+  /// The `data` of a GraphQL [query]. Tries 3 times on a 5xx or a network
+  /// error; throws on GraphQL errors.
+  Future<Map<String, Object?>> graphql(
+    String query, [
+    Map<String, Object?> variables = const {},
+  ]) async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        final request = await _client.postUrl(
+          Uri.parse('https://api.github.com/graphql'),
+        );
+        request.headers.contentType = ContentType.json;
+        if (token != null) {
+          request.headers.set('Authorization', 'Bearer $token');
+        }
+        request.write(jsonEncode({'query': query, 'variables': variables}));
+        final response = await request.close();
+        final body = await response.transform(utf8.decoder).join();
+        if (response.statusCode >= 500 && attempt < 3) {
+          await Future<void>.delayed(Duration(seconds: 2 * attempt));
+          continue;
+        }
+        if (response.statusCode != 200) {
+          throw _GitHubError('GraphQL: ${response.statusCode} $body');
+        }
+        final json = jsonDecode(body) as Map<String, Object?>;
+        if (json['errors'] != null) {
+          throw _GitHubError('GraphQL: ${jsonEncode(json['errors'])}');
+        }
+        return json['data'] as Map<String, Object?>;
+      } on IOException {
+        if (attempt == 3) rethrow;
+        await Future<void>.delayed(Duration(seconds: 2 * attempt));
+      }
+    }
+  }
+
   /// The text of [path] on [ref], null when it does not exist.
   Future<String?> file(String repo, String path, String ref) async {
     final json = await get(
