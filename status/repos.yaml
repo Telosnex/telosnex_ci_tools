@@ -228,6 +228,23 @@ followup:
       imports Flutter through step_store_chat_functions.dart ->
       chat_tool_text.dart -> loom_reasoning_globals.dart -> loom_step.dart ->
       bucket_id.dart.
+  - repo: supabase-flutter
+    why: >-
+      Sync and sign-in. supabase_flutter (pinned 7b66ba5): startup session
+      restoration had no completion to wait for (initialSession is not
+      "recovery finished"), and restarted after disposal. realtime_client
+      (branch telosnex/realtime-2.17, an override): channels stayed stuck
+      after a join error, a sync throw in connect() or transport(), or a
+      token change; heartbeats used a stale ref and a stale token; presence
+      payloads were mutated; a null old_record crashed deletes.
+    todo: >-
+      Send the 8 realtime fixes and the restoration completion upstream (none
+      sent; 3 of our earlier fixes landed upstream on their own, #1933,
+      #1950). Upstream main is rewriting realtime for 3.x (#2030, #2036,
+      #2066): recheck each fix there before moving. Both branches are on
+      release/supabase_flutter-2.17.x, 0 behind (2026-10-28). Delete the
+      merged fix/* branches and the telosnex/*-v2 fallbacks once unneeded.
+      Add CI.
 skip:
   - repo: monet_gdt
     reason: Python training of libmonet's on-device wallpaper model, not a Dart package.
