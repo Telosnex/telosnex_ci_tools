@@ -217,16 +217,6 @@ followup:
       LGPL 2.0 since 2026-10-28 (it said CC0, but it translates Shine's
       LGPL C code). Fine for the app: its repository will be public, so
       users can rebuild it with a changed shine_dart. Add CI.
-  - repo: sqlite3.dart
-    why: >-
-      OPFS file offsets above 2 GiB wrapped negative, which made healthy
-      databases look corrupt. Upstream fixed it in 3.5.2 (#403).
-    todo: >-
-      Move to sqlite3 3.8 from pub.dev: replace web/sqlite3mc.wasm and
-      rebuild web/step_store_worker.dart.js, which fails on main: the worker
-      imports Flutter through step_store_chat_functions.dart ->
-      chat_tool_text.dart -> loom_reasoning_globals.dart -> loom_step.dart ->
-      bucket_id.dart.
   - repo: supabase-flutter
     why: >-
       Sync and sign-in. supabase_flutter (pinned 7b66ba5): startup session
