@@ -233,14 +233,10 @@ String renderDashboard(List<PackageStatus> packages, DateTime now) {
     );
   }
 
-  final columns = <String, int>{};
-  for (final status in packages) {
-    for (final (cell, _) in status.cellJobs) {
-      columns[cell.column] = cell.order;
-    }
-  }
-  final ordered = columns.keys.toList()
-    ..sort((a, b) => columns[a]!.compareTo(columns[b]!));
+  final ordered = {
+    for (final status in packages)
+      for (final (cell, _) in status.cellJobs) cell.column,
+  }.toList()..sort(JobCell.compareColumns);
   out
     ..writeln()
     ..writeln('## Test cells')

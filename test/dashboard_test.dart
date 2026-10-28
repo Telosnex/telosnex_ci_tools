@@ -45,19 +45,29 @@ void main() {
       expect(parseJobName('desktop / linux-x64'), isNull);
     });
 
-    test('columns: platforms, archs, then browsers', () {
+    test('columns: alphabetical ignoring case, web last', () {
       final names = [
-        'Web Linux x64 Chrome',
+        'Web Linux x64 Safari',
         'Windows x64',
+        'macOS ARM64',
+        'Web Linux x64 Chrome',
+        'iOS ARM64 simulator',
+        'Linux x64',
+        'Android x64 emulator',
+        'Linux ARM64',
+      ];
+      final columns = [for (final n in names) parseJobName(n)!.column]
+        ..sort(JobCell.compareColumns);
+      expect(columns, [
+        'Android x64',
+        'iOS ARM64',
         'Linux ARM64',
         'Linux x64',
-      ];
-      final sorted = [for (final n in names) parseJobName(n)!]
-        ..sort((a, b) => a.order.compareTo(b.order));
-      expect(
-        [for (final c in sorted) c.column],
-        ['Linux x64', 'Linux ARM64', 'Windows x64', 'Web Chrome'],
-      );
+        'macOS ARM64',
+        'Windows x64',
+        'Web Chrome',
+        'Web Safari',
+      ]);
     });
   });
 

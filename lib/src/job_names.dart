@@ -39,10 +39,14 @@ final class JobCell {
   /// and the detail tell the jobs of one column apart).
   String get column => isWeb ? 'Web $browser' : '$platform $arch';
 
-  /// The order of [column]s: platforms, then archs, then browsers.
-  int get order => isWeb
-      ? 1000 + browsers.indexOf(browser!)
-      : platforms.indexOf(platform) * 10 + archs.indexOf(arch);
+  /// The order of [column]s: alphabetical, ignoring case (Android, iOS,
+  /// Linux, macOS, Windows), and the web columns after the platforms.
+  static int compareColumns(String a, String b) {
+    final aWeb = a.startsWith('Web ');
+    final bWeb = b.startsWith('Web ');
+    if (aWeb != bWeb) return aWeb ? 1 : -1;
+    return a.toLowerCase().compareTo(b.toLowerCase());
+  }
 }
 
 /// The cell of a job name in the Telosnex form, or null.
