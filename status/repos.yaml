@@ -186,6 +186,17 @@ followup:
     todo: >-
       Send upstream (none sent; upstream is active). Add CI. Branch
       telosnex/text-only rebased onto upstream (2.10.1) on 2026-10-28.
+  - repo: pixel_snap
+    why: >-
+      The app's widgets snap to physical pixels (about 1,140 files import
+      it). Upstream (widgetbakery, pub.dev 0.1.5) has had no commit since
+      2024-02, and its forked Flutter widgets fell behind the SDK. Ours
+      follows Flutter (3.38+, the material_ui and cupertino_ui packages) and
+      caches PixelSnap.of per subtree: about 1.5% of CPU in streaming chat.
+    todo: >-
+      Add CI. Its tests failed to compile on Flutter 3.47; fixed on
+      2026-10-28 (c1f2025). The generator/ package does not resolve (no
+      pubspec dependencies); fix or delete it.
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
