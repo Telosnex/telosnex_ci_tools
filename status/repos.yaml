@@ -207,6 +207,17 @@ followup:
       Drop the fork when the app compiles against SDK 37. Add CI until then.
       Rebased onto upstream master (2 fixes, not on pub.dev yet) on
       2026-10-28.
+  - repo: shine_dart
+    why: >-
+      Our package: a pure Dart MP3 encoder (a port of the Shine C library)
+      for saved TTS clips (64 kbit/s mono, 128 kbit/s stereo; telosnex_audio
+      ADR R11). Pure Dart runs everywhere, web included, in a squadron
+      worker.
+    todo: >-
+      License: the port translates Shine's C files (e.g. "Dart translation
+      of bitstream.c"), and Shine is LGPL 2.0 (COPYING; the telosnex_audio
+      ADR says so too), but the repository says CC0. Decide the license
+      with that in mind. Add CI. Pinned on 2026-10-28 (it floated on HEAD).
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
