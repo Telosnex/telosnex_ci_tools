@@ -12,6 +12,18 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: highlight.dart
+    reason: >-
+      Branch telosnex/limited-languages (0.7.0 plus 3 commits): a default
+      registry of about 50 languages (the 1C grammar crashes iOS Safari),
+      parseWithContinuation (incremental highlighting while streaming), and
+      flutter_highlight's dependency for cmark-gfm-widget. Not rebased:
+      upstream master (0.7.1, 2026-03-30, not on pub.dev) is a new engine
+      with a new API (Highlight/hljs, highlight_core.dart for selected
+      languages, HighlightResult; +2080/-669 in lib/src). Move
+      cmark-gfm-widget to it: highlight_core.dart replaces the limited
+      registry; continuation exists but is private (_highlight), so add a
+      public form (upstream PR), then drop the fork. Add CI.
   - repo: google_fonts
     reason: >-
       Keep the fork (a copy of google_fonts 9.0.0 from pub.dev, not a GitHub
