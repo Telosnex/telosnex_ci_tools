@@ -141,4 +141,23 @@ packages:
     expect(pubspecName('name: kiln\nversion: 1.0.0\n'), 'kiln');
     expect(pubspecName(': ['), isNull);
   });
+
+  test('parseSkips: lowercase names, reasons required', () {
+    expect(parseSkips('skip:\n  - repo: Foo\n    reason: a tool\n'), {
+      'foo': 'a tool',
+    });
+    expect(parseSkips('other: 1\n'), isEmpty);
+    expect(() => parseSkips('skip:\n  - repo: foo\n'), throwsFormatException);
+  });
+
+  test('category: a skip wins', () {
+    const repo = OrgRepo(
+      name: 'r',
+      isFork: false,
+      isArchived: false,
+      usesCiTools: true,
+      skipReason: 'tool',
+    );
+    expect(repo.category, ForkCategory.skipped);
+  });
 }

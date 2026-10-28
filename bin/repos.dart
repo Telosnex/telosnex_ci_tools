@@ -7,7 +7,10 @@
 /// - Missing CI: the app depends on it (a git dependency in a pubspec.yaml,
 ///   pubspec_overrides.yaml or pubspec.lock of the app's default branch),
 ///   without telosnex_ci_tools;
-/// - Unused: neither.
+/// - Unused: neither;
+/// - Skipped: listed in status/repos.yaml (or --skip-file) with a reason.
+///   A skipped repository the app uses, or that uses telosnex_ci_tools, is
+///   reported as a warning: the skip is out of date.
 /// A repository that is not a fork is also used when the app uses its
 /// package (the name in its root pubspec.yaml) from pub.dev.
 /// Also lists, per repository, the workflows (of the app, and of every
@@ -22,6 +25,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
 import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
@@ -54,6 +58,12 @@ Future<void> main(List<String> arguments) async {
     ..addOption('app', defaultsTo: 'Telosnex/telosnex')
     ..addOption('app-dir', help: 'A checkout of the app; else a clone.')
     ..addFlag('forks-only', negatable: false, help: 'Only forks.')
+    ..addOption(
+      'skip-file',
+      help:
+          'Repositories to skip, with reasons. Default: status/repos.yaml '
+          'of this package.',
+    )
     ..addFlag('json', negatable: false)
     ..addOption('out')
     ..addFlag('help', abbr: 'h', negatable: false);
@@ -72,6 +82,19 @@ Future<void> main(List<String> arguments) async {
   }
   final org = args.option('org')!;
   final app = args.option('app')!;
+  final skipPath =
+      args.option('skip-file') ??
+      (await Isolate.resolvePackageUri(
+        Uri.parse('package:telosnex_ci_tools/'),
+      ))!.resolve('../status/repos.yaml').toFilePath();
+  final Map<String, String> skips;
+  try {
+    final file = File(skipPath);
+    skips = file.existsSync() ? parseSkips(file.readAsStringSync()) : const {};
+  } on FormatException catch (e) {
+    stderr.writeln('$skipPath: ${e.message}');
+    exit(2);
+  }
   final github = await GitHubReader.fromEnvironment();
   try {
     final (appRef, references, appWorkflows, hosted) = await _appReferences(
@@ -137,6 +160,13 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
+    for (final name in skips.keys) {
+      if (!byName.containsKey(name)) {
+        stderr.writeln(
+          'Warning: $skipPath skips $name, not a repository of $org.',
+        );
+      }
+    }
     final report = [
       for (final repo in repos)
         // The app is not a dependency of itself.
@@ -145,8 +175,17 @@ Future<void> main(List<String> arguments) async {
           repo.withUses(
             found[repo.name.toLowerCase()] ?? const [],
             actionUsers[repo.name.toLowerCase()] ?? const {},
+            skipReason: skips[repo.name.toLowerCase()],
           ),
     ];
+    for (final repo in report) {
+      if (repo.skipReason != null && (repo.used || repo.usesCiTools)) {
+        stderr.writeln(
+          'Warning: $skipPath skips ${repo.name}, but '
+          '${repo.used ? '$app depends on it' : 'it uses telosnex_ci_tools'}.',
+        );
+      }
+    }
     final text = args.flag('json')
         ? '${const JsonEncoder.withIndent(' ').convert({
             'org': org,

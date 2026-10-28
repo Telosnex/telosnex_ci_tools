@@ -1,0 +1,11 @@
+# Repositories of Telosnex that `dart run telosnex_ci_tools:repos` reports
+# as Skipped instead of Unused: not expected to be a dependency of the app or
+# to use telosnex_ci_tools. Every entry needs a reason. The script warns when
+# a skipped repository turns out to be used, or to use telosnex_ci_tools.
+skip:
+  - repo: monet_gdt
+    reason: Python training of libmonet's on-device wallpaper model, not a Dart package.
+  - repo: telosnex_edge
+    reason: The app's Supabase edge functions (TypeScript).
+  - repo: telosnex_site
+    reason: The public website (TypeScript).

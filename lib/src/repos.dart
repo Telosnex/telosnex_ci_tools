@@ -135,6 +135,32 @@ String? pubspecName(String pubspec) {
   }
 }
 
+/// The skipped repositories of status/repos.yaml, lowercase name to reason:
+///
+/// ```yaml
+/// skip:
+///   - repo: flutter_dev_scripts
+///     reason: One script, now in telosnex dev/misc.
+/// ```
+///
+/// Throws a [FormatException] on an entry without a repo or a reason.
+Map<String, String> parseSkips(String yaml) {
+  final root = loadYaml(yaml);
+  final list = root is YamlMap ? root['skip'] : null;
+  if (list == null) return const {};
+  if (list is! YamlList) throw const FormatException('skip: is not a list.');
+  final out = <String, String>{};
+  for (final entry in list) {
+    final repo = entry is YamlMap ? entry['repo'] : null;
+    final reason = entry is YamlMap ? entry['reason'] : null;
+    if (repo is! String || reason is! String || reason.trim().isEmpty) {
+      throw FormatException('Each skip needs a repo and a reason: $entry');
+    }
+    out[repo.toLowerCase()] = reason.trim();
+  }
+  return out;
+}
+
 /// Whether [path] is a file [referencesIn] reads.
 bool isDependencyFile(String path) {
   final name = path.split('/').last;
@@ -167,6 +193,13 @@ enum ForkCategory {
   unused(
     'Unused',
     'The app does not depend on it, and it does not use telosnex_ci_tools.',
+  ),
+
+  /// Listed in status/repos.yaml, with the reason.
+  skipped(
+    'Skipped',
+    'Listed in status/repos.yaml: not expected to be a dependency or to use '
+        'telosnex_ci_tools.',
   );
 
   const ForkCategory(this.title, this.description);
@@ -186,7 +219,11 @@ final class OrgRepo {
     this.references = const [],
     this.actionUsers = const {},
     this.packageName,
+    this.skipReason,
   });
+
+  /// Why status/repos.yaml skips it; null when it does not.
+  final String? skipReason;
 
   /// The `name:` of the root pubspec.yaml.
   final String? packageName;
@@ -213,23 +250,29 @@ final class OrgRepo {
   /// Only through pubspec.lock: a dependency of a dependency.
   bool get usedTransitively => used && references.every((r) => r.fromLock);
 
-  ForkCategory get category => usesCiTools
+  ForkCategory get category => skipReason != null
+      ? ForkCategory.skipped
+      : usesCiTools
       ? ForkCategory.live
       : used
       ? ForkCategory.missingCi
       : ForkCategory.unused;
 
-  OrgRepo withUses(List<RepoReference> references, Set<String> actionUsers) =>
-      OrgRepo(
-        name: name,
-        isFork: isFork,
-        isArchived: isArchived,
-        usesCiTools: usesCiTools,
-        parent: parent,
-        pushedAt: pushedAt,
-        references: references,
-        actionUsers: actionUsers,
-      );
+  OrgRepo withUses(
+    List<RepoReference> references,
+    Set<String> actionUsers, {
+    String? skipReason,
+  }) => OrgRepo(
+    name: name,
+    isFork: isFork,
+    isArchived: isArchived,
+    usesCiTools: usesCiTools,
+    parent: parent,
+    pushedAt: pushedAt,
+    references: references,
+    actionUsers: actionUsers,
+    skipReason: skipReason,
+  );
 
   Map<String, Object?> toJson() => {
     'name': name,
@@ -245,6 +288,7 @@ final class OrgRepo {
         {'file': r.file, 'package': r.package, 'hosted': r.hosted},
     ],
     'actionUsers': [...actionUsers]..sort(),
+    'skipReason': ?skipReason,
   };
 }
 
@@ -286,9 +330,12 @@ String renderForks(
     if (rows.isEmpty) continue;
     out
       ..writeln(
-        '| Repository | Fork of | Used by $app | Action of | Last push |',
+        '| Repository | Fork of | Used by $app | Action of | Last push |'
+        '${category == ForkCategory.skipped ? ' Reason |' : ''}',
       )
-      ..writeln('|---|---|---|---|---|');
+      ..writeln(
+        '|---|---|---|---|---|${category == ForkCategory.skipped ? '---|' : ''}',
+      );
     for (final repo in rows) {
       final packages = {for (final r in repo.references) r.package}.toList()
         ..sort();
@@ -311,7 +358,10 @@ String renderForks(
       final actions = repo.actionUsers.isEmpty
           ? '—'
           : ([...repo.actionUsers]..sort()).join(', ');
-      out.writeln('| $name | $parent | $use | $actions | $pushed |');
+      final reason = repo.skipReason == null
+          ? ''
+          : ' ${repo.skipReason!.replaceAll('|', r'\|').replaceAll('\n', ' ')} |';
+      out.writeln('| $name | $parent | $use | $actions | $pushed |$reason');
     }
   }
   return out.toString();
