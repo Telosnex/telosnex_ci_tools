@@ -197,6 +197,16 @@ followup:
       Add CI (its tests failed to compile on Flutter 3.47 and nobody saw;
       fixed on 2026-10-28, c1f2025). On a Flutter update, regenerate the
       forked widgets with generator/.
+  - repo: receive_sharing_intent
+    why: >-
+      Sharing files into the app on Android and iOS. Upstream 1.9.0 compiles
+      its Android module against SDK 37; Flutter 3.47 and the app compile
+      against 36, the SDK that is installed. Ours sets compileSdk 36 (one
+      commit; nothing in the plugin needs 37).
+    todo: >-
+      Drop the fork when the app compiles against SDK 37. Add CI until then.
+      Rebased onto upstream master (2 fixes, not on pub.dev yet) on
+      2026-10-28.
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
