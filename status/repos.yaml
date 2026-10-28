@@ -260,10 +260,11 @@ followup:
   - repo: universal_html_compat
     why: >-
       HTML parsing for documents and web pages (5 files) in a WebAssembly
-      web build. universal_html exports dart:html in browsers, which
-      dart2wasm cannot compile (upstream #102, #111, open; 2.3.0 from
-      2025-11 still does). Ours (one 2024 commit) removes dart:html and
-      vendors package:html's parser.
+      web build. universal_html has dart:html in its import graph, which
+      the WebAssembly build reports as blocking (upstream #102, #111, open;
+      2.3.0 from 2025-11 still has it). Ours (one 2024 commit) removes
+      dart:html and vendors package:html's parser. Not verified on
+      2026-10-28 whether upstream 2.3.0 fails a real wasm build.
     todo: >-
       Decide: keep ours, or parse with package:html directly (the app uses
       only parsing.dart and html.dart's DOM). 27 behind upstream (2.3.0
