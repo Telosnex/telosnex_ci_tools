@@ -153,6 +153,8 @@ Examples: `Windows ARM64`, `macOS ARM64 Metal`, `iOS ARM64 simulator`,
 `Web iOS ARM64 Safari`. Jobs without a platform (`Unit`, `Web files`) only
 need sentence case.
 
+The whole checklist for a package is [status/STANDARD.md](status/STANDARD.md).
+
 Workflows of a Kiln package: `unit.yml` (Unit: analyze, format, host VM
 tests; every pull request), `integration.yml` (Integration: every platform
 and browser; main, nightly, manual), `kiln_check.yml`, `kiln_release.yml`.
