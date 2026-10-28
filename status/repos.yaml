@@ -12,6 +12,17 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: LuaDardo
+    reason: >-
+      Keep the fork; we own it. Branch develop is lua_dardo_plus 0.3.0 plus
+      our 77 commits (2026-02 to 07): 44 Lua 5.3 correctness fixes (string
+      library, patterns, coroutines, goto, integer math, string.pack/dump),
+      faster execution (register hot paths, frame loop, closure inlining,
+      scalar-replaced tables), tests. Upstream: the GitHub repository
+      (ImL1s/LuaDardo) is gone; lua_dardo_plus moved to
+      gitlab.com/aa22396584/LuaDardo (login required to clone). pub.dev
+      0.3.1 changed only its URLs, so 0 behind in code. Add CI. Optionally
+      offer the fixes upstream.
   - repo: libmonet
     reason: >-
       Keep (our package). Add CI. Also: androidx_graphics_shapes ^2.0.0
