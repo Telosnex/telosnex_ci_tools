@@ -1,6 +1,6 @@
 import 'job_names.dart';
 
-/// One package in dashboard.yaml.
+/// One package in status/packages.yaml.
 final class DashboardPackage {
   const DashboardPackage({
     required this.repo,
@@ -95,7 +95,17 @@ final class PackageStatus {
     this.defaultBranch,
     this.runs, {
     this.error,
+    this.usesKiln = false,
+    this.usesCiTools = false,
   });
+
+  /// Whether the default branch has kiln in its pubspec.
+  final bool usesKiln;
+
+  /// Whether a workflow of the default branch uses telosnex_ci_tools.
+  final bool usesCiTools;
+
+  bool get adopted => usesKiln || usesCiTools;
 
   final DashboardPackage package;
   final String defaultBranch;
@@ -127,6 +137,8 @@ final class PackageStatus {
   Map<String, Object?> toJson() => {
     'repo': package.repo,
     'defaultBranch': defaultBranch,
+    'usesKiln': usesKiln,
+    'usesCiTools': usesCiTools,
     'error': ?error,
     'runs': [for (final run in runs.values) run.toJson()],
   };
@@ -279,6 +291,46 @@ String renderDashboard(List<PackageStatus> packages, DateTime now) {
         '`${run.sha.substring(0, 7)}`',
       );
     }
+  }
+  return out.toString();
+}
+
+/// The live dashboard.
+const dashboardUrl =
+    'https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard';
+
+/// status/packages.md: the packages that use Kiln or CI tools on their
+/// default branch. No time in it: it changes only when a package does.
+String renderPackages(List<PackageStatus> packages) {
+  final sorted = [...packages]
+    ..sort((a, b) => a.package.name.compareTo(b.package.name));
+  String yes(bool value) => value ? '✅' : '—';
+  final out = StringBuffer()
+    ..writeln('# Packages')
+    ..writeln()
+    ..writeln(
+      'The Telosnex repositories that use Kiln or telosnex_ci_tools on their '
+      'default branch. Generated from `status/packages.yaml` by the Dashboard '
+      'workflow; do not edit. Their CI: the [dashboard]($dashboardUrl).',
+    )
+    ..writeln()
+    ..writeln('| Name | Uses Kiln | Uses CI tools |')
+    ..writeln('|---|---|---|');
+  for (final status in sorted.where((s) => s.adopted)) {
+    final repo = status.package.repo;
+    out.writeln(
+      '| [${status.package.name}](https://github.com/$repo) | '
+      '${yes(status.usesKiln)} | ${yes(status.usesCiTools)} |',
+    );
+  }
+  final pending = sorted.where((s) => !s.adopted).toList();
+  if (pending.isNotEmpty) {
+    out
+      ..writeln()
+      ..writeln(
+        'Not on the default branch yet: '
+        '${pending.map((s) => '[${s.package.name}](https://github.com/${s.package.repo})').join(', ')}.',
+      );
   }
   return out.toString();
 }

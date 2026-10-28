@@ -162,4 +162,69 @@ packages:
       );
     });
   });
+
+  group('adoption', () {
+    test('pubspecUsesKiln', () {
+      expect(
+        pubspecUsesKiln('name: a\ndev_dependencies:\n  kiln: ^1.0.0\n'),
+        isTrue,
+      );
+      expect(
+        pubspecUsesKiln('name: a\ndependencies:\n  kiln:\n    git: x\n'),
+        isTrue,
+      );
+      expect(
+        pubspecUsesKiln('name: a\ndependencies:\n  kilns: any\n'),
+        isFalse,
+      );
+      expect(pubspecUsesKiln('name: a\n# kiln: later\n'), isFalse);
+    });
+
+    test('workflowUsesCiTools', () {
+      expect(
+        workflowUsesCiTools(
+          '      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@abc\n',
+        ),
+        isTrue,
+      );
+      expect(
+        workflowUsesCiTools(
+          '    uses: Telosnex/telosnex_ci_tools/.github/workflows/k.yml@abc\n',
+        ),
+        isTrue,
+      );
+      expect(
+        workflowUsesCiTools('# see Telosnex/telosnex_ci_tools/actions\n'),
+        isFalse,
+      );
+    });
+
+    test('renderPackages: adopted rows by name, the rest pending', () {
+      PackageStatus status(String repo, {bool kiln = false, bool ci = false}) =>
+          PackageStatus(
+            DashboardPackage(repo: repo),
+            'main',
+            const {},
+            usesKiln: kiln,
+            usesCiTools: ci,
+          );
+      final md = renderPackages([
+        status('o/zeta', ci: true),
+        status('o/alpha', kiln: true, ci: true),
+        status('o/later'),
+      ]);
+      final rows = md.split('\n').where((l) => l.startsWith('| [')).toList();
+      expect(rows, [
+        '| [alpha](https://github.com/o/alpha) | ✅ | ✅ |',
+        '| [zeta](https://github.com/o/zeta) | — | ✅ |',
+      ]);
+      expect(
+        md,
+        contains(
+          'Not on the default branch yet: [later](https://github.com/o/later).',
+        ),
+      );
+      expect(md, isNot(contains('Updated')));
+    });
+  });
 }

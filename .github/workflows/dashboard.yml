@@ -1,9 +1,12 @@
 name: Dashboard
 
-# The CI dashboard of the packages in dashboard.yaml: README.md and
-# dashboard.json on the dashboard branch, one commit that each run replaces
-# (https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard), and the job
-# summary of each run.
+# The status views of the packages in status/packages.yaml:
+# - the live dashboard: README.md and dashboard.json on the dashboard branch,
+#   one commit that each run replaces
+#   (https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard), and the
+#   job summary of each run;
+# - status/packages.md on main, committed when it changes (a package starts
+#   using Kiln or CI tools). Pushes with GITHUB_TOKEN start no workflow.
 #
 # GitHub turns off the schedule of a public repository after 60 days without
 # activity in it; run it by hand to turn it back on.
@@ -15,7 +18,7 @@ on:
   push:
     branches: [main]
     paths:
-      - dashboard.yaml
+      - status/packages.yaml
       - bin/dashboard.dart
       - lib/src/dashboard*.dart
       - lib/src/job_names.dart
@@ -40,7 +43,7 @@ jobs:
     # The packages are public repositories: any token reads their runs and
     # jobs. A private one would need a token with actions: read on it.
     permissions:
-      # Pushes the dashboard branch.
+      # Pushes the dashboard branch, and status/packages.md to main.
       contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,7 +55,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          dart run telosnex_ci_tools:dashboard --out "$RUNNER_TEMP/dashboard"
+          dart run telosnex_ci_tools:dashboard --out "$RUNNER_TEMP/dashboard" \
+            --packages-md status/packages.md
           cat "$RUNNER_TEMP/dashboard/README.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish the dashboard branch
         env:
@@ -68,3 +72,22 @@ jobs:
           auth=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
           git -c "http.extraheader=AUTHORIZATION: basic $auth" \
             push -q --force "https://github.com/$REPOSITORY.git" dashboard
+      - name: Commit status/packages.md
+        if: github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if git diff --quiet -- status/packages.md; then
+            echo "status/packages.md is current."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -q -m "status/packages.md: update" -- status/packages.md
+          auth=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          # A push to main since checkout: the next run commits it.
+          if ! git -c "http.extraheader=AUTHORIZATION: basic $auth" \
+            push -q "https://github.com/$REPOSITORY.git" HEAD:main; then
+            echo "::warning::main moved; the next run updates status/packages.md."
+          fi

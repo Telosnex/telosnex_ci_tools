@@ -1,0 +1,29 @@
+# The packages of the status views (dart run telosnex_ci_tools:dashboard):
+# status/packages.md (which use Kiln and CI tools, on main) and the live
+# dashboard (the dashboard branch). A package that uses neither on its
+# default branch is listed under "Not on the default branch yet".
+#
+# Per package, all optional:
+#   tests:    workflow files whose jobs are the test cells, on the default
+#             branch. Default: [unit.yml, integration.yml].
+#   checks:   more workflow files on the default branch, shown with a status
+#             only. Default: [kiln_check.yml].
+#   releases: release workflow files, newest run on any branch.
+#             Default: [kiln_release.yml].
+# Only public repositories: the views are public.
+packages:
+  - repo: Telosnex/fllama
+    tests: [test.yml]
+    checks: [kiln_check.yml, cuda_pack.yml]
+  - repo: Telosnex/fonnx
+  - repo: Telosnex/image_ffmpeg
+  - repo: Telosnex/nutdart
+  - repo: Telosnex/telosnex_audio
+  - repo: Telosnex/telosnex_inappwebview
+    checks: []
+    releases: []
+  - repo: Telosnex/zxing_dart
+  # CI tools on ci/unit-integration only, so far.
+  - repo: Telosnex/riverpod
+    checks: []
+    releases: []

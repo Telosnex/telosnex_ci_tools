@@ -1,6 +1,6 @@
 # Packages
 
-The Telosnex repositories that use Kiln or telosnex_ci_tools on their default branch.
+The Telosnex repositories that use Kiln or telosnex_ci_tools on their default branch. Generated from `status/packages.yaml` by the Dashboard workflow; do not edit. Their CI: the [dashboard](https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard).
 
 | Name | Uses Kiln | Uses CI tools |
 |---|---|---|
@@ -12,4 +12,4 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
 
-Not on the default branch yet: [riverpod](https://github.com/Telosnex/riverpod) (CI tools on `ci/unit-integration`).
+Not on the default branch yet: [riverpod](https://github.com/Telosnex/riverpod).
