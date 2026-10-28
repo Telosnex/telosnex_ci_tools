@@ -8,6 +8,10 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: cmark-gfm-dart
+    reason: Keep (our package). Add CI.
+  - repo: cmark-gfm-widget
+    reason: Keep (our package). Add CI.
   - repo: dart-sprintf
     reason: >-
       Keep the fork: a rewrite about 5x faster (lua_dardo_plus uses sprintf
