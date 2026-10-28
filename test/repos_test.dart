@@ -180,4 +180,25 @@ packages:
       'r': 'x',
     });
   });
+
+  test('parseUpstreams', () {
+    expect(
+      parseUpstreams(
+        'upstream:\n  - repo: G\n    upstream: flutter/packages/packages/g\n',
+      ),
+      {'g': 'flutter/packages/packages/g'},
+    );
+    expect(
+      () => parseUpstreams('upstream:\n  - repo: g\n    upstream: nope\n'),
+      throwsFormatException,
+    );
+    const copy = OrgRepo(
+      name: 'g',
+      isFork: false,
+      isArchived: false,
+      usesCiTools: false,
+      copyOf: 'flutter/packages/packages/g',
+    );
+    expect(copy.hasUpstream, isTrue);
+  });
 }

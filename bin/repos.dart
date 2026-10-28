@@ -97,11 +97,13 @@ Future<void> main(List<String> arguments) async {
       ))!.resolve('../status/repos.yaml').toFilePath();
   final Map<String, String> skips;
   final Map<String, String> followups;
+  final Map<String, String> upstreams;
   try {
     final file = File(skipPath);
     final text = file.existsSync() ? file.readAsStringSync() : '';
     skips = parseSkips(text);
     followups = parseFollowups(text);
+    upstreams = parseUpstreams(text);
   } on FormatException catch (e) {
     stderr.writeln('$skipPath: ${e.message}');
     exit(2);
@@ -157,7 +159,11 @@ Future<void> main(List<String> arguments) async {
     // package on pub.dev the app may use instead).
     for (final repo in repos) {
       final package = repo.packageName;
-      if (repo.isFork || package == null) continue;
+      if (repo.isFork ||
+          upstreams.containsKey(repo.name.toLowerCase()) ||
+          package == null) {
+        continue;
+      }
       for (final MapEntry(key: lock, value: names) in hosted.entries) {
         if (!names.contains(package)) continue;
         (found[repo.name.toLowerCase()] ??= []).add(
@@ -172,10 +178,10 @@ Future<void> main(List<String> arguments) async {
       }
     }
 
-    for (final name in skips.keys) {
+    for (final name in {...skips.keys, ...followups.keys, ...upstreams.keys}) {
       if (!byName.containsKey(name)) {
         stderr.writeln(
-          'Warning: $skipPath skips $name, not a repository of $org.',
+          'Warning: $skipPath lists $name, not a repository of $org.',
         );
       }
     }
@@ -183,12 +189,15 @@ Future<void> main(List<String> arguments) async {
       for (final repo in repos)
         // The app is not a dependency of itself.
         if (repo.name.toLowerCase() != appName &&
-            (repo.isFork || !args.flag('forks-only')))
+            (repo.isFork ||
+                upstreams.containsKey(repo.name.toLowerCase()) ||
+                !args.flag('forks-only')))
           repo.withUses(
             found[repo.name.toLowerCase()] ?? const [],
             actionUsers[repo.name.toLowerCase()] ?? const {},
             skipReason: skips[repo.name.toLowerCase()],
             followup: followups[repo.name.toLowerCase()],
+            copyOf: upstreams[repo.name.toLowerCase()],
           ),
     ];
     for (final repo in report) {

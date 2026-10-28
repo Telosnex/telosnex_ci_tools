@@ -146,6 +146,39 @@ String? pubspecName(String pubspec) {
 /// Throws a [FormatException] on an entry without a repo or a reason.
 Map<String, String> parseSkips(String yaml) => _parseReasons(yaml, 'skip');
 
+/// The `upstream:` entries of status/repos.yaml: repositories that copy
+/// their upstream instead of forking it on GitHub (e.g. a package of a
+/// monorepo), lowercase name to `owner/repo[/path]`:
+///
+/// ```yaml
+/// upstream:
+///   - repo: google_fonts
+///     upstream: flutter/packages/packages/google_fonts
+/// ```
+Map<String, String> parseUpstreams(String yaml) {
+  final root = loadYaml(yaml);
+  final list = root is YamlMap ? root['upstream'] : null;
+  if (list == null) return const {};
+  if (list is! YamlList) {
+    throw const FormatException('upstream: is not a list.');
+  }
+  final out = <String, String>{};
+  for (final entry in list) {
+    final repo = entry is YamlMap ? entry['repo'] : null;
+    final upstream = entry is YamlMap ? entry['upstream'] : null;
+    if (repo is! String ||
+        upstream is! String ||
+        !RegExp(r'^[\w.-]+/[\w.-]+(/[\w./-]+)?$').hasMatch(upstream)) {
+      throw FormatException(
+        'Each upstream needs a repo and an upstream (owner/repo[/path]): '
+        '$entry',
+      );
+    }
+    out[repo.toLowerCase()] = upstream;
+  }
+  return out;
+}
+
 /// The follow-ups of status/repos.yaml (a `followup:` list of the same form
 /// as `skip:`), lowercase name to what is left to do.
 Map<String, String> parseFollowups(String yaml) =>
@@ -235,7 +268,15 @@ final class OrgRepo {
     this.packageName,
     this.skipReason,
     this.followup,
+    this.copyOf,
   });
+
+  /// The upstream (`owner/repo[/path]`) it copies, from status/repos.yaml;
+  /// null when it is a GitHub fork or has no upstream.
+  final String? copyOf;
+
+  /// A GitHub fork, or a copy of an upstream.
+  bool get hasUpstream => isFork || copyOf != null;
 
   /// What status/repos.yaml says is left to do; null when nothing.
   final String? followup;
@@ -283,6 +324,7 @@ final class OrgRepo {
     Set<String> actionUsers, {
     String? skipReason,
     String? followup,
+    String? copyOf,
   }) => OrgRepo(
     name: name,
     isFork: isFork,
@@ -294,6 +336,7 @@ final class OrgRepo {
     actionUsers: actionUsers,
     skipReason: skipReason,
     followup: followup,
+    copyOf: copyOf,
   );
 
   Map<String, Object?> toJson() => {
@@ -302,6 +345,7 @@ final class OrgRepo {
     'isFork': isFork,
     'isArchived': isArchived,
     'parent': parent,
+    'copyOf': ?copyOf,
     'pushedAt': pushedAt?.toIso8601String(),
     'usesCiTools': usesCiTools,
     'usedTransitively': usedTransitively,
@@ -333,13 +377,14 @@ String renderForks(
       'Telosnex/telosnex_ci_tools. Action of: a workflow (of the app or of a '
       'repository of $org) uses it as an action or reusable workflow; that '
       'does not change the category. Fork of: — for a repository of '
-      '$org that is not a fork.',
+      '$org that is not a fork; "(copy)": a copy of the upstream, not a '
+      'GitHub fork (status/repos.yaml upstream:).',
     )
     ..writeln()
     ..writeln(
       '${[for (final c in ForkCategory.values) '${c.title}: ${repos.where((r) => r.category == c).length}'].join(' · ')} '
       '(${repos.length} repositories, '
-      '${repos.where((r) => r.isFork).length} forks)',
+      '${repos.where((r) => r.hasUpstream).length} forks)',
     );
   for (final category in ForkCategory.values) {
     final rows = repos.where((r) => r.category == category).toList()
@@ -372,7 +417,9 @@ String renderForks(
       final name =
           '[${repo.name}](https://github.com/$org/${repo.name})'
           '${repo.isArchived ? ' (archived)' : ''}';
-      final parent = repo.parent == null
+      final parent = repo.copyOf != null
+          ? _copyLink(repo.copyOf!)
+          : repo.parent == null
           ? (repo.isFork ? '?' : '—')
           : '[${repo.parent}](https://github.com/${repo.parent})';
       final pushed = repo.pushedAt?.toIso8601String().substring(0, 10) ?? '?';
@@ -392,3 +439,14 @@ String renderForks(
 /// Whether the category's table has a Reason column.
 bool _noted(ForkCategory category) =>
     category == ForkCategory.skipped || category == ForkCategory.followup;
+
+/// A link to [upstream] (`owner/repo[/path]`), marked as a copy.
+String _copyLink(String upstream) {
+  final parts = upstream.split('/');
+  final repo = '${parts[0]}/${parts[1]}';
+  final path = parts.skip(2).join('/');
+  final url = path.isEmpty
+      ? 'https://github.com/$repo'
+      : 'https://github.com/$repo/tree/HEAD/$path';
+  return '[$upstream]($url) (copy)';
+}
