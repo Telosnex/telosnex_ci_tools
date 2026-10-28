@@ -1,0 +1,23 @@
+name: Lint the workflows
+description: Checks the caller's workflows against the Telosnex standard (status/STANDARD.md) with the lint of this commit of telosnex_ci_tools.
+
+# Needs Dart on the PATH: run actions/setup-flutter first.
+
+inputs:
+  path:
+    description: The repository to check.
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Lint the workflows
+      shell: bash
+      env:
+        REPO: ${{ inputs.path }}
+      run: |
+        repo=$(cd "$REPO" && pwd)
+        cd "$GITHUB_ACTION_PATH/../.."
+        dart pub get > /dev/null
+        dart run telosnex_ci_tools:lint "$repo"
