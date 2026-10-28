@@ -96,7 +96,7 @@ Future<void> main(List<String> arguments) async {
         Uri.parse('package:telosnex_ci_tools/'),
       ))!.resolve('../status/repos.yaml').toFilePath();
   final Map<String, String> skips;
-  final Map<String, String> followups;
+  final Map<String, Followup> followups;
   final Map<String, String> upstreams;
   try {
     final file = File(skipPath);
@@ -217,6 +217,15 @@ Future<void> main(List<String> arguments) async {
           '${repo.category.title}: remove the follow-up.',
         );
       }
+    }
+    final unknown = [
+      for (final r in report)
+        if (r.followup?.whyUnknown ?? false) r.name,
+    ];
+    if (unknown.isNotEmpty) {
+      stderr.writeln(
+        'Note: $skipPath has no why yet for ${unknown.join(', ')}.',
+      );
     }
     final text = args.flag('json')
         ? '${const JsonEncoder.withIndent(' ').convert({

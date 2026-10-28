@@ -179,10 +179,61 @@ Map<String, String> parseUpstreams(String yaml) {
   return out;
 }
 
-/// The follow-ups of status/repos.yaml (a `followup:` list of the same form
-/// as `skip:`), lowercase name to what is left to do.
-Map<String, String> parseFollowups(String yaml) =>
-    _parseReasons(yaml, 'followup');
+/// A follow-up of status/repos.yaml: why we have the repository, and what
+/// is left to do.
+final class Followup {
+  const Followup({required this.why, required this.todo});
+
+  /// Why we fork (or own) it: the problem it solves for us. `?` when not
+  /// known yet.
+  final String why;
+
+  /// What is left to do.
+  final String todo;
+
+  /// Whether [why] still needs an answer.
+  bool get whyUnknown => why == '?';
+
+  Map<String, Object?> toJson() => {'why': why, 'todo': todo};
+}
+
+/// The follow-ups of status/repos.yaml, lowercase name to [Followup]:
+///
+/// ```yaml
+/// followup:
+///   - repo: auto_updater
+///     why: The macOS app builds with Swift Package Manager; ...
+///     todo: Add CI.
+/// ```
+///
+/// Throws a [FormatException] on an entry without a repo, a why (`?` when
+/// not known) or a todo.
+Map<String, Followup> parseFollowups(String yaml) {
+  final root = loadYaml(yaml);
+  final list = root is YamlMap ? root['followup'] : null;
+  if (list == null) return const {};
+  if (list is! YamlList) {
+    throw const FormatException('followup: is not a list.');
+  }
+  final out = <String, Followup>{};
+  for (final entry in list) {
+    final repo = entry is YamlMap ? entry['repo'] : null;
+    final why = entry is YamlMap ? entry['why'] : null;
+    final todo = entry is YamlMap ? entry['todo'] : null;
+    if (repo is! String ||
+        why is! String ||
+        why.trim().isEmpty ||
+        todo is! String ||
+        todo.trim().isEmpty) {
+      throw FormatException(
+        'Each followup needs a repo, a why (? when not known) and a todo: '
+        '$entry',
+      );
+    }
+    out[repo.toLowerCase()] = Followup(why: why.trim(), todo: todo.trim());
+  }
+  return out;
+}
 
 Map<String, String> _parseReasons(String yaml, String key) {
   final root = loadYaml(yaml);
@@ -278,8 +329,9 @@ final class OrgRepo {
   /// A GitHub fork, or a copy of an upstream.
   bool get hasUpstream => isFork || copyOf != null;
 
-  /// What status/repos.yaml says is left to do; null when nothing.
-  final String? followup;
+  /// Why we have it and what is left to do, from status/repos.yaml; null
+  /// when it has no follow-up.
+  final Followup? followup;
 
   /// Why status/repos.yaml skips it; null when it does not.
   final String? skipReason;
@@ -323,7 +375,7 @@ final class OrgRepo {
     List<RepoReference> references,
     Set<String> actionUsers, {
     String? skipReason,
-    String? followup,
+    Followup? followup,
     String? copyOf,
   }) => OrgRepo(
     name: name,
@@ -355,7 +407,7 @@ final class OrgRepo {
     ],
     'actionUsers': [...actionUsers]..sort(),
     'skipReason': ?skipReason,
-    'followup': ?followup,
+    'followup': ?followup?.toJson(),
   };
 }
 
@@ -399,9 +451,19 @@ String renderForks(
     out
       ..writeln(
         '| Repository | Fork of | Used by $app | Action of | Last push |'
-        '${_noted(category) ? ' Reason |' : ''}',
+        '${switch (category) {
+          ForkCategory.skipped => ' Reason |',
+          ForkCategory.followup => ' Why | To do |',
+          _ => '',
+        }}',
       )
-      ..writeln('|---|---|---|---|---|${_noted(category) ? '---|' : ''}');
+      ..writeln(
+        '|---|---|---|---|---|${switch (category) {
+          ForkCategory.skipped => '---|',
+          ForkCategory.followup => '---|---|',
+          _ => '',
+        }}',
+      );
     for (final repo in rows) {
       final packages = {for (final r in repo.references) r.package}.toList()
         ..sort();
@@ -426,19 +488,21 @@ String renderForks(
       final actions = repo.actionUsers.isEmpty
           ? '—'
           : ([...repo.actionUsers]..sort()).join(', ');
-      final note = repo.skipReason ?? repo.followup;
-      final reason = !_noted(category) || note == null
-          ? ''
-          : ' ${note.replaceAll('|', r'\|').replaceAll('\n', ' ')} |';
+      String cell(String text) =>
+          ' ${text.replaceAll('|', r'\|').replaceAll('\n', ' ')} |';
+      final followup = repo.followup;
+      final reason = switch (category) {
+        ForkCategory.skipped => cell(repo.skipReason ?? ''),
+        ForkCategory.followup when followup != null =>
+          cell(followup.whyUnknown ? '**?**' : followup.why) +
+              cell(followup.todo),
+        _ => '',
+      };
       out.writeln('| $name | $parent | $use | $actions | $pushed |$reason');
     }
   }
   return out.toString();
 }
-
-/// Whether the category's table has a Reason column.
-bool _noted(ForkCategory category) =>
-    category == ForkCategory.skipped || category == ForkCategory.followup;
 
 /// A link to [upstream] (`owner/repo[/path]`), marked as a copy.
 String _copyLink(String upstream) {

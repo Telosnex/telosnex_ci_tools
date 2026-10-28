@@ -170,15 +170,21 @@ packages:
       isFork: true,
       isArchived: false,
       usesCiTools: ci,
-      followup: 'later',
+      followup: Followup(why: 'a bug', todo: 'later'),
       references: isUsed ? used : const [],
     );
     expect(repo().category, ForkCategory.followup);
     expect(repo(ci: true).category, ForkCategory.live);
     expect(repo(isUsed: false).category, ForkCategory.unused);
-    expect(parseFollowups('followup:\n  - repo: R\n    reason: x\n'), {
-      'r': 'x',
-    });
+    final followups = parseFollowups(
+      'followup:\n  - repo: R\n    why: "?"\n    todo: x\n',
+    );
+    expect(followups['r']!.todo, 'x');
+    expect(followups['r']!.whyUnknown, isTrue);
+    expect(
+      () => parseFollowups('followup:\n  - repo: r\n    todo: x\n'),
+      throwsFormatException,
+    );
   });
 
   test('parseUpstreams', () {

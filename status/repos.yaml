@@ -1,8 +1,9 @@
 # Notes for `dart run telosnex_ci_tools:repos`. Every entry needs a reason.
 #
-# followup: repositories the app uses without telosnex_ci_tools, with what is
-# left to do (reported as Follow-up instead of Missing CI). The script warns
-# when one is no longer used, or uses telosnex_ci_tools.
+# followup: repositories the app uses without telosnex_ci_tools (reported
+# as Follow-up instead of Missing CI). why: the problem the fork (or our
+# package) solves for us; "?" when not known yet. todo: what is left to do.
+# The script warns when one is no longer used, or uses telosnex_ci_tools.
 #
 # upstream: repositories that copy their upstream instead of forking it on
 # GitHub (e.g. a package of a monorepo): owner/repo[/path]. The report shows
@@ -12,163 +13,189 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
-  - repo: pdfrx
-    reason: >-
-      Keep the fork. Why: PDF import needs only text, and loadText also
-      builds and sends every character's rectangle (slow on web); a stalled
-      PDFium web worker blocked every later import. Branch
-      telosnex/text-only: PdfPage.loadTextOnly (native and web), stopping
-      and restarting a stalled web worker, one cache key for the web
-      worker/WASM URLs. Rebased onto upstream (2.10.1) on 2026-10-28. Send
-      upstream (none sent; upstream active). Add CI.
-  - repo: packages
-    reason: >-
-      Keep the fork (two branches of flutter/packages, rebased onto upstream
-      main on 2026-10-28). telosnex/sp-windows-local-appdata:
-      shared_preferences_windows keeps its file in Local AppData (our policy,
-      app_storage ADR 001 D5). telosnex/defer-gis-sdk: google_sign_in_web
-      loads Google's script at init, not at plugin registration; send
-      upstream. Branch main is an old mirror. Add CI.
-  - repo: LuaDardo
-    reason: >-
-      Keep the fork; we own it. Branch develop is lua_dardo_plus 0.3.0 plus
-      our 77 commits (2026-02 to 07): 44 Lua 5.3 correctness fixes (string
-      library, patterns, coroutines, goto, integer math, string.pack/dump),
-      faster execution (register hot paths, frame loop, closure inlining,
-      scalar-replaced tables), tests. Upstream: the GitHub repository
-      (ImL1s/LuaDardo) is gone; lua_dardo_plus moved to
-      gitlab.com/aa22396584/LuaDardo (login required to clone). pub.dev
-      0.3.1 changed only its URLs, so 0 behind in code. Add CI. Optionally
-      offer the fixes upstream.
-  - repo: libmonet
-    reason: >-
-      Keep (our package). Add CI. Also: androidx_graphics_shapes ^2.0.0
-      (see dart-flutter-packages).
-  - repo: irondash
-    reason: >-
-      Keep the fork (irondash_engine_context only): branch telosnex_main is
-      upstream main (0.6 native assets, 0 behind) plus one commit, nil
-      guards in the Darwin plugin's registry getters (a startup race with
-      super_native_extensions segfaulted on macOS). Send upstream: small,
-      matches the other platforms, and the maintainer is active (#90,
-      2026-08). Delete branch main (an old mirror). Add CI.
-  - repo: highlight.dart
-    reason: >-
-      Branch telosnex/limited-languages (0.7.0 plus 3 commits): a default
-      registry of about 50 languages (the 1C grammar crashes iOS Safari),
-      parseWithContinuation (incremental highlighting while streaming), and
-      flutter_highlight's dependency for cmark-gfm-widget. Not rebased:
-      upstream master (0.7.1, 2026-03-30, not on pub.dev) is a new engine
-      with a new API (Highlight/hljs, highlight_core.dart for selected
-      languages, HighlightResult; +2080/-669 in lib/src). Move
-      cmark-gfm-widget to it: highlight_core.dart replaces the limited
-      registry; continuation exists but is private (_highlight), so add a
-      public form (upstream PR), then drop the fork. Add CI.
-  - repo: google_fonts
-    reason: >-
-      Keep the fork (a copy of google_fonts 9.0.0 from pub.dev, not a GitHub
-      fork: upstream is a package of flutter/packages). One commit:
-      GoogleFontsConfig.fontBytesTransform, which telosnex uses to centre the
-      line box (ADR_font_line_height D10). When google_fonts releases, copy
-      the new version and apply the commit again. Could go upstream to
-      flutter/packages as a small, general hook. Add CI.
-  - repo: flutter_tts
-    reason: >-
-      Keep the fork: a mirror of Persie0/flutter_tts (identical, 49609539),
-      upstream 4.2.5 (dlutton, last commit 2026-01, 25 open PRs) plus about
-      20 community PRs: SwiftPM, Windows callback and crash fixes, Android
-      KGP and AGP 9, iOS crash fixes. Persie0's repository refuses anonymous
-      CI clones, so we mirror it. Update the mirror when Persie0 moves. Delete
-      the import/ and resolve/ branches. Add CI.
-  - repo: flutter_secure_storage
-    reason: >-
-      Keep the fork: develop is upstream develop (0 behind) plus 7 commits:
-      Linux in Snap/Flatpak (libsecret's backend choice, at most one unlock
-      prompt), web (non-extractable CryptoKey in IndexedDB), Windows (the
-      DPAPI file in Local AppData). Send the Linux and web fixes upstream
-      (active, maintainer reviews; none sent yet); Windows Local AppData is
-      our policy. Delete the stale branches (fix/linux-snap-portal-warmup,
-      fix/windows-local-appdata, backup/develop-2026-02-10). Add CI.
-  - repo: flutter_math_fork_fork
-    reason: >-
-      Keep the fork; we own it. Upstream (simpleclub/flutter_math, itself a
-      fork of the abandoned znjameswu/flutter_math) last merged code in
-      2025-05 (Flutter 3.32 support) and last released 0.7.4 on 2025-05-21;
-      since then one README merge, and 16 open PRs, the newest unreviewed.
-      Ours: computeDryBaseline, material_ui imports, arbitrary negations.
-      Add CI.
-  - repo: flutter_local_notifications
-    reason: >-
-      Keep the fork (flutter_local_notifications_linux only): notifications
-      through the portal in a Flatpak sandbox. Branch flatpak-portal-8.0.2,
-      rebased onto upstream hotfix/22.3.3 on 2026-10-28. Send upstream: open
-      issues #1757 and #1987 ask for it. Branch flatpak-portal is an older
-      copy on upstream master. Add CI.
-  - repo: flutter_lite_camera
-    reason: >-
-      Keep the fork: the Linux camera through the Camera portal and PipeWire,
-      which the Flatpak needs (no /dev/video*), and fixes for non-YUYV
-      cameras. Up to date with upstream (0 behind). Send the Linux work
-      upstream (active; 0.2.3 on 2026-09-02). Add CI.
-  - repo: dart-vector-tile-renderer
-    reason: >-
-      Keep the fork: Protomaps styles without the GPU renderer (format and
-      literal expressions, text-font). Upstream main is the GPU rewrite
-      (7.0 beta); the 6.x line is its 6.0.0 branch, our base: rebased onto it
-      (6.1.1) on 2026-10-28. Send the Protomaps change upstream to 6.0.0, or
-      move to the GPU renderer (vector_map_tiles 10). Add CI.
+  - repo: alchemist
+    why: >-
+      The app has about 1,050 golden tests. Upstream registers a setUp per
+      goldenTest call, and every setUp runs before every test (O(N²): 18 GB
+      peak RAM, 212 s on 442 tests). Golden images differed between macOS,
+      Linux and Windows (blocked-text masks, retained layers). The app's
+      Flutter UI comes from the material_ui package.
+    todo: >-
+      Add CI. Offer upstream: #175 again with the test-body form, and the
+      cross-OS fixes. Rebased onto 0.14.1 on 2026-10-28; its smoke tests fail
+      on macOS before and after (golden images).
+  - repo: archive
+    why: >-
+      Backups use archive's web codecs, which failed under dart2wasm (raw
+      inflate, gzip encode). The archive_40 rename let archive 3 and 4 be
+      used side by side; the app uses archive 4 now.
+    todo: >-
+      Drop the archive_40 rename; make a new fork of upstream with only the
+      dart2wasm fix (2026-10-21), and send that fix upstream.
+  - repo: auto_updater
+    why: >-
+      Sparkle updates on macOS. The macOS app builds with Swift Package
+      Manager, and pub.dev 1.0.0 has a podspec only. Upstream is about dead:
+      no commit since 2025-03, no release since 2024-10, open PRs unreviewed
+      (one is SwiftPM, #86).
+    todo: Add CI.
+  - repo: background_downloader
+    why: >-
+      Abandoned transfers left partial files of several GB that nothing
+      deleted; the app does not resume transfers across launches, so it
+      cleans them at launch (cleanUpTempFiles). On Windows, the task
+      database was in Roaming AppData, which roaming profiles copy between
+      PCs (our policy: per-PC data in Local AppData).
+    todo: Add CI. Rebased onto upstream 9.6.4 on 2026-10-28.
+  - repo: CamerAwesome
+    why: >-
+      iOS capture wrote PNG: a multi-second encode per photo; ours writes
+      JPEG. The app's Flutter UI comes from material_ui and cupertino_ui.
+    todo: >-
+      Send the iOS JPEG change upstream. Add CI. Rebased onto upstream on
+      2026-10-28.
+  - repo: cmark-gfm-dart
+    why: Our package; the app's Markdown (GFM) parser.
+    todo: Add CI.
+  - repo: cmark-gfm-widget
+    why: Our package; renders the app's Markdown.
+    todo: Add CI.
   - repo: dart-flutter-packages
-    reason: >-
-      Drop the fork (libmonet only; telosnex gets it through libmonet). Our
-      one commit restores MaterialShapes and the shape borders in
-      androidx_graphics_shapes; upstream 2.0.0 on pub.dev (2026-10-15) moved
-      them back. libmonet: androidx_graphics_shapes ^2.0.0, migrate the API
-      (Cubic -> CubicBezier, named CornerRounding, no MutableCubic, the
+    why: >-
+      In 2026-08 upstream moved MaterialShapes and the shape borders out of
+      androidx_graphics_shapes (to material_3p); libmonet's shapes and
+      safe-area data need them. Upstream 2.0.0 (pub.dev, 2026-10-15) moved
+      them back, so the fork can go.
+    todo: >-
+      Drop the fork. libmonet: androidx_graphics_shapes ^2.0.0, migrate the
+      API (Cubic -> CubicBezier, named CornerRounding, no MutableCubic, the
       material_shapes.dart import), run the AndroidX parity test, regenerate
       the safe-area data with tool/precompute_safe_areas.dart, and review the
       differences.
-  - repo: cmark-gfm-dart
-    reason: Keep (our package). Add CI.
-  - repo: cmark-gfm-widget
-    reason: Keep (our package). Add CI.
   - repo: dart-sprintf
-    reason: >-
-      Keep the fork: a rewrite about 5x faster (lua_dardo_plus uses sprintf
-      for Lua string.format), and upstream is dead (no commit since 2022).
-      Add CI.
-  - repo: CamerAwesome
-    reason: >-
-      Keep the fork: iOS JPEG capture (not seconds of PNG encoding) and the
-      material_ui/cupertino_ui imports. Rebased onto upstream on 2026-10-28.
-      Send the iOS JPEG change upstream. Add CI.
-  - repo: alchemist
-    reason: >-
-      Keep the fork (golden setup in the test body, not O(N²) setUps;
-      cross-OS golden fixes; material_ui imports). Rebased onto upstream
-      0.14.1 on 2026-10-28. Add CI. Its smoke tests fail on macOS before and
-      after the rebase (golden images).
-  - repo: auto_updater
-    reason: >-
-      Keep the fork: the macOS app builds with Swift Package Manager and
-      upstream (SwiftPM support; pub.dev 1.0.0 is podspec-only) is about
-      dead: no commit since 2025-03, no release since 2024-10, open PRs
-      unreviewed (one is SwiftPM, #86). Add CI.
-  - repo: background_downloader
-    reason: >-
-      Keep the fork (cleanUpTempFiles, Windows database in Local AppData).
-      Rebased onto upstream 9.6.4 on 2026-10-28. Add CI.
-  - repo: archive
-    reason: >-
-      Drop the archive_40 rename (the app already uses archive 4 from
-      pub.dev); make a new fork of upstream with only the dart2wasm web codec
-      fix (2026-10-21), and send that fix upstream.
+    why: >-
+      Lua string.format in mods goes through sprintf (lua_dardo_plus); our
+      rewrite is about 5x faster. Upstream is dead (no commit since 2022).
+    todo: Add CI.
+  - repo: dart-vector-tile-renderer
+    why: >-
+      The maps feature draws the Protomaps light and dark styles with the CPU
+      renderer (6.x). Those styles use format and literal expressions and
+      text-font, which 6.x does not support.
+    todo: >-
+      Send the Protomaps change upstream (branch 6.0.0), or move to the GPU
+      renderer (upstream main, 7.0). Add CI. Rebased onto 6.1.1 on
+      2026-10-28.
+  - repo: flutter_lite_camera
+    why: >-
+      The Flatpak has no /dev/video*: the camera comes through the Camera
+      portal and PipeWire. Also: crashes with non-YUYV cameras and before
+      the first frame.
+    todo: >-
+      Send the Linux work upstream (active; 0.2.3 on 2026-09-02). Add CI. Up
+      to date with upstream.
+  - repo: flutter_local_notifications
+    why: >-
+      In a Flatpak, notifications must go through the Notification portal;
+      upstream's Linux plugin calls the notification server on D-Bus.
+    todo: >-
+      Send upstream: open issues #1757 and #1987 ask for it. Delete branch
+      flatpak-portal (an older copy on upstream master). Add CI. Branch
+      flatpak-portal-8.0.2 rebased onto hotfix/22.3.3 on 2026-10-28.
+  - repo: flutter_math_fork_fork
+    why: >-
+      Math in Markdown (cmark-gfm-widget). Upstream does not keep up with
+      Flutter: we fixed hashValues, LayoutBuilder (3.32) and
+      computeDryBaseline ourselves. Ours also draws negations of any symbol.
+      Upstream last merged code in 2025-05; 16 PRs wait unreviewed.
+    todo: Add CI.
+  - repo: flutter_secure_storage
+    why: >-
+      In a Snap or Flatpak, reads and writes failed (the host keyring
+      answers on D-Bus, but AppArmor blocks it) and users were asked to
+      unlock more than once. On web the key was raw bytes in localStorage.
+      On Windows the DPAPI file was in Roaming AppData (our policy: per-PC
+      data in Local AppData).
+    todo: >-
+      Send the Linux and web fixes upstream (the Linux fix refines upstream
+      #1223). Delete the stale branches (fix/linux-snap-portal-warmup,
+      fix/windows-local-appdata, backup/develop-2026-02-10). Add CI.
+  - repo: flutter_tts
+    why: >-
+      Upstream (dlutton) is about dead (last commit 2026-01, 25 open PRs)
+      and lacks fixes the app needs: Windows build and crashes, SwiftPM,
+      Android AGP 9. Persie0/flutter_tts has them; we mirror it because
+      anonymous CI clones of it were refused (pubspec.yaml).
+    todo: >-
+      An anonymous fetch of Persie0/flutter_tts worked on 2026-10-28: check
+      whether the mirror is still needed. Update it when Persie0 moves.
+      Delete the import/ and resolve/ branches. Add CI.
+  - repo: google_fonts
+    why: >-
+      The app centres each font's line box (libmonet patchFontLineMetrics,
+      ADR_font_line_height D10); google_fonts 9.0.0 passes the bytes to
+      FontLoader with no hook. Ours adds GoogleFontsConfig.fontBytesTransform.
+    todo: >-
+      When google_fonts releases, copy the new version and apply the commit
+      again. Offer the hook to flutter/packages. Add CI.
+  - repo: highlight.dart
+    why: >-
+      Code highlighting in Markdown (cmark-gfm-widget). The full registry
+      loads the 1C grammar, which crashes iOS Safari; streamed messages need
+      highlighting that continues from where it stopped.
+    todo: >-
+      Upstream master (0.7.1, not on pub.dev) is a new engine:
+      highlight_core.dart replaces our limited registry, and continuation
+      exists but is private. Move cmark-gfm-widget to it, add a public
+      continuation upstream, then drop the fork. Add CI.
+  - repo: irondash
+    why: >-
+      super_native_extensions 0.10 needs irondash_engine_context 0.6 (native
+      assets), which pub.dev does not have as a release. Ours adds nil
+      guards in the Darwin plugin: a startup race segfaulted on macOS.
+    todo: >-
+      Send the nil guards upstream (the maintainer is active). Delete branch
+      main (an old mirror). Add CI.
+  - repo: libmonet
+    why: Our package; the app's colour, shape and typography system.
+    todo: Add CI. Then androidx_graphics_shapes ^2.0.0 (dart-flutter-packages).
+  - repo: LuaDardo
+    why: >-
+      Mods run Lua; upstream lua_dardo_plus had Lua 5.3 bugs (44 fixed:
+      string library and patterns, coroutines, goto, integer math,
+      string.pack and dump) and was slow (ours: register hot paths, frame
+      loop, closure inlining, scalar-replaced tables). Upstream's GitHub
+      repository is gone; it moved to gitlab.com/aa22396584/LuaDardo (login
+      to clone). pub.dev 0.3.1 changed only its URLs.
+    todo: Add CI. Optionally offer the fixes upstream.
+  - repo: packages
+    why: >-
+      shared_preferences_windows (branch telosnex/sp-windows-local-appdata):
+      the file was in Roaming AppData (our policy: per-PC data in Local
+      AppData). google_sign_in_web (branch telosnex/defer-gis-sdk): it
+      loaded Google's sign-in script when the plugin registered, at every
+      web start.
+    todo: >-
+      Send the google_sign_in_web change upstream. Branch main is an old
+      mirror. Add CI. Both rebased onto upstream main on 2026-10-28.
+  - repo: pdfrx
+    why: >-
+      PDF import needs only text, but loadText also builds and sends every
+      character's rectangle (slow on web); a stalled PDFium web worker
+      blocked every later import.
+    todo: >-
+      Send upstream (none sent; upstream is active). Add CI. Branch
+      telosnex/text-only rebased onto upstream (2.10.1) on 2026-10-28.
   - repo: sqlite3.dart
-    reason: >-
-      Upstream fixed our OPFS >2 GiB bug in sqlite3 3.5.2. Moving off the fork
-      means sqlite3 3.8 plus its sqlite3mc.wasm, and rebuilding
-      web/step_store_worker.dart.js, which fails on main: the worker imports
-      Flutter through step_store_chat_functions.dart -> chat_tool_text.dart ->
-      loom_reasoning_globals.dart -> loom_step.dart -> bucket_id.dart.
+    why: >-
+      OPFS file offsets above 2 GiB wrapped negative, which made healthy
+      databases look corrupt. Upstream fixed it in 3.5.2 (#403).
+    todo: >-
+      Move to sqlite3 3.8 from pub.dev: replace web/sqlite3mc.wasm and
+      rebuild web/step_store_worker.dart.js, which fails on main: the worker
+      imports Flutter through step_store_chat_functions.dart ->
+      chat_tool_text.dart -> loom_reasoning_globals.dart -> loom_step.dart ->
+      bucket_id.dart.
 skip:
   - repo: monet_gdt
     reason: Python training of libmonet's on-device wallpaper model, not a Dart package.
