@@ -245,6 +245,31 @@ followup:
       release/supabase_flutter-2.17.x, 0 behind (2026-10-28). Delete the
       merged fix/* branches and the telosnex/*-v2 fallbacks once unneeded.
       Add CI.
+  - repo: super_sliver_list
+    why: >-
+      The chat list. Upstream (pub.dev 0.4.1, 2024-03) has had one commit
+      since 2024-07 (CI, 2026-10). Ours (32 commits) adds StickToTarget
+      (follow the bottom or an item while content grows), initial positions,
+      cancellable header anchoring and reveal, animateToItem returning a
+      handle, leak and scroll-correction fixes, and performance work.
+    todo: >-
+      A fuzzer test fails on our branch before and after the rebase ("Fuzzer
+      layout multiple slivers scrolling up", seed 928964062: an extent of
+      2571 where 3258 is expected): find out whether it is our bug. Add CI.
+      Rebased onto upstream on 2026-10-28 and pinned (it floated on main).
+  - repo: universal_html_compat
+    why: >-
+      HTML parsing for documents and web pages (5 files) in a WebAssembly
+      web build. universal_html exports dart:html in browsers, which
+      dart2wasm cannot compile (upstream #102, #111, open; 2.3.0 from
+      2025-11 still does). Ours (one 2024 commit) removes dart:html and
+      vendors package:html's parser.
+    todo: >-
+      Decide: keep ours, or parse with package:html directly (the app uses
+      only parsing.dart and html.dart's DOM). 27 behind upstream (2.3.0
+      DOM accessor fixes), not rebased. One dart:html import is left in
+      lib/src/_sdk_html_additions.dart (exported by lib/src/_sdk/html.dart):
+      check it is not reachable in a wasm build. Add CI.
 skip:
   - repo: monet_gdt
     reason: Python training of libmonet's on-device wallpaper model, not a Dart package.
