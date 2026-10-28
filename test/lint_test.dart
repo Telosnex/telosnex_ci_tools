@@ -116,6 +116,13 @@ void main() {
     expect([for (final f in bad) f.rule], ['yaml']);
   });
 
+  test('a job name with an arch or a distribution is in the form', () {
+    expect(jobNameProblem('Debian 13 ARM64 WPE SDK'), isNotNull);
+    expect(jobNameProblem('Ubuntu build'), isNotNull);
+    expect(jobNameProblem('Linux ARM64 Debian 13 WPE SDK'), isNull);
+    expect(jobNameProblem('Publish WPE SDK'), isNull);
+  });
+
   test('permissions', () {
     final text = _workflow().replaceFirst(
       'permissions:\n  contents: read\n',

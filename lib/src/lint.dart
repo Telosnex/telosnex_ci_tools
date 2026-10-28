@@ -376,7 +376,7 @@ Iterable<(int, String)> _jobNames(YamlMap job) sync* {
 }
 
 final _platformWord = RegExp(
-  '\\b(${[...platforms, ...browsers, 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64'].join('|')})\\b',
+  '\\b(${[...platforms, ...browsers, ...archs.where((a) => a != 'universal'), 'mac[Oo][Ss]', 'MacOS', 'iPhone', 'arm64', 'X64', 'amd64', 'x86_64', 'aarch64', 'Ubuntu', 'Debian', 'Fedora'].join('|')})\\b',
 );
 
 /// Null if a job name is in the Telosnex form (README, "Job names"):
