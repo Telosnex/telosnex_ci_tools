@@ -8,6 +8,14 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: flutter_tts
+    reason: >-
+      Keep the fork: a mirror of Persie0/flutter_tts (identical, 49609539),
+      upstream 4.2.5 (dlutton, last commit 2026-01, 25 open PRs) plus about
+      20 community PRs: SwiftPM, Windows callback and crash fixes, Android
+      KGP and AGP 9, iOS crash fixes. Persie0's repository refuses anonymous
+      CI clones, so we mirror it. Update the mirror when Persie0 moves. Delete
+      the import/ and resolve/ branches. Add CI.
   - repo: flutter_secure_storage
     reason: >-
       Keep the fork: develop is upstream develop (0 behind) plus 7 commits:
