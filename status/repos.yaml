@@ -8,6 +8,16 @@
 # telosnex_ci_tools (reported as Skipped instead of Unused). The script warns
 # when one turns out to be used, or to use telosnex_ci_tools.
 followup:
+  - repo: dart-flutter-packages
+    reason: >-
+      Drop the fork (libmonet only; telosnex gets it through libmonet). Our
+      one commit restores MaterialShapes and the shape borders in
+      androidx_graphics_shapes; upstream 2.0.0 on pub.dev (2026-10-15) moved
+      them back. libmonet: androidx_graphics_shapes ^2.0.0, migrate the API
+      (Cubic -> CubicBezier, named CornerRounding, no MutableCubic, the
+      material_shapes.dart import), run the AndroidX parity test, regenerate
+      the safe-area data with tool/precompute_safe_areas.dart, and review the
+      differences.
   - repo: cmark-gfm-dart
     reason: Keep (our package). Add CI.
   - repo: cmark-gfm-widget
