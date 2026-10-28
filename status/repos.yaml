@@ -216,8 +216,9 @@ followup:
     todo: >-
       LGPL 2.0 since 2026-10-28 (it said CC0, but it translates Shine's
       LGPL C code). The app is closed and compiled ahead of time, so the
-      LGPL's relinking terms are hard to meet: replace it (a permissive MP3
-      encoder, or a platform encoder) or keep it with legal advice. Add CI.
+      LGPL's relinking terms are hard to meet: keep it with legal advice, or
+      save new clips in another format (R11 only needs old MP3 clips to
+      play; minimp3 decodes them, CC0). Add CI.
   - repo: sqlite3.dart
     why: >-
       OPFS file offsets above 2 GiB wrapped negative, which made healthy
