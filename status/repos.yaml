@@ -60,18 +60,6 @@ followup:
   - repo: cmark-gfm-widget
     why: Our package; renders the app's Markdown.
     todo: Add CI.
-  - repo: dart-flutter-packages
-    why: >-
-      In 2026-08 upstream moved MaterialShapes and the shape borders out of
-      androidx_graphics_shapes (to material_3p); libmonet's shapes and
-      safe-area data need them. Upstream 2.0.0 (pub.dev, 2026-10-15) moved
-      them back, so the fork can go.
-    todo: >-
-      Drop the fork. libmonet: androidx_graphics_shapes ^2.0.0, migrate the
-      API (Cubic -> CubicBezier, named CornerRounding, no MutableCubic, the
-      material_shapes.dart import), run the AndroidX parity test, regenerate
-      the safe-area data with tool/precompute_safe_areas.dart, and review the
-      differences.
   - repo: dart-sprintf
     why: >-
       Lua string.format in mods goes through sprintf (lua_dardo_plus); our
@@ -158,7 +146,10 @@ followup:
       main (an old mirror). Add CI.
   - repo: libmonet
     why: Our package; the app's colour, shape and typography system.
-    todo: Add CI. Then androidx_graphics_shapes ^2.0.0 (dart-flutter-packages).
+    todo: >-
+      Add CI. On androidx_graphics_shapes 2.0.0 since 2026-10-28; its circle
+      is not normalized (it follows material_ui), so MaterialExpressiveShape
+      normalizes it. Recheck that on each update (the AndroidX parity test).
   - repo: LuaDardo
     why: >-
       Mods run Lua; upstream lua_dardo_plus had Lua 5.3 bugs (44 fixed:
@@ -242,10 +233,10 @@ followup:
       cancellable header anchoring and reveal, animateToItem returning a
       handle, leak and scroll-correction fixes, and performance work.
     todo: >-
-      A fuzzer test fails on our branch before and after the rebase ("Fuzzer
-      layout multiple slivers scrolling up", seed 928964062: an extent of
-      2571 where 3258 is expected): find out whether it is our bug. Add CI.
-      Rebased onto upstream on 2026-10-28 and pinned (it floated on main).
+      Add CI. Add a test for the streaming case that the correction cap
+      guards (2006779; the viewport's layout-cycle limit): none exists. The
+      cap dropped corrections with several slivers, which broke a fuzzer
+      test; fixed on 2026-10-28 (965184d).
   - repo: universal_html_compat
     why: >-
       HTML parsing for documents and web pages (5 files) in a WebAssembly
