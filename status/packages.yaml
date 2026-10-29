@@ -28,9 +28,9 @@ packages:
   - repo: Telosnex/riverpod
     checks: []
     releases: []
-  # Kiln; no unit.yml or integration.yml yet (check_and_lint.yml).
+  # Kiln; check_and_lint.yml has the Rust checks.
   - repo: Telosnex/super_native_extensions
-    tests: [check_and_lint.yml]
+    checks: [kiln_check.yml, check_and_lint.yml]
   - repo: Telosnex/webcrypto.dart
   # Forks the app depends on, with telosnex_ci_tools workflows (no Kiln).
   - repo: Telosnex/libmonet
