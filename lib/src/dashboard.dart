@@ -231,6 +231,12 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
     ..writeln('Updated ${updatedAt(now)}.')
     ..writeln()
     ..writeln(
+      'GitHub runs the refresh a few times a day, not every 30 min as '
+      'scheduled. To refresh now, run the '
+      '[Dashboard workflow](https://github.com/Telosnex/telosnex_ci_tools/actions/workflows/dashboard.yml).',
+    )
+    ..writeln()
+    ..writeln(
       '✅ passed · ❌ failed · 🚫 cancelled · ⏭️ skipped · ⏳ running · '
       '⚠️ other · — none (no such job or workflow) · no run: a workflow '
       'with no finished run yet',
