@@ -61,3 +61,42 @@ packages:
   - repo: Telosnex/flutter_math_fork_fork
     checks: []
     releases: []
+  - repo: Telosnex/flutter_local_notifications
+    checks: []
+    releases: []
+  - repo: Telosnex/auto_updater
+    checks: []
+    releases: []
+  - repo: Telosnex/flutter_lite_camera
+    checks: []
+    releases: []
+  - repo: Telosnex/google_fonts
+    checks: []
+    releases: []
+  - repo: Telosnex/dart-vector-tile-renderer
+    checks: []
+    releases: []
+  - repo: Telosnex/supabase-flutter
+    checks: []
+    releases: []
+  - repo: Telosnex/irondash
+    checks: []
+    releases: []
+  - repo: Telosnex/packages
+    checks: []
+    releases: []
+  - repo: Telosnex/background_downloader
+    checks: []
+    releases: []
+  - repo: Telosnex/pdfrx
+    checks: []
+    releases: []
+  - repo: Telosnex/flutter_tts
+    checks: []
+    releases: []
+  - repo: Telosnex/alchemist
+    checks: []
+    releases: []
+  - repo: Telosnex/receive_sharing_intent
+    checks: []
+    releases: []
