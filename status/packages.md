@@ -4,6 +4,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 
 | Name | Uses Kiln | Uses CI tools |
 |---|---|---|
+| [CamerAwesome](https://github.com/Telosnex/CamerAwesome) | — | ✅ |
 | [LuaDardo](https://github.com/Telosnex/LuaDardo) | — | ✅ |
 | [alchemist](https://github.com/Telosnex/alchemist) | — | ✅ |
 | [auto_updater](https://github.com/Telosnex/auto_updater) | — | ✅ |
@@ -16,6 +17,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [flutter_lite_camera](https://github.com/Telosnex/flutter_lite_camera) | — | ✅ |
 | [flutter_local_notifications](https://github.com/Telosnex/flutter_local_notifications) | — | ✅ |
 | [flutter_math_fork_fork](https://github.com/Telosnex/flutter_math_fork_fork) | — | ✅ |
+| [flutter_secure_storage](https://github.com/Telosnex/flutter_secure_storage) | — | ✅ |
 | [flutter_tts](https://github.com/Telosnex/flutter_tts) | — | ✅ |
 | [fonnx](https://github.com/Telosnex/fonnx) | ✅ | ✅ |
 | [google_fonts](https://github.com/Telosnex/google_fonts) | — | ✅ |
@@ -33,9 +35,8 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [shine_dart](https://github.com/Telosnex/shine_dart) | — | ✅ |
 | [supabase-flutter](https://github.com/Telosnex/supabase-flutter) | — | ✅ |
 | [super_native_extensions](https://github.com/Telosnex/super_native_extensions) | ✅ | ✅ |
+| [super_sliver_list](https://github.com/Telosnex/super_sliver_list) | — | ✅ |
 | [telosnex_audio](https://github.com/Telosnex/telosnex_audio) | ✅ | ✅ |
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
-
-Not on the default branch yet: [super_sliver_list](https://github.com/Telosnex/super_sliver_list).
