@@ -287,6 +287,28 @@ packages:
     });
   });
 
+  group('updatedAt', () {
+    test('daylight time', () {
+      expect(
+        updatedAt(DateTime.utc(2026, 10, 29, 10, 11)),
+        '2026-10-29 03:11 PDT (10:11 UTC)',
+      );
+    });
+    test('standard time, across midnight', () {
+      expect(
+        updatedAt(DateTime.utc(2026, 12, 1, 5, 30)),
+        '2026-11-30 21:30 PST (05:30 UTC)',
+      );
+    });
+    test('the switches', () {
+      // 2026: 8 March 10:00 UTC and 1 November 09:00 UTC.
+      expect(updatedAt(DateTime.utc(2026, 3, 8, 9, 59)), contains('PST'));
+      expect(updatedAt(DateTime.utc(2026, 3, 8, 10)), contains('PDT'));
+      expect(updatedAt(DateTime.utc(2026, 11, 1, 8, 59)), contains('PDT'));
+      expect(updatedAt(DateTime.utc(2026, 11, 1, 9)), contains('PST'));
+    });
+  });
+
   test('renderDashboard: packages in alphabetical order', () {
     PackageStatus status(String repo) =>
         PackageStatus(DashboardPackage(repo: repo), 'main', const {});

@@ -191,6 +191,27 @@ String _runCell(DashboardRun? run, DateTime now, {bool showBranch = false}) {
 }
 
 /// The dashboard: a status per workflow, then every test cell.
+/// [now] in Pacific time (PDT or PST, whichever is in force) and UTC:
+/// `2026-10-29 03:11 PDT (10:11 UTC)`.
+String updatedAt(DateTime now) {
+  final utc = now.toUtc();
+  // US daylight time: from 2:00 PST on the second Sunday of March to 2:00
+  // PDT (9:00 UTC) on the first Sunday of November.
+  DateTime sunday(int month, int nth) {
+    final first = DateTime.utc(utc.year, month);
+    return first.add(Duration(days: (7 - first.weekday) % 7 + 7 * (nth - 1)));
+  }
+
+  final start = sunday(3, 2).add(const Duration(hours: 10));
+  final end = sunday(11, 1).add(const Duration(hours: 9));
+  final daylight = !utc.isBefore(start) && utc.isBefore(end);
+  final local = utc.subtract(Duration(hours: daylight ? 7 : 8));
+  String hm(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  final date = local.toIso8601String().substring(0, 10);
+  return '$date ${hm(local)} ${daylight ? 'PDT' : 'PST'} (${hm(utc)} UTC)';
+}
+
 String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   // Alphabetical, ignoring case, in every section.
   final packages = [...unsorted]
@@ -199,14 +220,14 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
           a.package.name.toLowerCase().compareTo(b.package.name.toLowerCase()),
     );
   final out = StringBuffer()
-    ..writeln('# CI dashboard')
+    ..writeln('# Telosnex CI dashboard')
     ..writeln()
     ..writeln(
-      'Updated ${now.toUtc().toIso8601String().substring(0, 16)}Z by '
-      '`dart run telosnex_ci_tools:dashboard`. The newest finished run of '
-      'each workflow on the default branch; release workflows on any branch. '
-      'Hover a mark for the job, click it for the log.',
+      '${packages.length} packages maintained by Telosnex for the Telosnex '
+      'app.',
     )
+    ..writeln()
+    ..writeln('Updated ${updatedAt(now)}.')
     ..writeln()
     ..writeln(
       '✅ passed · ❌ failed · 🚫 cancelled · ⏭️ skipped · ⏳ running · '
