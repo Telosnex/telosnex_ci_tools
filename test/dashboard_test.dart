@@ -377,6 +377,72 @@ packages:
     expect(a < f && f < z, isTrue);
   });
 
+  test('neededJobNames: the name of each needed job, or its id', () {
+    const workflow = '''
+jobs:
+  models:
+    name: Models
+  web-files:
+    runs-on: ubuntu-24.04
+  android-universal:
+    name: Android universal build
+  linux:
+    name: Linux x64
+    needs: models
+  web:
+    name: Web Linux x64 Chrome dart2js
+    needs: [models, web-files]
+''';
+    expect(neededJobNames(workflow), {'Models', 'web-files'});
+    expect(neededJobNames(': ['), isEmpty);
+  });
+
+  group('setup jobs', () {
+    final now = DateTime.utc(2026, 1, 2);
+    String rowOf(List<DashboardJob> jobs) {
+      final md = renderDashboard([
+        PackageStatus(
+          const DashboardPackage(
+            repo: 'Telosnex/pkg',
+            tests: ['unit.yml', 'integration.yml'],
+          ),
+          'main',
+          {
+            'unit.yml': _run('unit.yml', [_job('Unit')], now),
+            'integration.yml': DashboardRun(
+              workflowFile: 'integration.yml',
+              workflowName: 'Integration',
+              branch: 'main',
+              sha: 'abcdef0123456789',
+              event: 'push',
+              conclusion: 'success',
+              url: 'https://x/run/integration.yml',
+              finishedAt: now,
+              jobs: [_job('Linux x64'), ...jobs],
+              setupJobs: const {'Web files'},
+            ),
+          },
+        ),
+      ], now);
+      return md
+          .split('## Test cells')
+          .last
+          .split('\n')
+          .firstWhere((l) => l.startsWith('| pkg'));
+    }
+
+    test('one that passed is not shown', () {
+      final row = rowOf([_job('Web files'), _job('Android universal build')]);
+      expect(row, isNot(contains('Web files')));
+      // Not needed by another job: a test, shown.
+      expect(row, contains('Android universal build'));
+    });
+
+    test('one that failed is shown', () {
+      expect(rowOf([_job('Web files', 'failure')]), contains('Web files'));
+    });
+  });
+
   test('kilnWorkingDirectories: the Kiln calls only', () {
     const workflow = '''
 jobs:

@@ -65,6 +65,7 @@ final class DashboardRun {
     required this.url,
     required this.finishedAt,
     required this.jobs,
+    this.setupJobs = const {},
   });
 
   final String workflowFile;
@@ -77,6 +78,10 @@ final class DashboardRun {
   final DateTime finishedAt;
   final List<DashboardJob> jobs;
 
+  /// Names of the jobs that other jobs of the workflow need (`needs:`):
+  /// setup such as building web files or fetching models, not tests.
+  final Set<String> setupJobs;
+
   Map<String, Object?> toJson() => {
     'workflow': workflowFile,
     'name': workflowName,
@@ -86,7 +91,10 @@ final class DashboardRun {
     'conclusion': conclusion,
     'url': url,
     'finishedAt': finishedAt.toUtc().toIso8601String(),
-    'jobs': [for (final job in jobs) job.toJson()],
+    'jobs': [
+      for (final job in jobs)
+        {...job.toJson(), if (setupJobs.contains(job.name)) 'setup': true},
+    ],
   };
 }
 
@@ -140,13 +148,17 @@ final class PackageStatus {
       if (parseJobName(job.name) == null) job,
   ];
 
-  /// The other jobs of the test workflows that name no cell: Web files,
-  /// Plan, and names that break the form.
+  /// The other jobs of the test workflows that name no cell: names that
+  /// break the form, and setup jobs (Web files, Models) that did not pass.
+  /// A setup job that passed is not shown: the jobs that need it are.
   List<DashboardJob> get otherJobs => [
     for (final run in _tests)
       if (run != _unit)
         for (final job in run.jobs)
-          if (parseJobName(job.name) == null) job,
+          if (parseJobName(job.name) == null &&
+              !(run.setupJobs.contains(job.name) &&
+                  (job.conclusion == 'success' || job.conclusion == 'skipped')))
+            job,
   ];
 
   Map<String, Object?> toJson() => {

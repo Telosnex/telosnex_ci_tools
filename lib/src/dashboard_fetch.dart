@@ -212,6 +212,36 @@ Set<String> kilnWorkingDirectories(String workflow) {
   }..remove('');
 }
 
+/// The names of the jobs of [workflow] that another job needs (`needs:`).
+/// A job's name is its `name:`, or its id when it has none.
+Set<String> neededJobNames(String workflow) {
+  final Object? root;
+  try {
+    root = loadYaml(workflow);
+  } on YamlException {
+    return const {};
+  }
+  final jobs = root is YamlMap ? root['jobs'] : null;
+  if (jobs is! YamlMap) return const {};
+  final needed = <Object?>{
+    for (final job in jobs.values)
+      if (job is YamlMap)
+        ...switch (job['needs']) {
+          final String id => [id],
+          final YamlList ids => ids,
+          _ => const [],
+        },
+  };
+  return {
+    for (final MapEntry(:key, :value) in jobs.entries)
+      if (needed.contains(key))
+        switch (value) {
+          YamlMap() when value['name'] is String => value['name'] as String,
+          _ => key as String,
+        },
+  };
+}
+
 /// Whether the default branch uses Kiln (the root pubspec, or the pubspec
 /// in the working-directory of a Kiln workflow call) and CI tools (a
 /// workflow).
@@ -271,7 +301,32 @@ Future<PackageStatus> fetchPackage(
         file,
         package.releases.contains(file) ? null : branch,
       );
-      if (run != null) runs[file] = run;
+      if (run == null) continue;
+      // Setup jobs from the workflow at the run's commit, when it is a test
+      // workflow.
+      if (!package.tests.contains(file)) {
+        runs[file] = run;
+        continue;
+      }
+      final text = await github.file(
+        repo,
+        '.github/workflows/$file',
+        run.sha.isEmpty ? branch : run.sha,
+      );
+      runs[file] = text == null
+          ? run
+          : DashboardRun(
+              workflowFile: run.workflowFile,
+              workflowName: run.workflowName,
+              branch: run.branch,
+              sha: run.sha,
+              event: run.event,
+              conclusion: run.conclusion,
+              url: run.url,
+              finishedAt: run.finishedAt,
+              jobs: run.jobs,
+              setupJobs: neededJobNames(text),
+            );
     }
     return PackageStatus(
       package,
