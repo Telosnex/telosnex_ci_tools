@@ -47,6 +47,25 @@ Other workflows are named for their topic (`cuda_pack.yml`). The `name:` matches
 
 Pin another Telosnex package's git dependency to a commit, not a branch: a branch can lose its prebuilt files between Kiln releases, and then every consumer builds from source (fonnx and telosnex_audio, 2026-10-27).
 
-## 6. The dashboard
+## 6. Branch protection
+
+A protected default branch requires **one check: `Unit`**. Nothing else.
+
+- **Why only Unit:** a required check that doesn't run on a pull request stays "expected" forever, and the PR can't merge. `Unit` is the only workflow that runs on every pull request, with no `paths` filter. Integration runs on push, nightly and by hand, so requiring its jobs blocks every PR. `Kiln check` runs on pull requests only when the manifest changes, so requiring it blocks every other PR.
+- **So `unit.yml` must keep running on every pull request:** `pull_request:` without `paths` or `branches`.
+- **Integration still guards the default branch:** it runs on every push there and nightly, and a red run shows on the dashboard. Run it on a PR by hand (`workflow_dispatch` on the PR branch) when the change needs it, before merging.
+- **Job names are the check names:** if you rename the Unit job, update the rule in the same change.
+- **Set it with:**
+
+  ```sh
+  gh api -X PUT repos/Telosnex/<repo>/branches/<default branch>/protection --input - <<'JSON'
+  {"required_status_checks": {"strict": false, "checks": [{"context": "Unit"}]},
+   "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null}
+  JSON
+  ```
+
+  Protection is optional. A repository without it is fine; one with it follows this rule.
+
+## 7. The dashboard
 
 Add the repository to [`packages.yaml`](packages.yaml). Its defaults read `unit.yml` and `integration.yml` (test cells), `kiln_check.yml` and `kiln_release.yml`; set `checks: []` and `releases: []` for a package without Kiln. Only public repositories. `packages.md` and the dashboard then follow the default branch on their own.
