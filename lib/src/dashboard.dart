@@ -184,7 +184,8 @@ String _link(DashboardJob job, [String? label]) =>
     '"${_escape(job.name)}")';
 
 String _runCell(DashboardRun? run, DateTime now, {bool showBranch = false}) {
-  if (run == null) return '—';
+  // The package has the workflow, but no finished run of it yet.
+  if (run == null) return 'no run';
   final branch = showBranch ? ' `${run.branch}`' : '';
   return '[${mark(run.conclusion)}](${run.url} "${_escape(run.workflowName)}") '
       '${_age(run.finishedAt, now)}$branch';
@@ -231,7 +232,8 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
     ..writeln()
     ..writeln(
       '✅ passed · ❌ failed · 🚫 cancelled · ⏭️ skipped · ⏳ running · '
-      '⚠️ other · — no job',
+      '⚠️ other · — none (no such job or workflow) · no run: a workflow '
+      'with no finished run yet',
     )
     ..writeln()
     ..writeln('## Workflows')
@@ -264,7 +266,8 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
                 now,
                 showBranch: releases.contains(file),
               )
-            : '',
+            // The package has no such workflow: — as for a missing job.
+            : '—',
     ];
     final name = status.error == null
         ? status.package.name

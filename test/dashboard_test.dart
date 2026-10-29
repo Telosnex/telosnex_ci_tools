@@ -287,6 +287,28 @@ packages:
     });
   });
 
+  test('Workflows: — for a workflow the package lacks, no run for one '
+      'with no finished run', () {
+    final md = renderDashboard([
+      PackageStatus(
+        const DashboardPackage(repo: 'o/a', releases: []),
+        'main',
+        const {},
+      ),
+      PackageStatus(
+        const DashboardPackage(repo: 'o/b', checks: [], releases: []),
+        'main',
+        const {},
+      ),
+    ], DateTime.utc(2026));
+    final rows = md.split('## Workflows').last.split('\n');
+    String cellsOf(String name) =>
+        rows.firstWhere((line) => line.startsWith('| [$name]'));
+    // unit.yml, integration.yml, kiln_check.yml
+    expect(cellsOf('a'), endsWith('| no run | no run | no run |'));
+    expect(cellsOf('b'), endsWith('| no run | no run | — |'));
+  });
+
   group('updatedAt', () {
     test('daylight time', () {
       expect(
