@@ -60,11 +60,13 @@ A protected default branch requires **one check: `Unit`**. Nothing else.
   ```sh
   gh api -X PUT repos/Telosnex/<repo>/branches/<default branch>/protection --input - <<'JSON'
   {"required_status_checks": {"strict": false, "checks": [{"context": "Unit"}]},
-   "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null}
+   "enforce_admins": true,
+   "required_pull_request_reviews": {"required_approving_review_count": 0},
+   "restrictions": null}
   JSON
   ```
 
-  Protection is optional. A repository without it is fine; one with it follows this rule.
+  This also requires a pull request for every change (no approvals). Protection is optional. A repository without it is fine; one with it follows this rule.
 
 ## 7. The dashboard
 
