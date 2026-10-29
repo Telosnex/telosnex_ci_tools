@@ -100,3 +100,9 @@ packages:
   - repo: Telosnex/receive_sharing_intent
     checks: []
     releases: []
+  - repo: Telosnex/CamerAwesome
+    checks: []
+    releases: []
+  - repo: Telosnex/flutter_secure_storage
+    checks: []
+    releases: []

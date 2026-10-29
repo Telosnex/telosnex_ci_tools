@@ -21,13 +21,6 @@ followup:
     todo: >-
       Drop the archive_40 rename; make a new fork of upstream with only the
       dart2wasm fix (2026-10-21), and send that fix upstream.
-  - repo: CamerAwesome
-    why: >-
-      iOS capture wrote PNG: a multi-second encode per photo; ours writes
-      JPEG. The app's Flutter UI comes from material_ui and cupertino_ui.
-    todo: >-
-      Send the iOS JPEG change upstream. Add CI. Rebased onto upstream on
-      2026-10-28.
   - repo: flutter_math_fork_fork
     why: >-
       Math in Markdown (cmark-gfm-widget). Upstream does not keep up with
@@ -35,17 +28,6 @@ followup:
       computeDryBaseline ourselves. Ours also draws negations of any symbol.
       Upstream last merged code in 2025-05; 16 PRs wait unreviewed.
     todo: Add CI.
-  - repo: flutter_secure_storage
-    why: >-
-      In a Snap or Flatpak, reads and writes failed (the host keyring
-      answers on D-Bus, but AppArmor blocks it) and users were asked to
-      unlock more than once. On web the key was raw bytes in localStorage.
-      On Windows the DPAPI file was in Roaming AppData (our policy: per-PC
-      data in Local AppData).
-    todo: >-
-      Send the Linux and web fixes upstream (the Linux fix refines upstream
-      #1223). Delete the stale branches (fix/linux-snap-portal-warmup,
-      fix/windows-local-appdata, backup/develop-2026-02-10). Add CI.
   - repo: super_sliver_list
     why: >-
       The chat list. Upstream (pub.dev 0.4.1, 2024-03) has had one commit
