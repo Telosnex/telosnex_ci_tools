@@ -146,6 +146,9 @@ final class PackageStatus {
   };
 }
 
+/// The job of the Unit column: named `Unit`, the unit workflow's job.
+bool _isUnit(DashboardJob job) => job.name == 'Unit';
+
 /// The mark of a conclusion.
 String mark(String? conclusion) => switch (conclusion) {
   'success' => '✅',
@@ -255,7 +258,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       for (final (cell, job) in status.cellJobs)
         if (!cell.isNormal) job,
     ]..sort((a, b) => a.name.compareTo(b.name)),
-    ...status.otherJobs,
+    ...status.otherJobs.where((job) => !_isUnit(job)),
   ];
   final extraColumns = packages.fold(
     0,
@@ -270,21 +273,23 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       'column holds every host and compiler: the tooltip says which. The '
       'unnamed columns hold every other job of a package, one each, labelled '
       'with its name: extra targets (a detail in the name, such as `fake '
-      'camera`) and names with no platform (such as `Unit`).',
+      'camera`) and names with no platform other than Unit.',
     )
     ..writeln()
     ..writeln(
-      '| Package | '
+      '| Package | Unit | '
       '${[...ordered, ...List.filled(extraColumns, ' ')].join(' | ')} |',
     )
-    ..writeln('|---|${'---|' * (ordered.length + extraColumns)}');
+    ..writeln('|---|---|${'---|' * (ordered.length + extraColumns)}');
   for (final status in packages) {
     final byColumn = <String, List<(JobCell, DashboardJob)>>{};
     for (final entry in status.cellJobs) {
       if (entry.$1.isNormal) (byColumn[entry.$1.column] ??= []).add(entry);
     }
     final extra = extras(status);
+    final unit = status.otherJobs.where(_isUnit).toList();
     final cells = [
+      unit.isEmpty ? '—' : unit.map(_link).join(' '),
       for (final column in ordered)
         byColumn[column] == null
             ? '—'
