@@ -16,6 +16,7 @@ packages:
     checks: [kiln_check.yml, cuda_pack.yml]
   - repo: Telosnex/fonnx
   - repo: Telosnex/image_ffmpeg
+  - repo: Telosnex/lua_dart
   - repo: Telosnex/nutdart
   - repo: Telosnex/telosnex_audio
   - repo: Telosnex/telosnex_inappwebview
@@ -29,3 +30,34 @@ packages:
   - repo: Telosnex/super_native_extensions
     tests: [check_and_lint.yml]
   - repo: Telosnex/webcrypto.dart
+  # Forks the app depends on, with telosnex_ci_tools workflows (no Kiln).
+  - repo: Telosnex/libmonet
+    checks: []
+    releases: []
+  - repo: Telosnex/super_sliver_list
+    checks: []
+    releases: []
+  - repo: Telosnex/pixel_snap
+    checks: []
+    releases: []
+  - repo: Telosnex/cmark-gfm-dart
+    checks: []
+    releases: []
+  - repo: Telosnex/cmark-gfm-widget
+    checks: []
+    releases: []
+  - repo: Telosnex/LuaDardo
+    checks: []
+    releases: []
+  - repo: Telosnex/dart-sprintf
+    checks: []
+    releases: []
+  - repo: Telosnex/shine_dart
+    checks: []
+    releases: []
+  - repo: Telosnex/highlight.dart
+    checks: []
+    releases: []
+  - repo: Telosnex/flutter_math_fork_fork
+    checks: []
+    releases: []

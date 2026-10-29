@@ -54,17 +54,6 @@ followup:
     todo: >-
       Send the iOS JPEG change upstream. Add CI. Rebased onto upstream on
       2026-10-28.
-  - repo: cmark-gfm-dart
-    why: Our package; the app's Markdown (GFM) parser.
-    todo: Add CI.
-  - repo: cmark-gfm-widget
-    why: Our package; renders the app's Markdown.
-    todo: Add CI.
-  - repo: dart-sprintf
-    why: >-
-      Lua string.format in mods goes through sprintf (lua_dardo_plus); our
-      rewrite is about 5x faster. Upstream is dead (no commit since 2022).
-    todo: Add CI.
   - repo: dart-vector-tile-renderer
     why: >-
       The maps feature draws the Protomaps light and dark styles with the CPU
@@ -126,16 +115,6 @@ followup:
     todo: >-
       When google_fonts releases, copy the new version and apply the commit
       again. Offer the hook to flutter/packages. Add CI.
-  - repo: highlight.dart
-    why: >-
-      Code highlighting in Markdown (cmark-gfm-widget). The full registry
-      loads the 1C grammar, which crashes iOS Safari; streamed messages need
-      highlighting that continues from where it stopped.
-    todo: >-
-      Upstream master (0.7.1, not on pub.dev) is a new engine:
-      highlight_core.dart replaces our limited registry, and continuation
-      exists but is private. Move cmark-gfm-widget to it, add a public
-      continuation upstream, then drop the fork. Add CI.
   - repo: irondash
     why: >-
       super_native_extensions 0.10 needs irondash_engine_context 0.6 (native
@@ -144,21 +123,6 @@ followup:
     todo: >-
       Send the nil guards upstream (the maintainer is active). Delete branch
       main (an old mirror). Add CI.
-  - repo: libmonet
-    why: Our package; the app's colour, shape and typography system.
-    todo: >-
-      Add CI. On androidx_graphics_shapes 2.0.0 since 2026-10-28; its circle
-      is not normalized (it follows material_ui), so MaterialExpressiveShape
-      normalizes it. Recheck that on each update (the AndroidX parity test).
-  - repo: LuaDardo
-    why: >-
-      Mods run Lua; upstream lua_dardo_plus had Lua 5.3 bugs (44 fixed:
-      string library and patterns, coroutines, goto, integer math,
-      string.pack and dump) and was slow (ours: register hot paths, frame
-      loop, closure inlining, scalar-replaced tables). Upstream's GitHub
-      repository is gone; it moved to gitlab.com/aa22396584/LuaDardo (login
-      to clone). pub.dev 0.3.1 changed only its URLs.
-    todo: Add CI. Optionally offer the fixes upstream.
   - repo: packages
     why: >-
       shared_preferences_windows (branch telosnex/sp-windows-local-appdata):
@@ -177,17 +141,6 @@ followup:
     todo: >-
       Send upstream (none sent; upstream is active). Add CI. Branch
       telosnex/text-only rebased onto upstream (2.10.1) on 2026-10-28.
-  - repo: pixel_snap
-    why: >-
-      The app's widgets snap to physical pixels (about 1,140 files import
-      it). Upstream (widgetbakery, pub.dev 0.1.5) has had no commit since
-      2024-02, and its forked Flutter widgets fell behind the SDK. Ours
-      follows Flutter (3.38+, the material_ui and cupertino_ui packages) and
-      caches PixelSnap.of per subtree: about 1.5% of CPU in streaming chat.
-    todo: >-
-      Add CI (its tests failed to compile on Flutter 3.47 and nobody saw;
-      fixed on 2026-10-28, c1f2025). On a Flutter update, regenerate the
-      forked widgets with generator/.
   - repo: receive_sharing_intent
     why: >-
       Sharing files into the app on Android and iOS. Upstream 1.9.0 compiles
@@ -198,16 +151,6 @@ followup:
       Drop the fork when the app compiles against SDK 37. Add CI until then.
       Rebased onto upstream master (2 fixes, not on pub.dev yet) on
       2026-10-28.
-  - repo: shine_dart
-    why: >-
-      Our package: a pure Dart MP3 encoder (a port of the Shine C library)
-      for saved TTS clips (64 kbit/s mono, 128 kbit/s stereo; telosnex_audio
-      ADR R11). Pure Dart runs everywhere, web included, in a squadron
-      worker.
-    todo: >-
-      LGPL 2.0 since 2026-10-28 (it said CC0, but it translates Shine's
-      LGPL C code). Fine for the app: its repository will be public, so
-      users can rebuild it with a changed shine_dart. Add CI.
   - repo: supabase-flutter
     why: >-
       Sync and sign-in. supabase_flutter (pinned 7b66ba5): startup session
