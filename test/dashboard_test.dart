@@ -85,6 +85,8 @@ void main() {
           _job('Web Linux x64 Chrome dart2wasm'),
           _job('Web Linux x64 Chrome dart2js', 'failure'),
           _job('desktop / windows'),
+          _job('Linux x64 fake camera'),
+          _job('Android x64 emulator'),
         ], now.subtract(const Duration(minutes: 5))),
       },
     );
@@ -105,23 +107,39 @@ void main() {
           .split(' | ');
     }
 
-    test('a column per cell, Other for the rest', () {
+    test('a column per cell, then a blank-headed column per other job', () {
+      // pkg has three other jobs: three blank headers, whatever their names.
       expect(
         markdown,
-        contains('| Package | Linux x64 | Web Chrome | Other |'),
+        contains(
+          '| Package | Android x64 | Linux x64 | Web Chrome |   |   |   |',
+        ),
       );
       final cells = row('pkg', 'Test cells');
-      expect(cells[1], '[✅](https://x/Linux x64 "Linux x64")');
+      // emulator is the usual way to run Android: in its column.
+      expect(cells[1], contains('"Android x64 emulator"'));
+      // Only the plain Linux job: fake camera is an extra target.
+      expect(cells[2], '[✅](https://x/Linux x64 "Linux x64")');
       // Both compilers in one column, in name order.
-      expect(cells[2], startsWith('[❌]'));
-      expect(cells[2], contains('dart2js'));
-      expect(cells[2].indexOf('dart2js'), lessThan(cells[2].indexOf('wasm')));
-      expect(cells[3], contains('✅ Unit'));
-      expect(cells[3], contains('desktop / windows'));
+      expect(cells[3], startsWith('[❌]'));
+      expect(cells[3], contains('dart2js'));
+      expect(cells[3].indexOf('dart2js'), lessThan(cells[3].indexOf('wasm')));
+      // Extra targets first, then names with no platform; one each.
+      expect(cells[4], startsWith('[✅ Linux x64 fake camera]'));
+      expect(cells[5], startsWith('[✅ Unit]'));
+      expect(cells[6], startsWith('[✅ desktop / windows]'));
+    });
+
+    test('a package with fewer other jobs leaves the rest empty', () {
+      final cells = row('other', 'Test cells');
+      expect(cells.sublist(4, 6), everyElement(''));
     });
 
     test('no job is —', () {
-      expect(row('other', 'Test cells').skip(1), everyElement(startsWith('—')));
+      expect(
+        row('other', 'Test cells').sublist(1, 4),
+        everyElement(startsWith('—')),
+      );
     });
 
     test('workflow ages', () {

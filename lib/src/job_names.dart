@@ -35,6 +35,20 @@ final class JobCell {
 
   bool get isWeb => browser != null;
 
+  /// Whether the job is the usual one for its column: no detail, or one of
+  /// [normalDetails]. Other details (`fake camera`, `GNOME Wayland`,
+  /// `SwiftPM`) are extra targets, in columns of their own on the dashboard.
+  bool get isNormal => detail == null || normalDetails.contains(detail);
+
+  /// The details that name the usual way to run a column: a device for
+  /// mobile, a compiler for the web.
+  static const normalDetails = {
+    'emulator',
+    'simulator',
+    'dart2js',
+    'dart2wasm',
+  };
+
   /// The dashboard column: `Linux x64`, or `Web Chrome` (the host platform
   /// and the detail tell the jobs of one column apart).
   String get column => isWeb ? 'Web $browser' : '$platform $arch';

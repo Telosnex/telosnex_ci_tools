@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'job_names.dart';
 
 /// One package in status/packages.yaml.
@@ -241,25 +243,47 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
 
   final ordered = {
     for (final status in packages)
-      for (final (cell, _) in status.cellJobs) cell.column,
+      for (final (cell, _) in status.cellJobs)
+        if (cell.isNormal) cell.column,
   }.toList()..sort(JobCell.compareColumns);
+  // Every other job (an extra target such as `Linux x64 fake camera`, or a
+  // name with no platform, such as `Unit`) has a cell of its own, labelled
+  // with its name. As many blank-headed columns as the package with most,
+  // so no package's job names add columns for every other package.
+  List<DashboardJob> extras(PackageStatus status) => [
+    ...[
+      for (final (cell, job) in status.cellJobs)
+        if (!cell.isNormal) job,
+    ]..sort((a, b) => a.name.compareTo(b.name)),
+    ...status.otherJobs,
+  ];
+  final extraColumns = packages.fold(
+    0,
+    (most, status) => math.max(most, extras(status).length),
+  );
   out
     ..writeln()
     ..writeln('## Test cells')
     ..writeln()
     ..writeln(
       'The jobs of the test workflows, by the platform in their name. A web '
-      "column holds every host and compiler: the tooltip says which. Jobs "
-      'whose name has no platform are under Other.',
+      'column holds every host and compiler: the tooltip says which. The '
+      'unnamed columns hold every other job of a package, one each, labelled '
+      'with its name: extra targets (a detail in the name, such as `fake '
+      'camera`) and names with no platform (such as `Unit`).',
     )
     ..writeln()
-    ..writeln('| Package | ${[...ordered, 'Other'].join(' | ')} |')
-    ..writeln('|---|${'---|' * (ordered.length + 1)}');
+    ..writeln(
+      '| Package | '
+      '${[...ordered, ...List.filled(extraColumns, ' ')].join(' | ')} |',
+    )
+    ..writeln('|---|${'---|' * (ordered.length + extraColumns)}');
   for (final status in packages) {
     final byColumn = <String, List<(JobCell, DashboardJob)>>{};
     for (final entry in status.cellJobs) {
-      (byColumn[entry.$1.column] ??= []).add(entry);
+      if (entry.$1.isNormal) (byColumn[entry.$1.column] ??= []).add(entry);
     }
+    final extra = extras(status);
     final cells = [
       for (final column in ordered)
         byColumn[column] == null
@@ -268,9 +292,8 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
                     ..sort((a, b) => a.$2.name.compareTo(b.$2.name)))
                   .map((e) => _link(e.$2))
                   .join(' '),
-      status.otherJobs.isEmpty
-          ? '—'
-          : status.otherJobs.map((job) => _link(job, job.name)).join('<br>'),
+      for (var i = 0; i < extraColumns; i++)
+        i < extra.length ? _link(extra[i], extra[i].name) : '',
     ];
     out.writeln('| ${status.package.name} | ${cells.join(' | ')} |');
   }
