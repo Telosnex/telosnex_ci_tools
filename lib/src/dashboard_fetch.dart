@@ -133,6 +133,24 @@ final class GitHubReader {
     }
   }
 
+  /// DELETE [path]; throws unless GitHub answers 204.
+  Future<void> delete(String path) async {
+    final request = await _client.deleteUrl(
+      Uri.parse('https://api.github.com/$path'),
+    );
+    request.headers
+      ..set('Accept', 'application/vnd.github+json')
+      ..set('X-GitHub-Api-Version', '2022-11-28');
+    if (token != null) {
+      request.headers.set('Authorization', 'Bearer $token');
+    }
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    if (response.statusCode != 204) {
+      throw _GitHubError('DELETE $path: ${response.statusCode} $body');
+    }
+  }
+
   /// The text of [path] on [ref], null when it does not exist.
   Future<String?> file(String repo, String path, String ref) async {
     final json = await get(
