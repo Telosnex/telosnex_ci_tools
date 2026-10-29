@@ -5,7 +5,9 @@
 #
 # Per package, all optional:
 #   tests:    workflow files whose jobs are the test cells, on the default
-#             branch. Default: [unit.yml, integration.yml].
+#             branch. The first is the unit workflow: its jobs that name no
+#             platform are the Unit column. Default: [unit.yml,
+#             integration.yml].
 #   checks:   more workflow files on the default branch, shown with a status
 #             only. Default: [kiln_check.yml].
 #   releases: release workflow files, newest run on any branch.

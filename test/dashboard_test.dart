@@ -160,6 +160,36 @@ void main() {
       );
     });
 
+    test(
+      'Unit holds every job of the unit workflow that names no platform',
+      () {
+        final md = renderDashboard([
+          PackageStatus(
+            const DashboardPackage(repo: 'o/p', tests: ['check_and_lint.yml']),
+            'main',
+            {
+              'check_and_lint.yml': _run('check_and_lint.yml', [
+                _job('Rustfmt'),
+                _job('Rust (ubuntu-latest, stable)', 'failure'),
+                _job('Linux x64'),
+              ], now),
+            },
+          ),
+        ], now);
+        final cells = md
+            .split('## Test cells')
+            .last
+            .split('\n')
+            .firstWhere((line) => line.startsWith('| p |'))
+            .split(' | ');
+        expect(cells[1], contains('"Rustfmt"'));
+        expect(cells[1], contains('"Rust (ubuntu-latest, stable)"'));
+        // A job that names a platform keeps its column.
+        expect(cells[1], isNot(contains('Linux x64')));
+        expect(md, isNot(contains('[✅ Rustfmt]')));
+      },
+    );
+
     test('a pipe in a name does not break the table', () {
       final md = renderDashboard([
         PackageStatus(const DashboardPackage(repo: 'o/p'), 'main', {

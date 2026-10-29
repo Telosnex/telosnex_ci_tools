@@ -128,12 +128,25 @@ final class PackageStatus {
         if (parseJobName(job.name) case final cell?) (cell, job),
   ];
 
-  /// The jobs of the test workflows that do not: Unit, Web files, Plan, and
-  /// names that break the form.
+  /// The unit workflow's run: the first of [DashboardPackage.tests].
+  DashboardRun? get _unit =>
+      package.tests.isEmpty ? null : runs[package.tests.first];
+
+  /// The Unit column: the unit workflow's jobs that name no cell. `Unit` in
+  /// the standard workflow; `Analyze`, `Rustfmt`, `Rust (ubuntu-latest,
+  /// stable)` in others.
+  List<DashboardJob> get unitJobs => [
+    for (final job in _unit?.jobs ?? const <DashboardJob>[])
+      if (parseJobName(job.name) == null) job,
+  ];
+
+  /// The other jobs of the test workflows that name no cell: Web files,
+  /// Plan, and names that break the form.
   List<DashboardJob> get otherJobs => [
     for (final run in _tests)
-      for (final job in run.jobs)
-        if (parseJobName(job.name) == null) job,
+      if (run != _unit)
+        for (final job in run.jobs)
+          if (parseJobName(job.name) == null) job,
   ];
 
   Map<String, Object?> toJson() => {
@@ -145,9 +158,6 @@ final class PackageStatus {
     'runs': [for (final run in runs.values) run.toJson()],
   };
 }
-
-/// The job of the Unit column: named `Unit`, the unit workflow's job.
-bool _isUnit(DashboardJob job) => job.name == 'Unit';
 
 /// The mark of a conclusion.
 String mark(String? conclusion) => switch (conclusion) {
@@ -250,7 +260,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
         if (cell.isNormal) cell.column,
   }.toList()..sort(JobCell.compareColumns);
   // Every other job (an extra target such as `Linux x64 fake camera`, or a
-  // name with no platform, such as `Unit`) has a cell of its own, labelled
+  // name with no platform outside the unit workflow) has a cell of its own, labelled
   // with its name. As many blank-headed columns as the package with most,
   // so no package's job names add columns for every other package.
   List<DashboardJob> extras(PackageStatus status) => [
@@ -258,7 +268,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       for (final (cell, job) in status.cellJobs)
         if (!cell.isNormal) job,
     ]..sort((a, b) => a.name.compareTo(b.name)),
-    ...status.otherJobs.where((job) => !_isUnit(job)),
+    ...status.otherJobs,
   ];
   final extraColumns = packages.fold(
     0,
@@ -273,7 +283,8 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       'column holds every host and compiler: the tooltip says which. The '
       'unnamed columns hold every other job of a package, one each, labelled '
       'with its name: extra targets (a detail in the name, such as `fake '
-      'camera`) and names with no platform other than Unit.',
+      'camera`) and names with no platform. Unit holds the jobs of the unit '
+      'workflow that name no platform.',
     )
     ..writeln()
     ..writeln(
@@ -287,7 +298,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       if (entry.$1.isNormal) (byColumn[entry.$1.column] ??= []).add(entry);
     }
     final extra = extras(status);
-    final unit = status.otherJobs.where(_isUnit).toList();
+    final unit = status.unitJobs;
     final cells = [
       unit.isEmpty ? '—' : unit.map(_link).join(' '),
       for (final column in ordered)
