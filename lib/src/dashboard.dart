@@ -289,14 +289,18 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       for (final (cell, _) in status.cellJobs)
         if (cell.isNormal) cell.column,
   }.toList()..sort(JobCell.compareColumns);
-  // Every other job (an extra target such as `Linux x64 fake camera`, or a
-  // name with no platform outside the unit workflow) has a cell of its own, labelled
-  // with its name. As many blank-headed columns as the package with most,
-  // so no package's job names add columns for every other package.
+  // An extra target (`Linux x64 fake camera`) goes in the column its name
+  // starts with, after the usual job, when some package has that column.
+  final known = ordered.toSet();
+  bool inColumn(JobCell cell) => cell.isNormal || known.contains(cell.column);
+  // Every other job (an extra target with no such column, or a name with no
+  // platform outside the unit workflow) has a cell of its own, labelled with
+  // its name. As many blank-headed columns as the package with most, so no
+  // package's job names add columns for every other package.
   List<DashboardJob> extras(PackageStatus status) => [
     ...[
       for (final (cell, job) in status.cellJobs)
-        if (!cell.isNormal) job,
+        if (!inColumn(cell)) job,
     ]..sort((a, b) => a.name.compareTo(b.name)),
     ...status.otherJobs,
   ];
@@ -310,11 +314,13 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
     ..writeln()
     ..writeln(
       'The jobs of the test workflows, by the platform in their name. A web '
-      'column holds every host and compiler: the tooltip says which. The '
-      'unnamed columns hold every other job of a package, one each, labelled '
-      'with its name: extra targets (a detail in the name, such as `fake '
-      'camera`) and names with no platform. Unit holds the jobs of the unit '
-      'workflow that name no platform.',
+      'column holds every host and compiler: the tooltip says which. An extra '
+      'target (a detail in the name, such as `Linux x64 fake camera`) is one '
+      'more mark in its platform column, after the usual job. The unnamed '
+      'columns hold every other job of a package, one each, labelled with '
+      'its name: extra targets with no such column, and names with no '
+      'platform. Unit holds the jobs of the unit workflow that name no '
+      'platform.',
     )
     ..writeln()
     ..writeln(
@@ -325,7 +331,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   for (final status in packages) {
     final byColumn = <String, List<(JobCell, DashboardJob)>>{};
     for (final entry in status.cellJobs) {
-      if (entry.$1.isNormal) (byColumn[entry.$1.column] ??= []).add(entry);
+      if (inColumn(entry.$1)) (byColumn[entry.$1.column] ??= []).add(entry);
     }
     final extra = extras(status);
     final unit = status.unitJobs;
@@ -334,8 +340,12 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       for (final column in ordered)
         byColumn[column] == null
             ? '—'
-            : (byColumn[column]!
-                    ..sort((a, b) => a.$2.name.compareTo(b.$2.name)))
+            // The usual jobs first, then extra targets; each by name.
+            : (byColumn[column]!..sort(
+                    (a, b) => a.$1.isNormal != b.$1.isNormal
+                        ? (a.$1.isNormal ? -1 : 1)
+                        : a.$2.name.compareTo(b.$2.name),
+                  ))
                   .map((e) => _link(e.$2))
                   .join(' '),
       for (var i = 0; i < extraColumns; i++)

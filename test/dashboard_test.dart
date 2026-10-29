@@ -109,31 +109,62 @@ void main() {
 
     test('Unit first, a column per cell, then one blank-headed column per '
         'other job', () {
-      // pkg has two other jobs: two blank headers, whatever their names.
+      // pkg has one other job: one blank header, whatever its name.
       expect(
         markdown,
         contains(
-          '| Package | Unit | Android x64 | Linux x64 | Web Chrome |   |   |',
+          '| Package | Unit | Android x64 | Linux x64 | Web Chrome |   |\n',
         ),
       );
       final cells = row('pkg', 'Test cells');
       expect(cells[1], '[✅](https://x/Unit "Unit")');
       // emulator is the usual way to run Android: in its column.
       expect(cells[2], contains('"Android x64 emulator"'));
-      // Only the plain Linux job: fake camera is an extra target.
-      expect(cells[3], '[✅](https://x/Linux x64 "Linux x64")');
+      // The plain Linux job, then the extra target fake camera.
+      expect(
+        cells[3],
+        '[✅](https://x/Linux x64 "Linux x64") '
+        '[✅](https://x/Linux x64 fake camera "Linux x64 fake camera")',
+      );
       // Both compilers in one column, in name order.
       expect(cells[4], startsWith('[❌]'));
       expect(cells[4], contains('dart2js'));
       expect(cells[4].indexOf('dart2js'), lessThan(cells[4].indexOf('wasm')));
-      // Extra targets first, then names with no platform; one each.
-      expect(cells[5], startsWith('[✅ Linux x64 fake camera]'));
-      expect(cells[6], startsWith('[✅ desktop / windows]'));
+      // Names with no platform: one each.
+      expect(cells[5], startsWith('[✅ desktop / windows]'));
+    });
+
+    test('an extra target goes in a column another package has, and in a '
+        'column of its own when none has it', () {
+      final md = renderDashboard([
+        package,
+        PackageStatus(const DashboardPackage(repo: 'Telosnex/cam'), 'main', {
+          'integration.yml': _run('integration.yml', [
+            _job('Linux x64 no camera'),
+            _job('Linux x64 fake camera'),
+            _job('macOS ARM64 SwiftPM'),
+          ], now),
+        }),
+      ], now);
+      final cells = md
+          .split('## Test cells')
+          .last
+          .split('\n')
+          .firstWhere((l) => l.startsWith('| cam'))
+          .split(' | ');
+      // Linux x64 is a column (pkg's plain job): both, by name.
+      expect(cells[3], contains('"Linux x64 fake camera"'));
+      expect(
+        cells[3].indexOf('fake camera'),
+        lessThan(cells[3].indexOf('no camera')),
+      );
+      // No package has macOS ARM64: a labelled column of its own.
+      expect(cells[5], startsWith('[✅ macOS ARM64 SwiftPM]'));
     });
 
     test('a package with fewer other jobs leaves the rest empty', () {
       final cells = row('other', 'Test cells');
-      expect(cells[5], '');
+      expect(cells[5], ' |');
     });
 
     test('no job is —', () {
