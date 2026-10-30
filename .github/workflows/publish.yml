@@ -1,7 +1,9 @@
 # Publishes a package of the caller to pub.dev, from a release tag (ADR
 # "Telosnex dependencies from pub.dev"):
 # 1. Renames the checkout to its published names (tool/publish_names.yaml;
-#    without one, the names stay).
+#    without one, the names stay), and commits that to the published
+#    branch: the renamed packages' repository URL points there (pub.dev
+#    checks that it has a pubspec with the published name).
 # 2. Unit on the renamed package: analyze, then the test command.
 # 3. The pana gate: at most max-lost-points below pub.dev's maximum.
 # 4. Publishes through pub.dev's GitHub trust (OIDC): no token. On
@@ -19,6 +21,7 @@
 #     publish:
 #       uses: Telosnex/telosnex_ci_tools/.github/workflows/publish.yml@<sha> # vX.Y.Z
 #       permissions:
+#         contents: write # the published branch
 #         id-token: write
 name: Publish
 
@@ -56,7 +59,7 @@ jobs:
     timeout-minutes: 45
     environment: ${{ inputs.environment }}
     permissions:
-      contents: read
+      contents: write # the published branch
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -64,11 +67,39 @@ jobs:
           persist-credentials: false
       # Exchanges the OIDC token for a pub.dev token.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@afe24ae98f0772cc31803d72c5b86944eecaf9fa # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@67a5221adeb218aa11a9e55f90c1c930d353499d # self
       - id: rename
-        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@afe24ae98f0772cc31803d72c5b86944eecaf9fa # self
+        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@67a5221adeb218aa11a9e55f90c1c930d353499d # self
         with:
           tag: ${{ inputs.tag || github.ref_name }}
+          repository: ${{ github.server_url }}/${{ github.repository }}
+      # pub.dev checks that the repository URL has a pubspec with the
+      # published name: the renamed tree, one commit per release on the
+      # published branch (its parent the previous one).
+      - name: Commit the renamed tree to the published branch
+        if: hashFiles('tool/publish_names.yaml') != ''
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry-run && 'yes' || '' }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add -A
+          tree=$(git write-tree)
+          parents=(-p HEAD)
+          if git fetch -q --depth 1 "$remote" refs/heads/published; then
+            parents=(-p FETCH_HEAD -p HEAD)
+          fi
+          commit=$(GIT_AUTHOR_NAME='github-actions[bot]' \
+            GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' \
+            GIT_COMMITTER_NAME='github-actions[bot]' \
+            GIT_COMMITTER_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' \
+            git commit-tree "$tree" "${parents[@]}" \
+              -m "$TAG, renamed for pub.dev${DRY_RUN:+ (dry run: not uploaded)}" \
+              -m "From $(git rev-parse HEAD).")
+          git reset -q --soft "$commit"
+          git push -q "$remote" "$commit:refs/heads/published"
+          echo "published: $commit"
       - name: Unit on the renamed package
         working-directory: ${{ steps.rename.outputs.package }}
         env:
@@ -95,4 +126,10 @@ jobs:
       - name: Dry run
         if: ${{ inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}
-        run: flutter pub publish --dry-run
+        # Warnings (exit 65) are fine: the upload uses --force. Errors fail.
+        run: |
+          set +e
+          flutter pub publish --dry-run 2>&1 | tee "$RUNNER_TEMP/dry-run.txt"
+          code=${PIPESTATUS[0]}
+          if [[ $code -ne 0 ]] && grep -q 'following error' "$RUNNER_TEMP/dry-run.txt"; then exit "$code"; fi
+          if [[ $code -ne 0 && $code -ne 65 ]]; then exit "$code"; fi

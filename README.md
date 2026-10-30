@@ -128,7 +128,10 @@ name). A fork keeps upstream's package names in git; when it has
 to the published names (`dart run telosnex_ci_tools:publish_rename`, see
 its doc comment). Then analyze and the `test` command on the renamed
 package, the pana gate (`max-lost-points`), and `flutter pub publish`
-through pub.dev's GitHub trust.
+through pub.dev's GitHub trust. The renamed tree of each release is a
+commit on the fork's `published` branch, and the renamed packages'
+`repository` points there: pub.dev checks that it has a pubspec with the
+published name.
 
 ```yaml
 on:
@@ -138,6 +141,7 @@ jobs:
   publish:
     uses: Telosnex/telosnex_ci_tools/.github/workflows/publish.yml@<sha> # vX.Y.Z
     permissions:
+      contents: write
       id-token: write
 ```
 
