@@ -22,6 +22,7 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `actions/ios-flutter-test` | Composite action | `flutter test` on a fresh iOS simulator: a connect watchdog (flutter test sometimes never sees the VM service), a stall watchdog, and up to 3 attempts while no test has started. Never starts Safari. |
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
 | `.github/workflows/publish.yml` | Reusable workflow | Publishes a package to pub.dev from a release tag, renamed to its published names. |
+| `bin/published_key.dart` | Tool | Before publishing a Kiln package: checks that the files pub uploads compute the manifest's source key (else every build compiles from source). |
 | `actions/publish-rename` | Composite action | Renames a checkout to its published names (`tool/publish_names.yaml`). |
 | `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
