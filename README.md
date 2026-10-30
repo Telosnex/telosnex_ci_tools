@@ -37,7 +37,9 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `name-matches-file` | The `name:` is the file name in sentence case. `native_release.yml` is `Native release`. Acronyms such as `CUDA` can be in capitals. |
 | `permissions` | Each workflow sets the top-level `permissions`. |
 | `timeout` | Each job sets `timeout-minutes`. |
-| `pinned-uses` | Each `uses:` names a full commit SHA, then a version comment: `@<sha> # v7.0.1`. |
+| `pinned-uses` | Each `uses:` names a full commit SHA, then a version comment: `@<sha> # v7.0.1`. The comment is the tag the SHA is (`# v7.0.1`, `# v5 (Node 24)`), not a branch (`# main`). |
+| `one-tools-version` | Every workflow of a package uses one commit of telosnex_ci_tools: its actions and shared workflows are tested together, at a tag. |
+| `lint-step` | `unit.yml` runs `actions/lint`. |
 | `setup-flutter` | Jobs install Flutter with `actions/setup-flutter`. |
 | `shared-concurrency` | A caller of a shared workflow does not set `concurrency`. The same group in the caller and in the shared workflow deadlocks. |
 | `no-matrix` | No `strategy.matrix` (except in this repository's reusable workflows). GitHub draws a matrix as one box in the run graph; write the jobs out and share their steps with a YAML anchor: `steps: &desktop_steps` in the first job, `steps: *desktop_steps` in the others, and what differs in job `env:` and step `if:`. |

@@ -55,7 +55,61 @@ List<Finding> lintRepository(String repo) {
         p.relative(file.path, from: repo),
         file.readAsStringSync(),
       ),
+    if (!allowMatrix) ...lintToolsVersions(repo, files),
   ];
+}
+
+final _toolsUses = RegExp(
+  r'''^\s*(?:-\s+)?uses:\s*['"]?Telosnex/telosnex_ci_tools/[^@\s'"]+@'''
+  r'''([0-9a-f]{40})''',
+);
+
+/// Across the workflows of a package: every reference to telosnex_ci_tools
+/// is at one commit, and unit.yml runs the lint action.
+List<Finding> lintToolsVersions(String repo, List<File> workflows) {
+  final findings = <Finding>[];
+  final shas = <String, (String, int)>{};
+  var unit = false, lintStep = false;
+  for (final file in workflows) {
+    final path = p.relative(file.path, from: repo);
+    final isUnit = p.basename(path) == 'unit.yml';
+    unit |= isUnit;
+    final lines = file.readAsStringSync().split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trimLeft().startsWith('#')) continue;
+      final m = _toolsUses.firstMatch(lines[i]);
+      if (m == null) continue;
+      shas.putIfAbsent(m[1]!, () => (path, i + 1));
+      if (isUnit && lines[i].contains('/actions/lint@')) lintStep = true;
+    }
+  }
+  if (shas.length > 1) {
+    final first = shas.values.first;
+    for (final (path, line) in shas.values.skip(1)) {
+      findings.add(
+        Finding(
+          path,
+          line,
+          'one-tools-version',
+          'Use one commit of $selfRepository in every workflow '
+              '(${first.$1}:${first.$2} uses another). Its actions and '
+              'shared workflows are tested together, at a tag.',
+        ),
+      );
+    }
+  }
+  if (unit && !lintStep) {
+    findings.add(
+      Finding(
+        p.join('.github', 'workflows', 'unit.yml'),
+        1,
+        'lint-step',
+        'Run $selfRepository/actions/lint in the Unit job, after '
+            'setup-flutter.',
+      ),
+    );
+  }
+  return findings;
 }
 
 /// The `action.yml` files of the composite actions in `<repo>/actions`.
@@ -440,7 +494,7 @@ String? nameProblem(String name) {
 
 final _uses = RegExp(r'''^\s*(?:-\s+)?uses:\s*['"]?([^\s'"]+)['"]?(.*)$''');
 final _pinned = RegExp(r'^[\w.-]+/[\w.-]+(/[^@]+)?@[0-9a-f]{40}$');
-final _versionComment = RegExp(r'^\s*#\s*\S+');
+final _versionComment = RegExp(r'^\s*#\s*v?\d+(\.\d+)*\b');
 final _driveTarget = RegExp(r'(?:--target[ =]|\s-t\s+)(\S+\.dart)');
 final _plainTest = RegExp(r'^\s*test\(');
 final _pipeToTee = RegExp(r'\|\s*tee\b');
@@ -469,7 +523,12 @@ void _lintLines(String text, void Function(int, String, String) add) {
       } else if (!_pinned.hasMatch(ref)) {
         add(i + 1, 'pinned-uses', 'Pin $ref to a full commit SHA.');
       } else if (!_versionComment.hasMatch(rest)) {
-        add(i + 1, 'pinned-uses', 'Add the version comment, "# v1.2.3".');
+        add(
+          i + 1,
+          'pinned-uses',
+          'Add the version comment, "# v1.2.3": the tag the SHA is. A branch '
+              '(# main) is no version.',
+        );
       }
       final subaction = _cacheSubaction.firstMatch(ref);
       if (subaction != null) {

@@ -147,6 +147,16 @@ void main() {
       expect(_rules('native_release.yml', text), ['pinned-uses']);
     });
 
+    test('a branch is not a version comment', () {
+      final text = _workflow().replaceFirst(' # v7.0.1', ' # main');
+      expect(_rules('native_release.yml', text), ['pinned-uses']);
+    });
+
+    test('a version comment may say more after the version', () {
+      final text = _workflow().replaceFirst(' # v7.0.1', ' # v5 (Node 24)');
+      expect(_rules('native_release.yml', text), isEmpty);
+    });
+
     test('local actions need no pin', () {
       final text = _workflow(job: '      - uses: ./actions/setup-flutter\n');
       expect(_rules('native_release.yml', text), isEmpty);
@@ -417,6 +427,79 @@ jobs:
             '${f.path}:${f.line} ${f.rule}',
         ],
         ['example/integration_test/web_test.dart:2 drive-test-widgets'],
+      );
+    });
+  });
+
+  group('telosnex_ci_tools in a package', () {
+    final a = 'a' * 40, b = 'b' * 40;
+    String uses(String action, String sha) =>
+        '      - uses: Telosnex/telosnex_ci_tools/actions/$action@$sha # v1.0.0\n';
+    List<String> lintFiles(Map<String, String> workflows) {
+      final repo = Directory.systemTemp.createTempSync('lint_tools');
+      addTearDown(() => repo.deleteSync(recursive: true));
+      for (final MapEntry(:key, :value) in workflows.entries) {
+        File('${repo.path}/.github/workflows/$key')
+          ..createSync(recursive: true)
+          ..writeAsStringSync(value);
+      }
+      return [
+        for (final f in lintRepository(repo.path))
+          if (f.rule == 'one-tools-version' || f.rule == 'lint-step')
+            '${f.path}:${f.line} ${f.rule}',
+      ];
+    }
+
+    test('one commit and the lint step: no findings', () {
+      expect(
+        lintFiles({
+          'unit.yml': _workflow(
+            name: 'Unit',
+            job: uses('setup-flutter', a) + uses('lint', a),
+          ),
+          'integration.yml': _workflow(
+            name: 'Integration',
+            job: uses('setup-flutter', a),
+          ),
+        }),
+        isEmpty,
+      );
+    });
+
+    test('a second commit is flagged where it is used', () {
+      expect(
+        lintFiles({
+          'unit.yml': _workflow(
+            name: 'Unit',
+            job: uses('setup-flutter', a) + uses('lint', a),
+          ),
+          'kiln_check.yml': _workflow(
+            name: 'Kiln check',
+            job: uses('setup-flutter', b),
+          ),
+        }),
+        [startsWith('.github/workflows/unit.yml:')],
+      );
+    });
+
+    test('unit.yml without the lint action', () {
+      expect(
+        lintFiles({
+          'unit.yml': _workflow(name: 'Unit', job: uses('setup-flutter', a)),
+        }),
+        ['.github/workflows/unit.yml:1 lint-step'],
+      );
+    });
+
+    test('no unit.yml: no lint-step finding', () {
+      expect(
+        lintFiles({
+          'integration.yml': _workflow(
+            name: 'Integration',
+            job: uses('setup-flutter', a),
+          ),
+        }),
+        isEmpty,
       );
     });
   });
