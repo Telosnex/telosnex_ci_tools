@@ -126,6 +126,7 @@ jobs:
       - name: Dry run
         if: ${{ inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}
+        shell: bash
         # Warnings (exit 65) are fine: the upload uses --force. Errors fail.
         run: |
           set +e
