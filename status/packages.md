@@ -9,8 +9,8 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [alchemist](https://github.com/Telosnex/alchemist) | — | ✅ |
 | [auto_updater](https://github.com/Telosnex/auto_updater) | — | ✅ |
 | [background_downloader](https://github.com/Telosnex/background_downloader) | — | ✅ |
-| [cmark-gfm-dart](https://github.com/Telosnex/cmark_gfm_dart) | — | ✅ |
 | [cmark-gfm-widget](https://github.com/Telosnex/cmark-gfm-widget) | — | ✅ |
+| [cmark_gfm_dart](https://github.com/Telosnex/cmark_gfm_dart) | — | ✅ |
 | [dart-sprintf](https://github.com/Telosnex/dart-sprintf) | — | ✅ |
 | [dart-vector-tile-renderer](https://github.com/Telosnex/dart-vector-tile-renderer) | — | ✅ |
 | [fllama](https://github.com/Telosnex/fllama) | ✅ | ✅ |
