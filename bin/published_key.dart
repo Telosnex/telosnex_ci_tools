@@ -39,6 +39,7 @@ Future<void> main(List<String> args) async {
   }
 
   final tmp = Directory.systemTemp.createTempSync('published_key');
+  var ok = false;
   try {
     for (final f in files) {
       final to = File(p.join(tmp.path, f))..parent.createSync(recursive: true);
@@ -54,7 +55,7 @@ Future<void> main(List<String> args) async {
     ], workingDirectory: tmp.path);
     if (get.exitCode != 0) {
       stderr.writeln('pub get --offline failed in the copy:\n${get.stderr}');
-      exit(1);
+      return;
     }
     final key = await Process.run('dart', [
       'run',
@@ -66,6 +67,7 @@ Future<void> main(List<String> args) async {
         'The published files (${files.length}) compute the manifest\'s '
         'source key ${want.substring(0, 16)}.',
       );
+      ok = true;
       return;
     }
     stderr.writeln(
@@ -75,12 +77,12 @@ Future<void> main(List<String> args) async {
       '`dart run kiln:key --list` here and in a copy (KEEP=1 keeps it); a file that '
       '.pubignore leaves out must be in native_artifacts/source_excludes.txt.',
     );
-    exit(1);
   } finally {
-    if (!Platform.environment.containsKey('KEEP')) {
-      tmp.deleteSync(recursive: true);
-    } else {
+    if (Platform.environment.containsKey('KEEP')) {
       stderr.writeln('Kept: ${tmp.path}');
+    } else {
+      tmp.deleteSync(recursive: true);
     }
+    if (!ok) exitCode = 1;
   }
 }
