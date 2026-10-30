@@ -494,6 +494,7 @@ String? nameProblem(String name) {
 
 final _uses = RegExp(r'''^\s*(?:-\s+)?uses:\s*['"]?([^\s'"]+)['"]?(.*)$''');
 final _pinned = RegExp(r'^[\w.-]+/[\w.-]+(/[^@]+)?@[0-9a-f]{40}$');
+final _selfComment = RegExp(r'^\s*#\s*self\b');
 final _versionComment = RegExp(r'^\s*#\s*v?\d+(\.\d+)*\b');
 final _driveTarget = RegExp(r'(?:--target[ =]|\s-t\s+)(\S+\.dart)');
 final _plainTest = RegExp(r'^\s*test\(');
@@ -522,7 +523,11 @@ void _lintLines(String text, void Function(int, String, String) add) {
         // Local and Docker references have no tag.
       } else if (!_pinned.hasMatch(ref)) {
         add(i + 1, 'pinned-uses', 'Pin $ref to a full commit SHA.');
-      } else if (!_versionComment.hasMatch(rest)) {
+      } else if (!_versionComment.hasMatch(rest) &&
+          // pin_self: this repository's workflows use its own actions at
+          // HEAD, which has no tag yet.
+          !(ref.startsWith('$selfRepository/') &&
+              _selfComment.hasMatch(rest))) {
         add(
           i + 1,
           'pinned-uses',

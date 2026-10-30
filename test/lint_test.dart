@@ -152,6 +152,20 @@ void main() {
       expect(_rules('native_release.yml', text), ['pinned-uses']);
     });
 
+    test('# self is the version of pin_self, for this repository only', () {
+      const self =
+          '      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@'
+          '0123456789012345678901234567890123456789 # self\n';
+      expect(_rules('native_release.yml', _workflow(job: self)), isEmpty);
+      final other = self.replaceFirst(
+        'Telosnex/telosnex_ci_tools/actions/setup-flutter',
+        'actions/setup-node',
+      );
+      expect(_rules('native_release.yml', _workflow(job: other)), [
+        'pinned-uses',
+      ]);
+    });
+
     test('a version comment may say more after the version', () {
       final text = _workflow().replaceFirst(' # v7.0.1', ' # v5 (Node 24)');
       expect(_rules('native_release.yml', text), isEmpty);
