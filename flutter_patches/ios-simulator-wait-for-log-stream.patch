@@ -1,0 +1,76 @@
+diff --git a/packages/flutter_tools/lib/src/ios/simulators.dart b/packages/flutter_tools/lib/src/ios/simulators.dart
+index 8cac0a614e7..7a51bc96f15 100644
+--- a/packages/flutter_tools/lib/src/ios/simulators.dart
++++ b/packages/flutter_tools/lib/src/ios/simulators.dart
+@@ -495,6 +495,16 @@ class IOSSimulator extends Device {
+         devicePort: debuggingOptions.deviceVmServicePort,
+         logger: globals.logger,
+       );
++      // `log stream` only shows messages logged after it connects. Launching
++      // before then can lose the VM service line, and the tool then waits for
++      // it forever.
++      final DeviceLogReader logReader = getLogReader(app: package);
++      if (logReader is _IOSSimulatorLogReader) {
++        await logReader.ready.timeout(
++          const Duration(seconds: 10),
++          onTimeout: () => globals.printTrace('Simulator log stream not ready after 10s.'),
++        );
++      }
+     }
+ 
+     // Launch the updated application in the simulator.
+@@ -850,6 +860,17 @@ class _IOSSimulatorLogReader extends SharedIOSDeviceLogReader {
+   @visibleForTesting
+   StreamController<String> get linesController => _linesController;
+ 
++  final _ready = Completer<void>();
++
++  /// Completes once the device log process is reading new messages.
++  Future<void> get ready => _ready.future;
++
++  void _markReady() {
++    if (!_ready.isCompleted) {
++      _ready.complete();
++    }
++  }
++
+   // We log from two files: the device and the system log.
+   Process? _deviceProcess;
+   Process? _systemProcess;
+@@ -866,12 +887,17 @@ class _IOSSimulatorLogReader extends SharedIOSDeviceLogReader {
+       _deviceProcess = await launchDeviceUnifiedLogging(device, _appName);
+       _deviceProcess?.stdout.transform(utf8LineDecoder).listen(_onUnifiedLoggingLine);
+       _deviceProcess?.stderr.transform(utf8LineDecoder).listen(_onUnifiedLoggingLine);
++      if (_deviceProcess == null) {
++        _markReady();
++      }
+     } else {
+       // Fall back to syslog parsing.
+       await device.ensureLogsExists();
+       _deviceProcess = await launchDeviceSystemLogTool(device);
+       _deviceProcess?.stdout.transform(utf8LineDecoder).listen(_onSysLogDeviceLine);
+       _deviceProcess?.stderr.transform(utf8LineDecoder).listen(_onSysLogDeviceLine);
++      // tail -F follows the file from now on.
++      _markReady();
+     }
+ 
+     // Track system.log crashes.
+@@ -886,6 +912,7 @@ class _IOSSimulatorLogReader extends SharedIOSDeviceLogReader {
+     // cleanup in the callback.
+     unawaited(
+       _deviceProcess?.exitCode.whenComplete(() {
++        _markReady();
+         if (_linesController.hasListener) {
+           _linesController.close();
+         }
+@@ -1005,6 +1032,10 @@ class _IOSSimulatorLogReader extends SharedIOSDeviceLogReader {
+   //   "eventMessage" : "flutter: 21",
+   static final _unifiedLoggingEventMessageRegex = RegExp(r'.*"eventMessage" : (".*")');
+   void _onUnifiedLoggingLine(String line) {
++    // `log stream` prints this header once it is connected to the log.
++    if (line.startsWith('Filtering the log data')) {
++      _markReady();
++    }
+     // The log command predicate handles filtering, so every log eventMessage should be decoded and added.
+     final Match? eventMessageMatch = _unifiedLoggingEventMessageRegex.firstMatch(line);
+     if (eventMessageMatch != null) {

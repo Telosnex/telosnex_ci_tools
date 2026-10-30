@@ -35,6 +35,14 @@ runs:
         fi
         git clone -q --depth 1 --branch "$version" \
           https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+        # Fixes for upstream bugs that make CI flaky. Flutter builds its tool
+        # from source on first run, so patched tool code takes effect. A patch
+        # that no longer applies after a version bump fails here on purpose.
+        for patch in "$GITHUB_ACTION_PATH"/../../flutter_patches/*.patch; do
+          [[ -e "$patch" ]] || continue
+          echo "Applying $(basename "$patch")"
+          git -C "$RUNNER_TEMP/flutter" apply "$patch"
+        done
         echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
         "$RUNNER_TEMP/flutter/bin/flutter" config --no-analytics > /dev/null
         "$RUNNER_TEMP/flutter/bin/flutter" --version
