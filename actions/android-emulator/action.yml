@@ -95,7 +95,18 @@ runs:
         mkdir -p "$ANDROID_AVD_HOME"
         # yes ends with SIGPIPE when sdkmanager stops reading.
         (yes || true) | "$sdk/sdkmanager" --licenses > /dev/null
-        "$sdk/sdkmanager" emulator "$image" > /dev/null
+        # Google's mirror sometimes serves a truncated system image ("Error on
+        # ZipFile unknown archive"; zxing_dart, 2026-10-30). Try again, and
+        # judge by the installed image rather than sdkmanager's exit code.
+        image_dir="$ANDROID_HOME/${image//;//}"
+        for try in 1 2 3; do
+          "$sdk/sdkmanager" emulator "$image" > /dev/null || true
+          [[ -f "$image_dir/system.img" ]] && break
+          (( try == 3 )) && { echo "::error::$image did not install."; exit 1; }
+          echo "::warning::$image did not install (try $try); trying again in 30 s."
+          rm -rf "$image_dir"
+          sleep 30
+        done
         echo no | "$sdk/avdmanager" create avd -n ci -k "$image" -d "$DEVICE" > /dev/null
         printf 'hw.ramSize=%s\ndisk.dataPartition.size=8G\nhw.cpu.ncore=%s\n' "$RAM_MB" "$CORES" \
           >> "$ANDROID_AVD_HOME/ci.avd/config.ini"

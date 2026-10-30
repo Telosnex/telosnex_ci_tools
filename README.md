@@ -6,12 +6,13 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 
 | Path | Kind | What it does |
 |---|---|---|
-| `actions/setup-flutter` | Composite action | Installs Flutter from a shallow clone of its tag. The default version is in `flutter_version.txt`. |
+| `actions/setup-flutter` | Composite action | Installs Flutter from a shallow clone of its tag. The default version is in `flutter_version.txt`. It applies the patches in `flutter_patches/` (fixes for upstream Flutter bugs that make CI flaky). |
 | `actions/check-clean-tree` | Composite action | Fails if the checkout has untracked or changed files. |
 | `actions/lint` | Composite action | Runs this commit's workflow lint on the caller (`status/STANDARD.md`). Every package's `unit.yml` runs it after `setup-flutter`. |
 | `actions/kiln-build` | Composite action | Describes the toolchain and runs `<package>:build` for one target. |
 | `actions/watch` | Composite action | Runs a bash command; stops it after N minutes without output, runs an `on-stall` command first, and exits 124. |
 | `actions/android-emulator` | Composite action | Boots an x86_64 Android emulator with KVM on ubuntu-24.04, and puts `adb` on `PATH`. |
+| `actions/download-artifact` | Composite action | `actions/download-artifact`, tried again once after a minute if it fails (a short GitHub storage outage outlasts its own quick retries). Same inputs: `name`, `pattern`, `path`, `merge-multiple`. |
 | `actions/web-driver` | Composite action | Starts chromedriver, geckodriver or safaridriver (`ios-safari`: opens Safari once in the simulator first). Optionally runs `flutter drive` with a watchdog, and again only when the driver could not start a session; passes with a warning when all tests passed and only closing the session failed. Uploads the driver, run and console logs; `require-result` checks the response data with jq. Use it with `packages/telosnex_web_test`. |
 | `packages/telosnex_web_test` | Dart package (git dependency) | For Flutter web integration tests: keeps the browser console while the tests run, reports failed plain `test()`s and tests that never ran (flutter drive passes them), and always writes the response data. See its README. |
 | `status/`, `bin/dashboard.dart`, `.github/workflows/dashboard.yml` | Status views, scheduled workflow | From the list in `status/packages.yaml`: `status/packages.md` (which packages use Kiln and CI tools, committed when it changes) and the [CI dashboard](https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard) (the newest run of each workflow, and every test job in a column by the platform in its name, "Job names"), every 30 min. `dart run telosnex_ci_tools:dashboard` prints the dashboard locally. See `status/README.md`. |
