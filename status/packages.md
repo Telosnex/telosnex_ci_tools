@@ -9,8 +9,8 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [alchemist](https://github.com/Telosnex/alchemist) | — | ✅ |
 | [auto_updater](https://github.com/Telosnex/auto_updater) | — | ✅ |
 | [background_downloader](https://github.com/Telosnex/background_downloader) | — | ✅ |
-| [cmark-gfm-widget](https://github.com/Telosnex/cmark_gfm_widget) | — | ✅ |
 | [cmark_gfm_dart](https://github.com/Telosnex/cmark_gfm_dart) | — | ✅ |
+| [cmark_gfm_widget](https://github.com/Telosnex/cmark_gfm_widget) | — | ✅ |
 | [dart-sprintf](https://github.com/Telosnex/dart-sprintf) | — | ✅ |
 | [dart-vector-tile-renderer](https://github.com/Telosnex/dart-vector-tile-renderer) | — | ✅ |
 | [fllama](https://github.com/Telosnex/fllama) | ✅ | ✅ |
@@ -21,7 +21,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [flutter_tts](https://github.com/Telosnex/flutter_tts) | — | ✅ |
 | [fonnx](https://github.com/Telosnex/fonnx) | ✅ | ✅ |
 | [google_fonts](https://github.com/Telosnex/google_fonts) | — | ✅ |
-| [highlight.dart](https://github.com/Telosnex/highlight_fork) | — | ✅ |
+| [highlight_fork](https://github.com/Telosnex/highlight_fork) | — | ✅ |
 | [image_ffmpeg](https://github.com/Telosnex/image_ffmpeg) | ✅ | ✅ |
 | [irondash](https://github.com/Telosnex/irondash) | — | ✅ |
 | [libmonet](https://github.com/Telosnex/libmonet) | — | ✅ |
@@ -29,7 +29,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
 | [packages](https://github.com/Telosnex/packages) | — | ✅ |
 | [pdfrx](https://github.com/Telosnex/pdfrx) | — | ✅ |
-| [pixel_snap](https://github.com/Telosnex/pixel_snap_fork) | — | ✅ |
+| [pixel_snap_fork](https://github.com/Telosnex/pixel_snap_fork) | — | ✅ |
 | [receive_sharing_intent](https://github.com/Telosnex/receive_sharing_intent) | — | ✅ |
 | [riverpod](https://github.com/Telosnex/riverpod) | — | ✅ |
 | [shine_dart](https://github.com/Telosnex/shine_dart) | — | ✅ |
