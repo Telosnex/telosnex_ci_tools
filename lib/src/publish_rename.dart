@@ -9,6 +9,10 @@ import 'package:yaml/yaml.dart';
 /// Where a repository keeps its published names.
 const publishNamesPath = 'tool/publish_names.yaml';
 
+/// The branch the publish workflow commits each published renamed tree to.
+/// pana reads a repository URL's branch as one segment of `[a-z0-9]+`.
+const publishedBranch = 'published';
+
 /// A package's published name and, for a package of another repository,
 /// the version constraint its git or path dependency becomes.
 final class PublishName {
@@ -124,6 +128,8 @@ Future<RenameReport> renameRepository(
   PublishNames config, {
   bool rekey = true,
   bool moveDirectories = false,
+  String? repository,
+  String? ref,
 }) async {
   final names = config.names;
   final report = RenameReport();
@@ -191,6 +197,24 @@ Future<RenameReport> renameRepository(
       final pd = Directory(p.join(dir, platform));
       if (pd.existsSync()) {
         _renameNative(root, pd, old, renamed, report);
+      }
+    }
+  }
+
+  if (repository != null) {
+    for (final dir in packageDirs.values) {
+      final f = File(p.join(dir, 'pubspec.yaml'));
+      final text = f.readAsStringSync();
+      final rel = p.posix.joinAll(p.split(p.relative(dir, from: root)));
+      final out = setRepository(
+        text,
+        repository,
+        ref: ref ?? 'main',
+        path: rel == '.' ? '' : rel,
+      );
+      if (out != text) {
+        f.writeAsStringSync(out);
+        report.changed.add(p.relative(f.path, from: root));
       }
     }
   }
@@ -329,6 +353,39 @@ String _apply(
 }
 
 String _old(String name) => RegExp.escape(name);
+
+/// A pubspec whose `repository` is [repository] at [ref] (the renamed
+/// sources that were published: pub.dev checks that the repository has a
+/// pubspec with the published name) and whose `issue_tracker` is the
+/// fork's: users of the published name report to us. `homepage` stays
+/// (upstream's, credit).
+String setRepository(
+  String text,
+  String repository, {
+  required String ref,
+  String path = '',
+}) {
+  final base = repository.endsWith('/')
+      ? repository.substring(0, repository.length - 1)
+      : repository;
+  final url = path.isEmpty && ref == 'main'
+      ? base
+      : '$base/tree/$ref${path.isEmpty ? '' : '/$path'}';
+  var out = text;
+  for (final (key, value) in [
+    ('repository', url),
+    ('issue_tracker', '$base/issues'),
+  ]) {
+    final line = RegExp('^$key:.*\$', multiLine: true);
+    out = line.hasMatch(out)
+        ? out.replaceFirst(line, '$key: $value')
+        : out.replaceFirstMapped(
+            RegExp(r'^(version:.*)$', multiLine: true),
+            (m) => '${m[1]}\n$key: $value',
+          );
+  }
+  return out;
+}
 
 /// `package:old/` to `package:new/` (imports, exports, and strings: asset
 /// IDs, type checker URIs), and analyzer_buffer's `#{{old|Symbol}}`.

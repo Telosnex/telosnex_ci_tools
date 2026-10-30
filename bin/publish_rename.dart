@@ -9,6 +9,9 @@
 /// package, CMake target, include directory). A published package's path
 /// dependency on a package of the repository becomes ^version. A Kiln
 /// package's manifest gets the renamed sources' key (--no-rekey: not).
+/// --repository (the fork's URL) sets each renamed package's repository
+/// to the fork's `published` branch (the publish workflow commits the
+/// renamed tree there), and its issue_tracker to the fork's.
 /// --move-directories also moves a package directory named after the old
 /// name (and the paths to it): to build a renamed checkout's examples for
 /// iOS and macOS, where Swift packages take their identity from the
@@ -39,6 +42,7 @@ Future<void> main(List<String> arguments) async {
     ..addFlag('rekey', defaultsTo: true)
     ..addFlag('move-directories')
     ..addOption('tag')
+    ..addOption('repository')
     ..addFlag('help', abbr: 'h', negatable: false);
   final ArgResults args;
   try {
@@ -75,6 +79,8 @@ Future<void> main(List<String> arguments) async {
     names,
     rekey: args.flag('rekey'),
     moveDirectories: args.flag('move-directories'),
+    repository: args.option('repository'),
+    ref: tag == null ? null : publishedBranch,
   );
   for (final MapEntry(:key, :value) in report.moved.entries) {
     stdout.writeln('moved $key -> $value');

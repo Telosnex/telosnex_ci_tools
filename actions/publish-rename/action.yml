@@ -11,6 +11,10 @@ inputs:
   tag:
     description: The release tag (v1.2.3, or <package>-v1.2.3).
     required: true
+  repository:
+    description: The repository URL; the renamed packages' repository becomes its published branch.
+    required: false
+    default: ''
 
 outputs:
   package:
@@ -26,8 +30,10 @@ runs:
       env:
         REPO: ${{ inputs.path }}
         TAG: ${{ inputs.tag }}
+        REPOSITORY: ${{ inputs.repository }}
       run: |
         repo=$(cd "$REPO" && pwd)
         cd "$GITHUB_ACTION_PATH/../.."
         dart pub get > /dev/null
-        dart run telosnex_ci_tools:publish_rename --tag "$TAG" "$repo"
+        dart run telosnex_ci_tools:publish_rename --tag "$TAG" \
+          ${REPOSITORY:+--repository "$REPOSITORY"} "$repo"
