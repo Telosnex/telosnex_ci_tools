@@ -39,13 +39,13 @@ packages:
   - repo: Telosnex/super_sliver_list
     checks: []
     releases: []
-  - repo: Telosnex/pixel_snap
+  - repo: Telosnex/pixel_snap_fork
     checks: []
     releases: []
   - repo: Telosnex/cmark_gfm_dart
     checks: []
     releases: []
-  - repo: Telosnex/cmark-gfm-widget
+  - repo: Telosnex/cmark_gfm_widget
     checks: []
     releases: []
   - repo: Telosnex/LuaDardo
@@ -57,7 +57,7 @@ packages:
   - repo: Telosnex/shine_dart
     checks: []
     releases: []
-  - repo: Telosnex/highlight.dart
+  - repo: Telosnex/highlight_fork
     checks: []
     releases: []
   - repo: Telosnex/flutter_math_fork_fork
