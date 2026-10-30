@@ -21,6 +21,8 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `actions/ios-simulator-boot` | Composite action | Creates and boots a fresh iPhone simulator (newest runtime) and outputs its UDID. For native and iOS Safari jobs; use macos-26 or newer. |
 | `actions/ios-flutter-test` | Composite action | `flutter test` on a fresh iOS simulator: a connect watchdog (flutter test sometimes never sees the VM service), a stall watchdog, and up to 3 attempts while no test has started. Never starts Safari. |
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
+| `.github/workflows/publish.yml` | Reusable workflow | Publishes a package to pub.dev from a release tag, renamed to its published names. |
+| `actions/publish-rename` | Composite action | Renames a checkout to its published names (`tool/publish_names.yaml`). |
 | `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
@@ -116,6 +118,34 @@ A target in `runners` builds on its runner, and in its container image if it has
 | Release tag | `native-<16 characters of the source key>`. Kiln sets it. |
 
 The `package` input is the Dart package of [kiln](https://github.com/Telosnex/kiln), `kiln` by default. A package that still uses `native_prebuilt` passes `package: native_prebuilt`.
+
+### Publish to pub.dev
+
+`publish.yml` publishes a package from a release tag: `v1.2.3` for a
+repository with one package, `<package>-v1.2.3` for several (the published
+name). A fork keeps upstream's package names in git; when it has
+`tool/publish_names.yaml`, the workflow first renames a throwaway checkout
+to the published names (`dart run telosnex_ci_tools:publish_rename`, see
+its doc comment). Then analyze and the `test` command on the renamed
+package, the pana gate (`max-lost-points`), and `flutter pub publish`
+through pub.dev's GitHub trust.
+
+```yaml
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+jobs:
+  publish:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/publish.yml@<sha> # vX.Y.Z
+    permissions:
+      id-token: write
+```
+
+The first version of a package is published by hand (pub.dev enables
+automated publishing on a package that exists): on the package's Admin
+page, enable publishing from the repository with the tag pattern and the
+`pub.dev` environment. A dry run from a branch: `dry-run: true` and
+`tag: <the tag>`.
 
 ## Change this repository
 

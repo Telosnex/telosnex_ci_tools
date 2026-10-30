@@ -1,0 +1,98 @@
+# Publishes a package of the caller to pub.dev, from a release tag (ADR
+# "Telosnex dependencies from pub.dev"):
+# 1. Renames the checkout to its published names (tool/publish_names.yaml;
+#    without one, the names stay).
+# 2. Unit on the renamed package: analyze, then the test command.
+# 3. The pana gate: at most max-lost-points below pub.dev's maximum.
+# 4. Publishes through pub.dev's GitHub trust (OIDC): no token. On
+#    pub.dev, the package's Admin page enables automated publishing from
+#    the caller's repository, with its tag pattern and the environment.
+#
+# The first version of a package is published by hand: pub.dev sets up
+# automated publishing on a package that exists.
+#
+# The caller:
+#   on:
+#     push:
+#       tags: ['v[0-9]+.[0-9]+.[0-9]+*']   # or '<package>-v[0-9]+...'
+#   jobs:
+#     publish:
+#       uses: Telosnex/telosnex_ci_tools/.github/workflows/publish.yml@<sha> # vX.Y.Z
+#       permissions:
+#         id-token: write
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      test:
+        description: Run in the renamed package's directory after analyze.
+        type: string
+        default: flutter test
+      max-lost-points:
+        description: The pana gate. Publishes only if pub.dev's maximum minus the points is at most this.
+        type: number
+        default: 30
+      environment:
+        description: The GitHub environment pub.dev's automated publishing names.
+        type: string
+        default: pub.dev
+      dry-run:
+        description: Everything but the upload.
+        type: boolean
+        default: false
+      tag:
+        description: The release tag to publish, for a dry run from a branch. Default the tag that started the run.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to pub.dev
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Exchanges the OIDC token for a pub.dev token.
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@afe24ae98f0772cc31803d72c5b86944eecaf9fa # self
+      - id: rename
+        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@afe24ae98f0772cc31803d72c5b86944eecaf9fa # self
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+      - name: Unit on the renamed package
+        working-directory: ${{ steps.rename.outputs.package }}
+        env:
+          TEST: ${{ inputs.test }}
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          bash -c "$TEST"
+      - name: pana gate
+        working-directory: ${{ steps.rename.outputs.package }}
+        env:
+          MAX_LOST: ${{ inputs.max-lost-points }}
+        run: |
+          dart pub global activate pana 0.23.19 > /dev/null
+          # pana writes into the package: score a copy.
+          copy="$RUNNER_TEMP/pana/$(basename "$PWD")"
+          mkdir -p "$(dirname "$copy")"
+          cp -R . "$copy"
+          dart pub global run pana --no-warning --exit-code-threshold "$MAX_LOST" "$copy"
+      - name: Publish
+        if: ${{ !inputs.dry-run }}
+        working-directory: ${{ steps.rename.outputs.package }}
+        run: flutter pub publish --force
+      - name: Dry run
+        if: ${{ inputs.dry-run }}
+        working-directory: ${{ steps.rename.outputs.package }}
+        run: flutter pub publish --dry-run
