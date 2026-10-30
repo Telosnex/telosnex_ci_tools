@@ -1,0 +1,33 @@
+name: Rename for publishing
+description: Renames the caller's checkout to its published names (tool/publish_names.yaml) with publish_rename of this commit of telosnex_ci_tools, and finds the package a release tag publishes.
+
+# Needs Dart on the PATH: run actions/setup-flutter first.
+
+inputs:
+  path:
+    description: The repository checkout to rename, in place.
+    required: false
+    default: '.'
+  tag:
+    description: The release tag (v1.2.3, or <package>-v1.2.3).
+    required: true
+
+outputs:
+  package:
+    description: The directory of the package the tag publishes, relative to the checkout.
+    value: ${{ steps.rename.outputs.package }}
+
+runs:
+  using: composite
+  steps:
+    - name: Rename
+      id: rename
+      shell: bash
+      env:
+        REPO: ${{ inputs.path }}
+        TAG: ${{ inputs.tag }}
+      run: |
+        repo=$(cd "$REPO" && pwd)
+        cd "$GITHUB_ACTION_PATH/../.."
+        dart pub get > /dev/null
+        dart run telosnex_ci_tools:publish_rename --tag "$TAG" "$repo"
