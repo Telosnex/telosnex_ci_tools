@@ -42,7 +42,7 @@ packages:
   - repo: Telosnex/pixel_snap
     checks: []
     releases: []
-  - repo: Telosnex/cmark-gfm-dart
+  - repo: Telosnex/cmark_gfm_dart
     checks: []
     releases: []
   - repo: Telosnex/cmark-gfm-widget
