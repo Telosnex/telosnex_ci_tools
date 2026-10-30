@@ -30,7 +30,7 @@ Other workflows are named for their topic (`cuda_pack.yml`). The `name:` matches
 
 ## 3. telosnex_ci_tools
 
-- **Pin a tag**, never `main`: `uses: Telosnex/telosnex_ci_tools/actions/<action>@<full sha> # vX.Y.Z`, the same tag everywhere in the package (Renovate moves them). Git dependencies on `packages/telosnex_web_test` use `ref: vX.Y.Z` of the same tag.
+- **Pin a tag**, never `main`: `uses: Telosnex/telosnex_ci_tools/actions/<action>@<full sha> # vX.Y.Z`, the same tag everywhere in the package (`dart run telosnex_ci_tools:release` moves them). Git dependencies on `packages/telosnex_web_test` use `ref: vX.Y.Z` of the same tag.
 - Install Flutter with `actions/setup-flutter` **(lint)**.
 - **Upstream fork workflows** (issue bots and the like): delete them, or bring them in line; the lint checks every workflow.
 - **Logs on failure**: every job that can fail opaquely uploads its logs. `ios-flutter-test` and `web-driver` do it themselves (give each an `artifact-name`); upload the Android emulator's `log` and `logcat` outputs with `if: failure() || cancelled()`. Name artifacts `<job-ish>-logs`.

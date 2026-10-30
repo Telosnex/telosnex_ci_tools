@@ -23,12 +23,13 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `actions/ios-flutter-test` | Composite action | `flutter test` on a fresh iOS simulator: a connect watchdog (flutter test sometimes never sees the VM service), a stall watchdog, and up to 3 attempts while no test has started. Never starts Safari. |
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
 | `.github/workflows/publish.yml` | Reusable workflow | Publishes a package to pub.dev from a release tag, renamed to its published names. |
+| `bin/release.dart` | Tool | Tags a release and pins every package to it, in one command (see Change this repository). |
 | `bin/published_key.dart` | Tool | Before publishing a Kiln package: checks that the files pub uploads compute the manifest's source key (else every build compiles from source). |
 | `actions/publish-rename` | Composite action | Renames a checkout to its published names (`tool/publish_names.yaml`). |
 | `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
-| `default.json` | Renovate preset | Keeps the pinned actions current. |
+| `default.json` | Renovate preset | Unused: no package has a `renovate.json` (see Renovate). |
 
 ## Conventions
 
@@ -158,26 +159,18 @@ page, enable publishing from the repository with the tag pattern and the
 The reusable workflows use the composite actions of this repository. A `uses:` cannot contain an expression, so each of these references names a commit. `pin_self` sets the references, and `pin_self --check` in CI makes sure that they are current.
 
 1. Commit the change to `actions/` or `flutter_version.txt`.
-2. Run `dart run telosnex_ci_tools:pin_self`.
-3. Commit the changed workflow files.
-4. Push, then tag the commit of step 3 `vX.Y.Z`.
+2. Run `dart run telosnex_ci_tools:pin_self`, commit the changed workflow files, and push.
+3. Run `dart run telosnex_ci_tools:release vX.Y.Z`.
 
-Callers pin the tagged commit. Do not pin the commit of step 1: its workflows still reference the actions by branch, and the SHA pinning policy of the organization rejects the run with a startup failure. Renovate opens a pull request in each caller for a new tag.
+`release` checks the checkout (clean, at `origin/main`, self pins current, lint clean), tags HEAD and pushes the tag. Then it pins every repository of the organization that uses this one to the tag's commit, lints it, and pushes to its default branch. Where a push is refused (a protected branch), it opens a pull request. `--dry-run` shows what would change; `--only a,b` limits it to some repositories.
+
+To undo a release, run `release` with the previous tag: an existing tag is not moved, only pinned again.
+
+The organization requires actions pinned to a full commit SHA, so callers cannot use a moving tag such as `v0` (the run fails at startup). Do not pin the commit of step 1: its workflows still reference the actions of the previous release.
 
 ## Renovate
 
-The Renovate GitHub app is installed on the organization. Each repository has `renovate.json`:
-
-```json
-{ "extends": ["github>Telosnex/telosnex_ci_tools"] }
-```
-
-The preset, `default.json`, updates only the pinned GitHub Actions:
-
-- A new tag of this repository: one pull request, at once.
-- Other actions: one grouped pull request, before 6am on Mondays.
-
-This repository pins its own actions with `pin_self`; its `renovate.json` makes Renovate ignore them.
+The Renovate app is installed on the organization, but no package has a `renovate.json`, so it has never run. New releases of this repository reach the packages through `release`. Other pinned actions (`actions/checkout`, ...) are not updated automatically. `default.json` is the preset a package would use.
 
 ## Job names
 
