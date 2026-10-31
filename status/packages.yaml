@@ -21,8 +21,9 @@ packages:
   - repo: Telosnex/lua_dart
   - repo: Telosnex/nutdart
   - repo: Telosnex/telosnex_audio
+    checks: [kiln_check.yml, vendor_watch.yml]
   - repo: Telosnex/telosnex_inappwebview
-    checks: []
+    checks: [wpe_sdk_watch.yml]
     releases: []
   - repo: Telosnex/zxing_dart
   - repo: Telosnex/riverpod
