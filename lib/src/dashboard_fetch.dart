@@ -30,7 +30,7 @@ List<DashboardPackage> readDashboardConfig(String yaml) {
           // The upstream watch shows wherever a package has one.
           checks: {
             ...files(entry, 'checks') ?? const ['kiln_check.yml'],
-            'upstream_watch.yml',
+            upstreamWatchWorkflow,
           }.toList(),
           releases: files(entry, 'releases') ?? const ['kiln_release.yml'],
         )
@@ -38,6 +38,9 @@ List<DashboardPackage> readDashboardConfig(String yaml) {
         throw FormatException('packages.yaml: $entry has no repo.'),
   ];
 }
+
+/// Added to the checks of every package; dropped where it is absent.
+const upstreamWatchWorkflow = 'upstream_watch.yml';
 
 /// GitHub's REST API, read only.
 final class GitHubReader {
@@ -249,7 +252,7 @@ Set<String> neededJobNames(String workflow) {
 /// Whether the default branch uses Kiln (the root pubspec, or the pubspec
 /// in the working-directory of a Kiln workflow call) and CI tools (a
 /// workflow).
-Future<({bool kiln, bool ciTools})> _adoption(
+Future<({bool kiln, bool ciTools, Set<String> workflows})> _adoption(
   GitHubReader github,
   String repo,
   String branch,
@@ -259,10 +262,12 @@ Future<({bool kiln, bool ciTools})> _adoption(
     '?ref=${Uri.encodeQueryComponent(branch)}',
   );
   var ciTools = false;
+  final workflows = <String>{};
   final kilnDirs = <String>{''};
   for (final entry in (list is List ? list : const []).cast<Map>()) {
     final name = entry['name'] as String;
     if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
+    workflows.add(name);
     final text = await github.file(repo, '.github/workflows/$name', branch);
     if (text == null) continue;
     if (workflowUsesCiTools(text)) ciTools = true;
@@ -277,14 +282,15 @@ Future<({bool kiln, bool ciTools})> _adoption(
       break;
     }
   }
-  return (kiln: kiln, ciTools: ciTools);
+  return (kiln: kiln, ciTools: ciTools, workflows: workflows);
 }
 
 /// Reads one package: the newest finished run of each workflow and its jobs.
 Future<PackageStatus> fetchPackage(
   GitHubReader github,
-  DashboardPackage package,
+  DashboardPackage listed,
 ) async {
+  var package = listed;
   final repo = package.repo;
   try {
     final info = await github.get('repos/$repo');
@@ -293,6 +299,10 @@ Future<PackageStatus> fetchPackage(
     }
     final branch = info['default_branch'] as String;
     final adoption = await _adoption(github, repo, branch);
+    // A check added to every package shows only where the package has it.
+    if (!adoption.workflows.contains(upstreamWatchWorkflow)) {
+      package = package.withoutCheck(upstreamWatchWorkflow);
+    }
     final runs = <String, DashboardRun>{};
     for (final file in {
       ...package.tests,

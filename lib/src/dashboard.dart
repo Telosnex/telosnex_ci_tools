@@ -23,6 +23,17 @@ final class DashboardPackage {
 
   /// Release workflow files: their newest run on any branch.
   final List<String> releases;
+
+  /// This package without the check [file].
+  DashboardPackage withoutCheck(String file) => DashboardPackage(
+    repo: repo,
+    tests: tests,
+    checks: [
+      for (final c in checks)
+        if (c != file) c,
+    ],
+    releases: releases,
+  );
 }
 
 /// A finished job of a run, as the dashboard keeps it.
