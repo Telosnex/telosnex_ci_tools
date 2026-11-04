@@ -224,15 +224,59 @@ void main() {
           },
         ),
       ], now);
+      expect(md, isNot(contains('## Failing')));
+      expect(md, contains('## Cancelled'));
       expect(
         md,
         contains(
-          '- **q** · Integration · 🚫 [macOS ARM64](https://x/macOS ARM64)',
+          '- **q** · Integration · [macOS ARM64](https://x/macOS ARM64)',
         ),
       );
       // The Workflows cell is 🚫, not ❌: no job failed.
       expect(md, contains('[🚫](https://x/run/integration.yml "Integration")'));
       expect(md, isNot(contains('[❌](https://x/run/integration.yml')));
+    });
+
+    test('failed and cancelled runs are in separate sections', () {
+      final md = renderDashboard([
+        PackageStatus(
+          const DashboardPackage(repo: 'o/f', tests: ['integration.yml']),
+          'main',
+          {
+            'integration.yml': _run('integration.yml', [
+              _job('Linux x64', 'failure'),
+              _job('macOS ARM64', 'cancelled'),
+            ], now),
+          },
+        ),
+        PackageStatus(
+          const DashboardPackage(repo: 'o/c', tests: ['integration.yml']),
+          'main',
+          {
+            'integration.yml': _run(
+              'integration.yml',
+              [_job('Linux x64'), _job('macOS ARM64', 'cancelled')],
+              now,
+              conclusion: 'failure',
+            ),
+          },
+        ),
+      ], now);
+      final failing = md.substring(
+        md.indexOf('## Failing'),
+        md.indexOf('## Cancelled'),
+      );
+      final cancelled = md.substring(md.indexOf('## Cancelled'));
+      expect(
+        failing,
+        contains(
+          '- **f** · Integration · [Linux x64](https://x/Linux x64) · '
+          '1 cancelled',
+        ),
+      );
+      expect(failing, isNot(contains('**c**')));
+      expect(cancelled, contains('- **c** · Integration · [macOS ARM64]'));
+      expect(cancelled, isNot(contains('**f**')));
     });
 
     test(
