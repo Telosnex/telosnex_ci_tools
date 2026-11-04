@@ -1,0 +1,25 @@
+name: Upstream watch
+description: Checks the upstream sources of the caller's .github/upstream.yaml with the upstream_watch of this commit of telosnex_ci_tools. Fails on an update or an error.
+
+# Needs Dart on the PATH: run actions/setup-flutter first.
+
+inputs:
+  path:
+    description: The package to check.
+    required: false
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Check the upstream sources
+      shell: bash
+      env:
+        REPO: ${{ inputs.path }}
+        GITHUB_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        repo=$(cd "$REPO" && pwd)
+        cd "$GITHUB_ACTION_PATH/../.."
+        dart pub get > /dev/null
+        dart run telosnex_ci_tools:upstream_watch "$repo"

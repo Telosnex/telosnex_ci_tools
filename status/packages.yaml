@@ -9,7 +9,8 @@
 #             platform are the Unit column. Default: [unit.yml,
 #             integration.yml].
 #   checks:   more workflow files on the default branch, shown with a status
-#             only. Default: [kiln_check.yml].
+#             only. Default: [kiln_check.yml]. upstream_watch.yml is always
+#             added; a package without it shows nothing for it.
 #   releases: release workflow files, newest run on any branch.
 #             Default: [kiln_release.yml].
 # Only public repositories: the views are public.
@@ -21,9 +22,8 @@ packages:
   - repo: Telosnex/lua_dart
   - repo: Telosnex/nutdart
   - repo: Telosnex/telosnex_audio
-    checks: [kiln_check.yml, vendor_watch.yml]
   - repo: Telosnex/telosnex_inappwebview
-    checks: [wpe_sdk_watch.yml]
+    checks: []
     releases: []
   - repo: Telosnex/zxing_dart
   - repo: Telosnex/riverpod

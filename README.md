@@ -27,6 +27,7 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `bin/published_key.dart` | Tool | Before publishing a Kiln package: checks that the files pub uploads compute the manifest's source key (else every build compiles from source). |
 | `actions/publish-rename` | Composite action | Renames a checkout to its published names (`tool/publish_names.yaml`). |
 | `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
+| `.github/workflows/upstream_watch.yml`, `actions/upstream-watch`, `bin/upstream_watch.dart` | Reusable workflow, composite action, tool | Daily check for updates to the code that a package pins from other projects (see Upstream watch). |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
 | `default.json` | Renovate preset | Unused: no package has a `renovate.json` (see Renovate). |
@@ -153,6 +154,60 @@ automated publishing on a package that exists): on the package's Admin
 page, enable publishing from the repository with the tag pattern and the
 `pub.dev` environment. A dry run from a branch: `dry-run: true` and
 `tag: <the tag>`.
+
+### Upstream watch
+
+A package that pins code from another project (a library, an SDK, a
+vendored tree) lists it in `.github/upstream.yaml`. The file is in
+`.github/` so that it is not in the Kiln source key.
+
+```yaml
+sources:
+  - name: FFmpeg
+    tags: https://github.com/FFmpeg/FFmpeg.git    # any git URL
+    version: 'n(\d+(?:\.\d+)*)'                  # the tag name; group 1 is the version
+    pin: {file: tool/fetch_ffmpeg.sh, pattern: '^revision=([0-9a-f]{40})'}
+    alert: patch                                  # major, minor (default) or patch
+  - name: BoringSSL
+    branch: https://github.com/google/boringssl   # GitHub; `ref` is the branch, default the default branch
+    pin: {file: tool/REVISION, pattern: '([0-9a-f]{40})'}
+    lag_days: 30                                  # alert when the oldest commit not taken is this old
+  - name: WebRTC
+    run: dart .github/vendor_watch.dart           # exit 0: up to date, 1: update, other: error
+```
+
+- `pin` is a value, or the first group of `pattern` in `file`. Point it at
+  the file that the build reads, so that there is one pin.
+- A `tags` pin is a version, or the commit of a version tag.
+- `seen` skips an update: a version (`tags`) or a commit (`branch`) to treat
+  as taken. The alert comes back with the next newer one.
+
+The caller workflow, `.github/workflows/upstream_watch.yml`:
+
+```yaml
+name: Upstream watch
+
+on:
+  schedule:
+    - cron: '23 7 * * *'
+  push:
+    branches: [main]
+    paths: [.github/upstream.yaml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    uses: Telosnex/telosnex_ci_tools/.github/workflows/upstream_watch.yml@<sha> # vX.Y.Z
+```
+
+The run fails on an update or an error, and GitHub emails a failed
+scheduled run to whoever last changed the caller's workflow file. The job
+summary lists each source. The dashboard shows `upstream_watch.yml` for
+every package that has it. Run it on your computer with
+`dart run telosnex_ci_tools:upstream_watch <package directory>`.
 
 ## Change this repository
 

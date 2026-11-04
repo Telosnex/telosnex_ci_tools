@@ -27,7 +27,11 @@ List<DashboardPackage> readDashboardConfig(String yaml) {
         DashboardPackage(
           repo: entry['repo'] as String,
           tests: files(entry, 'tests') ?? const ['unit.yml', 'integration.yml'],
-          checks: files(entry, 'checks') ?? const ['kiln_check.yml'],
+          // The upstream watch shows wherever a package has one.
+          checks: {
+            ...files(entry, 'checks') ?? const ['kiln_check.yml'],
+            'upstream_watch.yml',
+          }.toList(),
           releases: files(entry, 'releases') ?? const ['kiln_release.yml'],
         )
       else
