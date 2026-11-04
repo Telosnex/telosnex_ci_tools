@@ -26,6 +26,20 @@ DashboardRun _run(
 );
 
 void main() {
+  test('runMark: ❌ when a job failed, 🚫 when jobs were only cancelled', () {
+    final now = DateTime.utc(2026);
+    DashboardRun run(List<String> jobs) => _run(
+      'integration.yml',
+      [for (final (i, c) in jobs.indexed) _job('J$i', c)],
+      now,
+      conclusion: 'failure',
+    );
+    expect(runMark(run(['success', 'cancelled'])), '🚫');
+    expect(runMark(run(['failure', 'cancelled'])), '❌');
+    expect(runMark(run(['success'])), '❌');
+    expect(runMark(run([])), '❌');
+  });
+
   group('parseJobName', () {
     test('native', () {
       final cell = parseJobName('iOS ARM64 simulator')!;
@@ -216,6 +230,9 @@ void main() {
           '- **q** · Integration · 🚫 [macOS ARM64](https://x/macOS ARM64)',
         ),
       );
+      // The Workflows cell is 🚫, not ❌: no job failed.
+      expect(md, contains('[🚫](https://x/run/integration.yml "Integration")'));
+      expect(md, isNot(contains('[❌](https://x/run/integration.yml')));
     });
 
     test(

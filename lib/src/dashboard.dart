@@ -181,6 +181,16 @@ String mark(String? conclusion) => switch (conclusion) {
   _ => '⚠️',
 };
 
+/// The mark of a run. A run that failed only because GitHub cancelled
+/// jobs (often when no runner took them) is 🚫, not ❌.
+String runMark(DashboardRun run) {
+  final m = mark(run.conclusion);
+  if (m != '❌' || run.jobs.isEmpty) return m;
+  final jobs = run.jobs.map((j) => mark(j.conclusion));
+  if (jobs.contains('❌') || !jobs.contains('🚫')) return m;
+  return '🚫';
+}
+
 String _age(DateTime at, DateTime now) {
   final d = now.difference(at);
   if (d.inMinutes < 60) return '${d.inMinutes}m';
@@ -199,7 +209,7 @@ String _runCell(DashboardRun? run, DateTime now, {bool showBranch = false}) {
   // The package has the workflow, but no finished run of it yet.
   if (run == null) return 'no run';
   final branch = showBranch ? ' `${run.branch}`' : '';
-  return '[${mark(run.conclusion)}](${run.url} "${_escape(run.workflowName)}") '
+  return '[${runMark(run)}](${run.url} "${_escape(run.workflowName)}") '
       '${_age(run.finishedAt, now)}$branch';
 }
 
@@ -375,7 +385,10 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
         for (final job in run.jobs)
           if (mark(job.conclusion) == '❌') '[${job.name}](${job.url})',
       ];
-      if (failed.isEmpty && mark(run.conclusion) != '❌') continue;
+      final runFailed = {'❌', '🚫'}.contains(runMark(run));
+      if (failed.isEmpty && !(runFailed && mark(run.conclusion) == '❌')) {
+        continue;
+      }
       final cancelled = [
         for (final job in run.jobs)
           if (job.conclusion == 'cancelled') '[${job.name}](${job.url})',
