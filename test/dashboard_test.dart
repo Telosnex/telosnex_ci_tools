@@ -6,20 +6,24 @@ import 'package:test/test.dart';
 DashboardJob _job(String name, [String? conclusion = 'success']) =>
     DashboardJob(name: name, conclusion: conclusion, url: 'https://x/$name');
 
-DashboardRun _run(String file, List<DashboardJob> jobs, DateTime at) =>
-    DashboardRun(
-      workflowFile: file,
-      workflowName: file == 'unit.yml' ? 'Unit' : 'Integration',
-      branch: 'main',
-      sha: 'abcdef0123456789',
-      event: 'push',
-      conclusion: jobs.any((j) => j.conclusion == 'failure')
-          ? 'failure'
-          : 'success',
-      url: 'https://x/run/$file',
-      finishedAt: at,
-      jobs: jobs,
-    );
+DashboardRun _run(
+  String file,
+  List<DashboardJob> jobs,
+  DateTime at, {
+  String? conclusion,
+}) => DashboardRun(
+  workflowFile: file,
+  workflowName: file == 'unit.yml' ? 'Unit' : 'Integration',
+  branch: 'main',
+  sha: 'abcdef0123456789',
+  event: 'push',
+  conclusion:
+      conclusion ??
+      (jobs.any((j) => j.conclusion == 'failure') ? 'failure' : 'success'),
+  url: 'https://x/run/$file',
+  finishedAt: at,
+  jobs: jobs,
+);
 
 void main() {
   group('parseJobName', () {
@@ -187,6 +191,29 @@ void main() {
           '- **pkg** · Integration · '
           '[Web Linux x64 Chrome dart2js](https://x/Web Linux x64 Chrome '
           'dart2js) · 5m ago, `main` `abcdef0`',
+        ),
+      );
+    });
+
+    test('a failed run with only cancelled jobs is listed', () {
+      final md = renderDashboard([
+        PackageStatus(
+          const DashboardPackage(repo: 'o/q', tests: ['integration.yml']),
+          'main',
+          {
+            'integration.yml': _run(
+              'integration.yml',
+              [_job('Linux x64'), _job('macOS ARM64', 'cancelled')],
+              now,
+              conclusion: 'failure',
+            ),
+          },
+        ),
+      ], now);
+      expect(
+        md,
+        contains(
+          '- **q** · Integration · 🚫 [macOS ARM64](https://x/macOS ARM64)',
         ),
       );
     });

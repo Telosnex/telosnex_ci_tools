@@ -366,22 +366,43 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
     out.writeln('| ${status.package.name} | ${cells.join(' | ')} |');
   }
 
-  final failing = [
-    for (final status in packages)
-      for (final run in status.runs.values)
+  // A failed run is listed even when no job failed: GitHub fails a run whose
+  // jobs it cancelled, for example when no runner took them.
+  final failing = <(String, DashboardRun, String)>[];
+  for (final status in packages) {
+    for (final run in status.runs.values) {
+      final failed = [
         for (final job in run.jobs)
-          if (mark(job.conclusion) == '❌') (status.package.name, run, job),
-  ];
+          if (mark(job.conclusion) == '❌') '[${job.name}](${job.url})',
+      ];
+      if (failed.isEmpty && mark(run.conclusion) != '❌') continue;
+      final cancelled = [
+        for (final job in run.jobs)
+          if (job.conclusion == 'cancelled') '[${job.name}](${job.url})',
+      ];
+      final what = [
+        if (failed.isNotEmpty) failed.join(', '),
+        if (cancelled.isNotEmpty) '🚫 ${cancelled.join(', ')}',
+        if (failed.isEmpty && cancelled.isEmpty) '[run](${run.url})',
+      ].join(' · ');
+      failing.add((status.package.name, run, what));
+    }
+  }
   if (failing.isNotEmpty) {
     out
       ..writeln()
       ..writeln('## Failing')
+      ..writeln()
+      ..writeln(
+        '🚫: GitHub cancelled the job, often because no runner took it. '
+        'Re-run it.',
+      )
       ..writeln();
-    for (final (name, run, job) in failing) {
+    for (final (name, run, what) in failing) {
       out.writeln(
-        '- **$name** · ${run.workflowName} · [${job.name}](${job.url}) · '
+        '- **$name** · ${run.workflowName} · $what · '
         '${_age(run.finishedAt, now)} ago, `${run.branch}` '
-        '`${run.sha.substring(0, 7)}`',
+        '`${run.sha.isEmpty ? '' : run.sha.substring(0, 7)}`',
       );
     }
   }
