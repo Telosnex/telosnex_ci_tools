@@ -136,6 +136,34 @@ sources:
     });
   });
 
+  test('upstreamNote reads the annotations of the watch', () {
+    final tags = checkTags(
+      TagsSource(
+        'FFmpeg',
+        url: 'u',
+        pin: '9.0',
+        version: RegExp(r'^(?:n(\d+(?:\.\d+)*))$'),
+        alert: AlertLevel.patch,
+      ),
+      {'n9.0': 'a' * 40, 'n9.0.2': 'b' * 40},
+    );
+    expect(upstreamNote('FFmpeg: update', tags.summary), 'FFmpeg 9.0 → 9.0.2');
+    expect(
+      upstreamNote(
+        'BoringSSL: update',
+        'Pinned 5ee9407bc2; main is 575 commit(s) ahead, the oldest 79 '
+            'day(s) old.',
+      ),
+      'BoringSSL: 575 commits behind main, the oldest 79 days old',
+    );
+    expect(
+      upstreamNote('WebRTC: update', 'The command reports an update.'),
+      'WebRTC: update',
+    );
+    expect(upstreamNote('X: error', 'boom'), 'X: error: boom');
+    expect(upstreamNote('', 'Process completed with exit code 1.'), isNull);
+  });
+
   test('run: exit 0 is up to date, 1 an update, others an error', () async {
     Future<UpstreamStatus> run(String c) async =>
         (await checkRun(RunSource('R', c), root.path)).status;

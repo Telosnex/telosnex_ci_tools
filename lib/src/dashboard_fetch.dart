@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:yaml/yaml.dart';
 
 import 'dashboard.dart';
+import 'upstream.dart' show upstreamNote;
 
 /// Reads status/packages.yaml.
 List<DashboardPackage> readDashboardConfig(String yaml) {
@@ -316,6 +317,10 @@ Future<PackageStatus> fetchPackage(
         package.releases.contains(file) ? null : branch,
       );
       if (run == null) continue;
+      if (file == upstreamWatchWorkflow && run.conclusion == 'failure') {
+        runs[file] = run.withNotes(await _upstreamNotes(github, repo, run));
+        continue;
+      }
       // Setup jobs from the workflow at the run's commit, when it is a test
       // workflow.
       if (!package.tests.contains(file)) {
@@ -411,4 +416,32 @@ Future<DashboardRun?> _newestRun(
     ),
     jobs: jobs,
   );
+}
+
+/// The updates and errors that a failed upstream watch run reported, from
+/// the annotations of its failed jobs.
+Future<List<String>> _upstreamNotes(
+  GitHubReader github,
+  String repo,
+  DashboardRun run,
+) async {
+  final notes = <String>[];
+  for (final job in run.jobs) {
+    if (job.conclusion != 'failure') continue;
+    final id = Uri.parse(job.url).pathSegments.last;
+    final list =
+        await github.getJson(
+              'repos/$repo/check-runs/$id/annotations?per_page=100',
+            )
+            as List?;
+    for (final a in (list ?? const []).cast<Map<String, Object?>>()) {
+      final note = upstreamNote(
+        a['title'] as String? ?? '',
+        a['message'] as String? ?? '',
+      );
+      if (note != null) notes.add(note);
+    }
+  }
+  // GitHub lists the annotations newest first.
+  return notes.reversed.toList();
 }

@@ -77,6 +77,7 @@ final class DashboardRun {
     required this.finishedAt,
     required this.jobs,
     this.setupJobs = const {},
+    this.notes = const [],
   });
 
   final String workflowFile;
@@ -93,6 +94,25 @@ final class DashboardRun {
   /// setup such as building web files or fetching models, not tests.
   final Set<String> setupJobs;
 
+  /// What a failed run found, from its annotations: for the upstream watch,
+  /// one line per update, such as `FFmpeg 9.0 → 9.0.2`.
+  final List<String> notes;
+
+  /// This run with [notes].
+  DashboardRun withNotes(List<String> notes) => DashboardRun(
+    workflowFile: workflowFile,
+    workflowName: workflowName,
+    branch: branch,
+    sha: sha,
+    event: event,
+    conclusion: conclusion,
+    url: url,
+    finishedAt: finishedAt,
+    jobs: jobs,
+    setupJobs: setupJobs,
+    notes: notes,
+  );
+
   Map<String, Object?> toJson() => {
     'workflow': workflowFile,
     'name': workflowName,
@@ -106,6 +126,7 @@ final class DashboardRun {
       for (final job in jobs)
         {...job.toJson(), if (setupJobs.contains(job.name)) 'setup': true},
     ],
+    if (notes.isNotEmpty) 'notes': notes,
   };
 }
 
@@ -191,6 +212,13 @@ String mark(String? conclusion) => switch (conclusion) {
   null => '⏳',
   _ => '⚠️',
 };
+
+DashboardJob? _firstFailed(DashboardRun run) {
+  for (final job in run.jobs) {
+    if (job.conclusion == 'failure') return job;
+  }
+  return null;
+}
 
 /// The mark of a run. A run that failed only because GitHub cancelled
 /// jobs (often when no runner took them) is 🚫, not ❌.
@@ -408,7 +436,12 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
           status.package.name,
           run,
           [
-            if (failed.isNotEmpty) failed else '[run](${run.url})',
+            if (run.notes.isNotEmpty)
+              '[${run.notes.join(', ')}](${_firstFailed(run)?.url ?? run.url})'
+            else if (failed.isNotEmpty)
+              failed
+            else
+              '[run](${run.url})',
             if (cancelled.isNotEmpty) '${cancelled.length} cancelled',
           ].join(' · '),
         ));

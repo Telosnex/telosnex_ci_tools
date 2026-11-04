@@ -473,3 +473,23 @@ String upstreamSummary(List<UpstreamResult> results) {
   );
   return '$b';
 }
+
+/// A short form of a watch annotation, for the dashboard: title
+/// `<source>: update` or `<source>: error`, message the summary of
+/// [checkTags], [checkBranch] or [checkRun]. Null when it is not one.
+String? upstreamNote(String title, String message) {
+  final t = RegExp(r'^(.+): (update|error)$').firstMatch(title);
+  if (t == null) return null;
+  final name = t[1]!;
+  if (t[2] == 'error') return '$name: error: $message';
+  final tags = RegExp(r'^Pinned (\S+); newest (\S+) \(').firstMatch(message);
+  if (tags != null) return '$name ${tags[1]} → ${tags[2]}';
+  final branch = RegExp(
+    r'; (\S+) is (\d+) commit\(s\) ahead, the oldest (\d+) day\(s\) old\.$',
+  ).firstMatch(message);
+  if (branch != null) {
+    return '$name: ${branch[2]} commits behind ${branch[1]}, the oldest '
+        '${branch[3]} days old';
+  }
+  return '$name: update';
+}

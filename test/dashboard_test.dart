@@ -237,6 +237,31 @@ void main() {
       expect(md, isNot(contains('[❌](https://x/run/integration.yml')));
     });
 
+    test('a failed run with notes lists them under Failing', () {
+      final md = renderDashboard([
+        PackageStatus(
+          const DashboardPackage(
+            repo: 'o/u',
+            tests: [],
+            checks: ['upstream_watch.yml'],
+          ),
+          'main',
+          {
+            'upstream_watch.yml': _run('upstream_watch.yml', [
+              _job('watch / watch', 'failure'),
+            ], now).withNotes(['FFmpeg 9.0 → 9.0.2', 'zlib 1.3.1 → 1.3.2']),
+          },
+        ),
+      ], now);
+      expect(
+        md,
+        contains(
+          '- **u** · Integration · [FFmpeg 9.0 → 9.0.2, zlib 1.3.1 → 1.3.2]'
+          '(https://x/watch / watch)',
+        ),
+      );
+    });
+
     test('failed and cancelled runs are in separate sections', () {
       final md = renderDashboard([
         PackageStatus(
