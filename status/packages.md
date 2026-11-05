@@ -5,13 +5,11 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | Name | Uses Kiln | Uses CI tools |
 |---|---|---|
 | [CamerAwesome](https://github.com/Telosnex/CamerAwesome) | — | ✅ |
-| [LuaDardo](https://github.com/Telosnex/LuaDardo) | — | ✅ |
 | [alchemist](https://github.com/Telosnex/alchemist) | — | ✅ |
 | [auto_updater](https://github.com/Telosnex/auto_updater) | — | ✅ |
 | [background_downloader](https://github.com/Telosnex/background_downloader) | — | ✅ |
 | [cmark_gfm_dart](https://github.com/Telosnex/cmark_gfm_dart) | — | ✅ |
 | [cmark_gfm_widget](https://github.com/Telosnex/cmark_gfm_widget) | — | ✅ |
-| [dart-sprintf](https://github.com/Telosnex/dart-sprintf) | — | ✅ |
 | [dart-vector-tile-renderer](https://github.com/Telosnex/dart-vector-tile-renderer) | — | ✅ |
 | [fllama](https://github.com/Telosnex/fllama) | ✅ | ✅ |
 | [flutter_lite_camera](https://github.com/Telosnex/flutter_lite_camera) | — | ✅ |
@@ -24,8 +22,8 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [highlight_fork](https://github.com/Telosnex/highlight_fork) | — | ✅ |
 | [image_ffmpeg](https://github.com/Telosnex/image_ffmpeg) | ✅ | ✅ |
 | [irondash](https://github.com/Telosnex/irondash) | — | ✅ |
-| [libmonet](https://github.com/Telosnex/libmonet) | — | ✅ |
 | [lua_dart](https://github.com/Telosnex/lua_dart) | ✅ | ✅ |
+| [monet_ui](https://github.com/Telosnex/monet_ui) | — | ✅ |
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
 | [packages](https://github.com/Telosnex/packages) | — | ✅ |
 | [pdfrx](https://github.com/Telosnex/pdfrx) | — | ✅ |

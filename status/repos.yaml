@@ -56,7 +56,7 @@ followup:
       check it is not reachable in a wasm build. Add CI.
 skip:
   - repo: monet_gdt
-    reason: Python training of libmonet's on-device wallpaper model, not a Dart package.
+    reason: Python training of monet_ui's on-device wallpaper model, not a Dart package.
   - repo: telosnex_edge
     reason: The app's Supabase edge functions (TypeScript).
   - repo: telosnex_site

@@ -34,7 +34,7 @@ packages:
     checks: [kiln_check.yml, check_and_lint.yml]
   - repo: Telosnex/webcrypto.dart
   # Forks the app depends on, with telosnex_ci_tools workflows (no Kiln).
-  - repo: Telosnex/libmonet
+  - repo: Telosnex/monet_ui
     checks: []
     releases: []
   - repo: Telosnex/super_sliver_list
@@ -47,12 +47,6 @@ packages:
     checks: []
     releases: []
   - repo: Telosnex/cmark_gfm_widget
-    checks: []
-    releases: []
-  - repo: Telosnex/LuaDardo
-    checks: []
-    releases: []
-  - repo: Telosnex/dart-sprintf
     checks: []
     releases: []
   - repo: Telosnex/shine_dart
