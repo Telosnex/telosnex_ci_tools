@@ -362,6 +362,11 @@ Future<PackageStatus> fetchPackage(
 /// The newest finished run of [file], skipping cancelled runs (a newer push
 /// cancels a run of the same concurrency group) when a newer finished one
 /// is in the last 20.
+///
+/// Filters on `status` here, not with the API's `status=completed`, which
+/// can leave out finished runs: on 2026-11-04 it omitted a
+/// workflow_dispatch run of fonnx's upstream watch hours after it finished,
+/// so the dashboard showed the older failure.
 Future<DashboardRun?> _newestRun(
   GitHubReader github,
   String repo,
@@ -369,7 +374,6 @@ Future<DashboardRun?> _newestRun(
   String? branch,
 ) async {
   final query = [
-    'status=completed',
     'per_page=20',
     'exclude_pull_requests=true',
     if (branch != null) 'branch=${Uri.encodeQueryComponent(branch)}',
@@ -378,7 +382,9 @@ Future<DashboardRun?> _newestRun(
     'repos/$repo/actions/workflows/$file/runs?$query',
   );
   final list = (page?['workflow_runs'] as List? ?? const [])
-      .cast<Map<String, Object?>>();
+      .cast<Map<String, Object?>>()
+      .where((run) => run['status'] == 'completed')
+      .toList();
   if (list.isEmpty) return null;
   final run = list.firstWhere(
     (run) => run['conclusion'] != 'cancelled',
