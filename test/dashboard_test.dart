@@ -114,8 +114,8 @@ void main() {
       const {},
     );
     final markdown = renderDashboard([package, empty], now);
-    List<String> row(String name, String section) {
-      final table = markdown.split('## $section').last;
+    List<String> row(String name) {
+      final table = markdown.split('| Package |').last;
       return table
           .split('\n')
           .firstWhere(
@@ -134,7 +134,7 @@ void main() {
           '| Package | Unit | Android x64 | Linux x64 | Web Chrome |   |\n',
         ),
       );
-      final cells = row('pkg', 'Test cells');
+      final cells = row('pkg');
       expect(cells[1], '[✅](https://x/Unit "Unit")');
       // emulator is the usual way to run Android: in its column.
       expect(cells[2], contains('"Android x64 emulator"'));
@@ -173,7 +173,7 @@ void main() {
         ),
       ], now);
       final cells = md
-          .split('## Test cells')
+          .split('| Package |')
           .last
           .split('\n')
           .firstWhere((l) => l.startsWith('| [cam]'))
@@ -189,15 +189,12 @@ void main() {
     });
 
     test('a package with fewer other jobs leaves the rest empty', () {
-      final cells = row('other', 'Test cells');
+      final cells = row('other');
       expect(cells[5], ' |');
     });
 
     test('no job is —', () {
-      expect(
-        row('other', 'Test cells').sublist(1, 5),
-        everyElement(startsWith('—')),
-      );
+      expect(row('other').sublist(1, 5), everyElement(startsWith('—')));
     });
 
     test('failing jobs are listed', () {
@@ -320,7 +317,7 @@ void main() {
           ),
         ], now);
         final cells = md
-            .split('## Test cells')
+            .split('| Package |')
             .last
             .split('\n')
             .firstWhere((line) => line.startsWith('| [p]('))
@@ -430,8 +427,8 @@ packages:
     });
   });
 
-  test('check and release workflows: a blank-headed cell each, after the '
-      'other jobs, with age; a release with its branch', () {
+  test('other cells: one blank-headed cell each, in alphabetical order; '
+      'check and release workflows with age, a release with its branch', () {
     final now = DateTime.utc(2026, 1, 2);
     DashboardRun run(String file, String name, String branch, Duration ago) =>
         DashboardRun(
@@ -478,23 +475,25 @@ packages:
       ),
     ], now);
     expect(md, isNot(contains('## Workflows')));
-    final table = md.split('## Test cells').last.split('\n');
+    expect(md, isNot(contains('## Test cells')));
+    final table = md.split('| Package |').last.split('\n');
     List<String> cellsOf(String name) =>
         table.firstWhere((line) => line.startsWith('| [$name](')).split(' | ');
     final a = cellsOf('a');
-    // Unit, Linux x64, then the other job, the checks, the release.
+    // Unit, Linux x64, then the other cells in alphabetical order of their
+    // label, ignoring case.
     expect(a[3], startsWith('[✅ desktop / windows]'));
     expect(
       a[4],
       '[✅ Kiln check](https://x/run/kiln_check.yml "kiln_check.yml") 2h',
     );
-    // A check with no finished run yet.
-    expect(a[5], 'upstream_watch.yml: no run');
     expect(
-      a[6],
+      a[5],
       '[✅ Kiln release](https://x/run/kiln_release.yml "kiln_release.yml") '
-      '3d `v1.2.0` |',
+      '3d `v1.2.0`',
     );
+    // A check with no finished run yet.
+    expect(a[6], 'upstream_watch.yml: no run |');
     // A package with none: empty cells.
     expect(cellsOf('b').sublist(3), everyElement(anyOf('', ' |', ' ')));
   });
@@ -584,7 +583,7 @@ jobs:
         ),
       ], now);
       return md
-          .split('## Test cells')
+          .split('| Package |')
           .last
           .split('\n')
           .firstWhere((l) => l.startsWith('| [pkg]('));

@@ -244,6 +244,9 @@ String _link(DashboardJob job, [String? label]) =>
     '[${mark(job.conclusion)}${label == null ? '' : ' $label'}](${job.url} '
     '"${_escape(job.name)}")';
 
+/// The label a check or release workflow's cell sorts by.
+String _otherLabel(DashboardRun? run, String file) => run?.workflowName ?? file;
+
 /// A check or release workflow's cell: its newest run, labelled with the
 /// workflow's name, or [file] and `no run` when none has finished.
 String _otherRunCell(
@@ -323,39 +326,33 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   // platform outside the unit workflow) has a cell of its own, labelled with
   // its name. As many blank-headed columns as the package with most, so no
   // package's job names add columns for every other package.
-  // The check and release workflows follow, one cell each, labelled with
-  // the workflow's name and its age; a release also with its branch.
-  List<String> extras(PackageStatus status) => [
-    ...([
+  // So do the check and release workflows, one cell each, labelled with
+  // the workflow's name and its age; a release also with its branch. All of
+  // them in alphabetical order of their label, ignoring case.
+  List<String> extras(PackageStatus status) {
+    final cells = <(String, String)>[
       for (final (cell, job) in status.cellJobs)
-        if (!inColumn(cell)) job,
-    ]..sort((a, b) => a.name.compareTo(b.name))).map((j) => _link(j, j.name)),
-    ...status.otherJobs.map((j) => _link(j, j.name)),
-    for (final file in status.package.checks)
-      _otherRunCell(status.runs[file], file, now),
-    for (final file in status.package.releases)
-      _otherRunCell(status.runs[file], file, now, showBranch: true),
-  ];
+        if (!inColumn(cell)) (job.name, _link(job, job.name)),
+      for (final job in status.otherJobs) (job.name, _link(job, job.name)),
+      for (final file in status.package.checks)
+        (
+          _otherLabel(status.runs[file], file),
+          _otherRunCell(status.runs[file], file, now),
+        ),
+      for (final file in status.package.releases)
+        (
+          _otherLabel(status.runs[file], file),
+          _otherRunCell(status.runs[file], file, now, showBranch: true),
+        ),
+    ]..sort((a, b) => a.$1.toLowerCase().compareTo(b.$1.toLowerCase()));
+    return [for (final (_, cell) in cells) cell];
+  }
+
   final extraColumns = packages.fold(
     0,
     (most, status) => math.max(most, extras(status).length),
   );
   out
-    ..writeln()
-    ..writeln('## Test cells')
-    ..writeln()
-    ..writeln(
-      'The jobs of the test workflows, by the platform in their name. A web '
-      'column holds every host and compiler: the tooltip says which. An extra '
-      'target (a detail in the name, such as `Linux x64 fake camera`) is one '
-      'more mark in its platform column, after the usual job. The unnamed '
-      'columns hold every other job of a package, one each, labelled with '
-      'its name: extra targets with no such column, and names with no '
-      'platform, then the check and release workflows (such as the upstream '
-      'watch and Kiln release), with how long ago their newest run finished. '
-      'Unit holds the jobs of the unit workflow that name no platform.',
-    )
-    ..writeln()
     ..writeln(
       '| Package | Unit | '
       '${[...ordered, ...List.filled(extraColumns, ' ')].join(' | ')} |',
