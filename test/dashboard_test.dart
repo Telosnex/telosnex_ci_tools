@@ -568,8 +568,11 @@ packages:
       expect(
         mono[0],
         endsWith(
-          '| [mono_a 1.0.3](https://pub.dev/packages/mono_a) | 3d | '
-          '✅ same |',
+          '| [mono_a 1.0.3](https://pub.dev/packages/mono_a) | '
+          '[![version](https://img.shields.io/pub/v/mono_a)]'
+          '(https://pub.dev/packages/mono_a) '
+          '[![pub points](https://img.shields.io/pub/points/mono_a)]'
+          '(https://pub.dev/packages/mono_a/score) | 3d | ✅ same |',
         ),
       );
       expect(
@@ -584,7 +587,7 @@ packages:
       expect(rowsOf(md, 'libmonet').single, contains('monet_ui 1.0.4'));
       expect(
         rowsOf(md, 'none').single,
-        '| [none](https://github.com/Telosnex/none) | — | | |',
+        '| [none](https://github.com/Telosnex/none) | — | | | |',
       );
     });
 
