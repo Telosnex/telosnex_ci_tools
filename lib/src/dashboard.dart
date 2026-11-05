@@ -244,15 +244,20 @@ String _link(DashboardJob job, [String? label]) =>
     '[${mark(job.conclusion)}${label == null ? '' : ' $label'}](${job.url} '
     '"${_escape(job.name)}")';
 
-String _runCell(DashboardRun? run, DateTime now, {bool showBranch = false}) {
-  // The package has the workflow, but no finished run of it yet.
-  if (run == null) return 'no run';
+/// A check or release workflow's cell: its newest run, labelled with the
+/// workflow's name, or [file] and `no run` when none has finished.
+String _otherRunCell(
+  DashboardRun? run,
+  String file,
+  DateTime now, {
+  bool showBranch = false,
+}) {
+  if (run == null) return '$file: no run';
   final branch = showBranch ? ' `${run.branch}`' : '';
-  return '[${runMark(run)}](${run.url} "${_escape(run.workflowName)}") '
-      '${_age(run.finishedAt, now)}$branch';
+  return '[${runMark(run)} ${_escape(run.workflowName)}](${run.url} '
+      '"${_escape(file)}") ${_age(run.finishedAt, now)}$branch';
 }
 
-/// The dashboard: a status per workflow, then every test cell.
 /// [now] in Pacific time (PDT or PST, whichever is in force) and UTC:
 /// `2026-10-29 03:11 PDT (10:11 UTC)`.
 String updatedAt(DateTime now) {
@@ -274,6 +279,7 @@ String updatedAt(DateTime now) {
   return '$date ${hm(local)} ${daylight ? 'PDT' : 'PST'} (${hm(utc)} UTC)';
 }
 
+/// The dashboard: every test cell, then failing and cancelled runs.
 String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   // Alphabetical, ignoring case, in every section.
   final packages = [...unsorted]
@@ -302,48 +308,7 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       '⚠️ other · — none (no such job or workflow) · no run: a workflow '
       'with no finished run yet',
     )
-    ..writeln()
-    ..writeln('## Workflows')
     ..writeln();
-
-  final files = <String>[];
-  final releases = <String>{};
-  for (final status in packages) {
-    final package = status.package;
-    for (final file in [
-      ...package.tests,
-      ...package.checks,
-      ...package.releases,
-    ]) {
-      if (!files.contains(file)) files.add(file);
-    }
-    releases.addAll(package.releases);
-  }
-  out
-    ..writeln('| Package | ${files.join(' | ')} |')
-    ..writeln('|---|${'---|' * files.length}');
-  for (final status in packages) {
-    final cells = [
-      for (final file in files)
-        status.package.tests.contains(file) ||
-                status.package.checks.contains(file) ||
-                status.package.releases.contains(file)
-            ? _runCell(
-                status.runs[file],
-                now,
-                showBranch: releases.contains(file),
-              )
-            // The package has no such workflow: — as for a missing job.
-            : '—',
-    ];
-    final name = status.error == null
-        ? status.package.name
-        : '${status.package.name} ⚠️ ${_escape(status.error!)}';
-    out.writeln(
-      '| [$name](https://github.com/${status.package.repo}) | '
-      '${cells.join(' | ')} |',
-    );
-  }
 
   final ordered = {
     for (final status in packages)
@@ -358,12 +323,18 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   // platform outside the unit workflow) has a cell of its own, labelled with
   // its name. As many blank-headed columns as the package with most, so no
   // package's job names add columns for every other package.
-  List<DashboardJob> extras(PackageStatus status) => [
-    ...[
+  // The check and release workflows follow, one cell each, labelled with
+  // the workflow's name and its age; a release also with its branch.
+  List<String> extras(PackageStatus status) => [
+    ...([
       for (final (cell, job) in status.cellJobs)
         if (!inColumn(cell)) job,
-    ]..sort((a, b) => a.name.compareTo(b.name)),
-    ...status.otherJobs,
+    ]..sort((a, b) => a.name.compareTo(b.name))).map((j) => _link(j, j.name)),
+    ...status.otherJobs.map((j) => _link(j, j.name)),
+    for (final file in status.package.checks)
+      _otherRunCell(status.runs[file], file, now),
+    for (final file in status.package.releases)
+      _otherRunCell(status.runs[file], file, now, showBranch: true),
   ];
   final extraColumns = packages.fold(
     0,
@@ -380,8 +351,9 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       'more mark in its platform column, after the usual job. The unnamed '
       'columns hold every other job of a package, one each, labelled with '
       'its name: extra targets with no such column, and names with no '
-      'platform. Unit holds the jobs of the unit workflow that name no '
-      'platform.',
+      'platform, then the check and release workflows (such as the upstream '
+      'watch and Kiln release), with how long ago their newest run finished. '
+      'Unit holds the jobs of the unit workflow that name no platform.',
     )
     ..writeln()
     ..writeln(
@@ -395,6 +367,9 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
       if (inColumn(entry.$1)) (byColumn[entry.$1.column] ??= []).add(entry);
     }
     final extra = extras(status);
+    final name = status.error == null
+        ? status.package.name
+        : '${status.package.name} ⚠️ ${_escape(status.error!)}';
     final unit = status.unitJobs;
     final cells = [
       unit.isEmpty ? '—' : unit.map(_link).join(' '),
@@ -409,10 +384,12 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
                   ))
                   .map((e) => _link(e.$2))
                   .join(' '),
-      for (var i = 0; i < extraColumns; i++)
-        i < extra.length ? _link(extra[i], extra[i].name) : '',
+      for (var i = 0; i < extraColumns; i++) i < extra.length ? extra[i] : '',
     ];
-    out.writeln('| ${status.package.name} | ${cells.join(' | ')} |');
+    out.writeln(
+      '| [$name](https://github.com/${status.package.repo}) | '
+      '${cells.join(' | ')} |',
+    );
   }
 
   // Failing: runs where a job failed. Cancelled: failed runs where no job

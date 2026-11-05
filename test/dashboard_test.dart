@@ -92,7 +92,7 @@ void main() {
   group('renderDashboard', () {
     final now = DateTime.utc(2026, 10, 27, 12);
     final package = PackageStatus(
-      const DashboardPackage(repo: 'Telosnex/pkg'),
+      const DashboardPackage(repo: 'Telosnex/pkg', checks: [], releases: []),
       'main',
       {
         'unit.yml': _run('unit.yml', [
@@ -109,7 +109,7 @@ void main() {
       },
     );
     final empty = PackageStatus(
-      const DashboardPackage(repo: 'Telosnex/other'),
+      const DashboardPackage(repo: 'Telosnex/other', checks: [], releases: []),
       'main',
       const {},
     );
@@ -156,19 +156,27 @@ void main() {
         'column of its own when none has it', () {
       final md = renderDashboard([
         package,
-        PackageStatus(const DashboardPackage(repo: 'Telosnex/cam'), 'main', {
-          'integration.yml': _run('integration.yml', [
-            _job('Linux x64 no camera'),
-            _job('Linux x64 fake camera'),
-            _job('macOS ARM64 SwiftPM'),
-          ], now),
-        }),
+        PackageStatus(
+          const DashboardPackage(
+            repo: 'Telosnex/cam',
+            checks: [],
+            releases: [],
+          ),
+          'main',
+          {
+            'integration.yml': _run('integration.yml', [
+              _job('Linux x64 no camera'),
+              _job('Linux x64 fake camera'),
+              _job('macOS ARM64 SwiftPM'),
+            ], now),
+          },
+        ),
       ], now);
       final cells = md
           .split('## Test cells')
           .last
           .split('\n')
-          .firstWhere((l) => l.startsWith('| cam'))
+          .firstWhere((l) => l.startsWith('| [cam]'))
           .split(' | ');
       // Linux x64 is a column (pkg's plain job): both, by name.
       expect(cells[3], contains('"Linux x64 fake camera"'));
@@ -190,12 +198,6 @@ void main() {
         row('other', 'Test cells').sublist(1, 5),
         everyElement(startsWith('—')),
       );
-    });
-
-    test('workflow ages', () {
-      final cells = row('pkg', 'Workflows');
-      expect(cells[1], endsWith(' 2h'));
-      expect(cells[2], endsWith(' 5m'));
     });
 
     test('failing jobs are listed', () {
@@ -232,9 +234,6 @@ void main() {
           '- **q** · Integration · [macOS ARM64](https://x/macOS ARM64)',
         ),
       );
-      // The Workflows cell is 🚫, not ❌: no job failed.
-      expect(md, contains('[🚫](https://x/run/integration.yml "Integration")'));
-      expect(md, isNot(contains('[❌](https://x/run/integration.yml')));
     });
 
     test('a failed run with notes lists them under Failing', () {
@@ -324,7 +323,7 @@ void main() {
             .split('## Test cells')
             .last
             .split('\n')
-            .firstWhere((line) => line.startsWith('| p |'))
+            .firstWhere((line) => line.startsWith('| [p]('))
             .split(' | ');
         expect(cells[1], contains('"Rustfmt"'));
         expect(cells[1], contains('"Rust (ubuntu-latest, stable)"'));
@@ -431,26 +430,73 @@ packages:
     });
   });
 
-  test('Workflows: — for a workflow the package lacks, no run for one '
-      'with no finished run', () {
+  test('check and release workflows: a blank-headed cell each, after the '
+      'other jobs, with age; a release with its branch', () {
+    final now = DateTime.utc(2026, 1, 2);
+    DashboardRun run(String file, String name, String branch, Duration ago) =>
+        DashboardRun(
+          workflowFile: file,
+          workflowName: name,
+          branch: branch,
+          sha: 'abcdef0123456789',
+          event: 'push',
+          conclusion: 'success',
+          url: 'https://x/run/$file',
+          finishedAt: now.subtract(ago),
+          jobs: const [],
+        );
     final md = renderDashboard([
       PackageStatus(
-        const DashboardPackage(repo: 'o/a', releases: []),
+        const DashboardPackage(
+          repo: 'o/a',
+          checks: ['kiln_check.yml', 'upstream_watch.yml'],
+        ),
         'main',
-        const {},
+        {
+          'integration.yml': _run('integration.yml', [
+            _job('Linux x64'),
+            _job('desktop / windows'),
+          ], now),
+          'kiln_check.yml': run(
+            'kiln_check.yml',
+            'Kiln check',
+            'main',
+            const Duration(hours: 2),
+          ),
+          'kiln_release.yml': run(
+            'kiln_release.yml',
+            'Kiln release',
+            'v1.2.0',
+            const Duration(days: 3),
+          ),
+        },
       ),
       PackageStatus(
         const DashboardPackage(repo: 'o/b', checks: [], releases: []),
         'main',
         const {},
       ),
-    ], DateTime.utc(2026));
-    final rows = md.split('## Workflows').last.split('\n');
-    String cellsOf(String name) =>
-        rows.firstWhere((line) => line.startsWith('| [$name]'));
-    // unit.yml, integration.yml, kiln_check.yml
-    expect(cellsOf('a'), endsWith('| no run | no run | no run |'));
-    expect(cellsOf('b'), endsWith('| no run | no run | — |'));
+    ], now);
+    expect(md, isNot(contains('## Workflows')));
+    final table = md.split('## Test cells').last.split('\n');
+    List<String> cellsOf(String name) =>
+        table.firstWhere((line) => line.startsWith('| [$name](')).split(' | ');
+    final a = cellsOf('a');
+    // Unit, Linux x64, then the other job, the checks, the release.
+    expect(a[3], startsWith('[✅ desktop / windows]'));
+    expect(
+      a[4],
+      '[✅ Kiln check](https://x/run/kiln_check.yml "kiln_check.yml") 2h',
+    );
+    // A check with no finished run yet.
+    expect(a[5], 'upstream_watch.yml: no run');
+    expect(
+      a[6],
+      '[✅ Kiln release](https://x/run/kiln_release.yml "kiln_release.yml") '
+      '3d `v1.2.0` |',
+    );
+    // A package with none: empty cells.
+    expect(cellsOf('b').sublist(3), everyElement(anyOf('', ' |', ' ')));
   });
 
   group('updatedAt', () {
@@ -541,7 +587,7 @@ jobs:
           .split('## Test cells')
           .last
           .split('\n')
-          .firstWhere((l) => l.startsWith('| pkg'));
+          .firstWhere((l) => l.startsWith('| [pkg]('));
     }
 
     test('one that passed is not shown', () {
