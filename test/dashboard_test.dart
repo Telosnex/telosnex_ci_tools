@@ -588,6 +588,18 @@ packages:
       );
     });
 
+    test('pubRepositories: rows for packages not in the table', () {
+      final md = renderDashboard(
+        [status('Telosnex/mono')],
+        now,
+        published: [pub('kiln', 'Telosnex/kiln', 1)],
+        pubRepositories: [status('Telosnex/mono'), status('Telosnex/kiln')],
+      );
+      expect(md.split('## pub.dev').first, isNot(contains('[kiln]')));
+      expect(rowsOf(md, 'kiln').single, contains('kiln 1.0.1'));
+      expect(rowsOf(md, 'mono').single, contains('| — |'));
+    });
+
     test('a warning when pub.dev could not be read', () {
       final md = renderDashboard(
         [status('Telosnex/mono')],

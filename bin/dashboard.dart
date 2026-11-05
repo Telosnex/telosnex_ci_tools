@@ -82,7 +82,12 @@ Future<void> main(List<String> arguments) async {
     for (final status in statuses)
       if (status.adopted || status.error != null) status,
   ];
-  final markdown = renderDashboard(shown, now, published: published);
+  final markdown = renderDashboard(
+    shown,
+    now,
+    published: published,
+    pubRepositories: statuses,
+  );
   final out = args.option('out');
   if (out == null) {
     stdout.write(markdown);

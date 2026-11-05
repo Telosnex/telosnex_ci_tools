@@ -383,11 +383,14 @@ String updatedAt(DateTime now) {
 
 /// The dashboard: every test cell, failing and cancelled runs, then the
 /// packages of [published] each repository publishes (every repository has
-/// a row; with [published] null, pub.dev could not be read).
+/// a row; with [published] null, pub.dev could not be read). The pub.dev
+/// section lists [pubRepositories], default the packages of the table: also
+/// those that use neither Kiln nor CI tools.
 String renderDashboard(
   List<PackageStatus> unsorted,
   DateTime now, {
   List<PubPackage>? published = const [],
+  List<PackageStatus>? pubRepositories,
 }) {
   // Alphabetical, ignoring case, in every section.
   final packages = [...unsorted]
@@ -558,7 +561,18 @@ String renderDashboard(
         'took them. Re-run them.',
     cancelledRuns,
   );
-  _pubSection(out, packages, published, now);
+  _pubSection(
+    out,
+    pubRepositories == null
+        ? packages
+        : ([...pubRepositories]..sort(
+            (a, b) => a.package.name.toLowerCase().compareTo(
+              b.package.name.toLowerCase(),
+            ),
+          )),
+    published,
+    now,
+  );
   return out.toString();
 }
 

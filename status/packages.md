@@ -38,3 +38,5 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
+
+Not on the default branch yet: [kiln](https://github.com/Telosnex/kiln), [perf_tester](https://github.com/Telosnex/perf_tester).
