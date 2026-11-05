@@ -107,7 +107,11 @@ jobs:
           TEST: ${{ inputs.test }}
         run: |
           flutter pub get
-          flutter analyze --no-fatal-infos
+          # The package, not its example or nested packages (their assets
+          # and dependencies are the caller's Unit's business).
+          dirs=(lib)
+          [[ -d test ]] && dirs+=(test)
+          flutter analyze --no-fatal-infos "${dirs[@]}"
           bash -c "$TEST"
       - name: pana gate
         working-directory: ${{ steps.rename.outputs.package }}
