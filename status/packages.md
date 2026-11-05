@@ -22,11 +22,13 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [highlight_fork](https://github.com/Telosnex/highlight_fork) | — | ✅ |
 | [image_ffmpeg](https://github.com/Telosnex/image_ffmpeg) | ✅ | ✅ |
 | [irondash](https://github.com/Telosnex/irondash) | — | ✅ |
+| [kiln](https://github.com/Telosnex/kiln) | — | ✅ |
 | [lua_dart](https://github.com/Telosnex/lua_dart) | ✅ | ✅ |
 | [monet_ui](https://github.com/Telosnex/monet_ui) | — | ✅ |
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
 | [packages](https://github.com/Telosnex/packages) | — | ✅ |
 | [pdfrx](https://github.com/Telosnex/pdfrx) | — | ✅ |
+| [perf_tester](https://github.com/Telosnex/perf_tester) | — | ✅ |
 | [pixel_snap_fork](https://github.com/Telosnex/pixel_snap_fork) | — | ✅ |
 | [receive_sharing_intent](https://github.com/Telosnex/receive_sharing_intent) | — | ✅ |
 | [riverpod](https://github.com/Telosnex/riverpod) | — | ✅ |
@@ -38,5 +40,3 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
-
-Not on the default branch yet: [kiln](https://github.com/Telosnex/kiln), [perf_tester](https://github.com/Telosnex/perf_tester).
