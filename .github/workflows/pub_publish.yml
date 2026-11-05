@@ -8,7 +8,8 @@
 # 3. The pana gate: at most max-lost-points below pub.dev's maximum.
 # 4. Publishes through pub.dev's GitHub trust (OIDC): no token. On
 #    pub.dev, the package's Admin page enables automated publishing from
-#    the caller's repository, with its tag pattern and the environment.
+#    the caller's repository, with tag pattern pub-<package>-v{{version}}
+#    and environment pub.dev.
 #
 # The first version of a package is published by hand: pub.dev sets up
 # automated publishing on a package that exists.
@@ -16,7 +17,7 @@
 # The caller:
 #   on:
 #     push:
-#       tags: ['v[0-9]+.[0-9]+.[0-9]+*']   # or '<package>-v[0-9]+...'
+#       tags: ['pub-<package>-v[0-9]+.[0-9]+.[0-9]+*']
 #   jobs:
 #     publish:
 #       uses: Telosnex/telosnex_ci_tools/.github/workflows/pub_publish.yml@<sha> # vX.Y.Z

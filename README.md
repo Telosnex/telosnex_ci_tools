@@ -125,9 +125,12 @@ The `package` input is the Dart package of [kiln](https://github.com/Telosnex/ki
 
 ### Publish to pub.dev
 
-`pub_publish.yml` publishes a package from a release tag: `v1.2.3` for a
-repository with one package, `<package>-v1.2.3` for several (the published
-name). A fork keeps upstream's package names in git; when it has
+`pub_publish.yml` publishes a package from a release tag,
+`pub-<package>-v1.2.3` (the published name), also in a repository with one
+package: `pub-` keeps publish tags apart from Kiln's `native-…` and
+hand-made `v1.2.3` tags. On pub.dev, the package's Admin page allows
+automated publishing from the repository, with tag pattern
+`pub-<package>-v{{version}}` and environment `pub.dev`. A fork keeps upstream's package names in git; when it has
 `tool/publish_names.yaml`, the workflow first renames a throwaway checkout
 to the published names (`dart run telosnex_ci_tools:publish_rename`, see
 its doc comment). Then analyze and the `test` command on the renamed
@@ -140,7 +143,7 @@ published name.
 ```yaml
 on:
   push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+    tags: ['pub-<package>-v[0-9]+.[0-9]+.[0-9]+*']
 jobs:
   publish:
     uses: Telosnex/telosnex_ci_tools/.github/workflows/pub_publish.yml@<sha> # vX.Y.Z

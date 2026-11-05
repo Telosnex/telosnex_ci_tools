@@ -21,7 +21,7 @@
 /// is renamed or kept by the line rules (strings.rename, strings.keep) of
 /// tool/publish_names.yaml; one no rule matches is an error.
 ///
-/// With --tag (a release tag: `v1.2.3`, or `<package>-v1.2.3`), also finds the
+/// With --tag (a release tag: `pub-<package>-v1.2.3`), also finds the
 /// package the tag publishes and checks its version; writes
 /// `package=<directory>` to \$GITHUB_OUTPUT. With no names file and
 /// --tag, only that.

@@ -645,20 +645,22 @@ Future<String?> _rekey(String dir, File manifest) async {
   return null;
 }
 
-/// The package a release tag publishes, from a (renamed) checkout:
-/// `v1.2.3` the repository's only published package, `name-v1.2.3` the
-/// package `name`. Its directory relative to [root], or an error.
+/// The tag that publishes [package] at [version] to pub.dev. `pub-` keeps
+/// it apart from other tags (Kiln's native-…, a hand-made v1.2.3), and the
+/// package name keeps it unambiguous in a repository of several.
+String pubTag(String package, String version) => 'pub-$package-v$version';
+
+/// The package a release tag ([pubTag]: `pub-<package>-v<version>`)
+/// publishes, from a (renamed) checkout. Its directory relative to [root],
+/// or an error.
 ({String? dir, String? error}) packageForTag(String root, String tag) {
   final m = RegExp(
-    r'^(?:([a-z][a-z0-9_]*)-)?v(\d+\.\d+\.\d+\S*)$',
+    r'^pub-([a-z][a-z0-9_]*)-v(\d+\.\d+\.\d+\S*)$',
   ).firstMatch(tag);
   if (m == null) {
-    return (
-      dir: null,
-      error: 'Tag "$tag" is not v<version> or <package>-v<version>.',
-    );
+    return (dir: null, error: 'Tag "$tag" is not pub-<package>-v<version>.');
   }
-  final wanted = m[1], version = m[2]!;
+  final name = m[1]!, version = m[2]!;
   final found = <String, (String, String?)>{}; // name -> (dir, version)
   for (final f in _files(Directory(root))) {
     if (p.basename(f.path) != 'pubspec.yaml') continue;
@@ -669,25 +671,12 @@ Future<String?> _rekey(String dir, File manifest) async {
     if (doc['publish_to'] == 'none' || doc['workspace'] != null) continue;
     found[doc['name'] as String] = (rel, doc['version'] as String?);
   }
-  final String name;
-  if (wanted != null) {
-    if (!found.containsKey(wanted)) {
-      return (
-        dir: null,
-        error:
-            'No published package "$wanted" (tag $tag); found: '
-            '${(found.keys.toList()..sort()).join(', ')}.',
-      );
-    }
-    name = wanted;
-  } else if (found.length == 1) {
-    name = found.keys.single;
-  } else {
+  if (!found.containsKey(name)) {
     return (
       dir: null,
       error:
-          'Tag $tag names no package, and the repository has '
-          '${found.length}: use <package>-v<version>.',
+          'No published package "$name" (tag $tag); found: '
+          '${(found.keys.toList()..sort()).join(', ')}.',
     );
   }
   final (dir, pubspecVersion) = found[name]!;

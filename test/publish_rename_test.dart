@@ -333,31 +333,38 @@ set(foo_bundled_libraries "" PARENT_SCOPE)
       return root;
     }
 
-    test('v<version>: the only published package', () {
+    test('pub-<package>-v<version>, also for the only package', () {
       final root = repo({
         '.': 'name: foo\nversion: 1.2.3\n',
         'example': 'name: foo_example\npublish_to: none\n',
       });
-      expect(packageForTag(root.path, 'v1.2.3'), (dir: '.', error: null));
+      expect(pubTag('foo', '1.2.3'), 'pub-foo-v1.2.3');
+      expect(packageForTag(root.path, 'pub-foo-v1.2.3'), (
+        dir: '.',
+        error: null,
+      ));
       expect(
-        packageForTag(root.path, 'v1.2.4').error,
+        packageForTag(root.path, 'pub-foo-v1.2.4').error,
         contains('version 1.2.3 in its pubspec'),
       );
+      // Not publish tags.
+      for (final tag in ['v1.2.3', 'foo-v1.2.3', 'native-0123abcd']) {
+        expect(packageForTag(root.path, tag).error, contains('is not'));
+      }
     });
 
-    test('<package>-v<version> in a repository of several', () {
+    test('pub-<package>-v<version> in a repository of several', () {
       final root = repo({
         '.': 'name: ws\nworkspace:\n  - packages/a\n',
         'packages/a': 'name: telosnex_a\nversion: 2.0.0-dev.1\n',
         'packages/b': 'name: telosnex_b\nversion: 1.0.0\n',
       });
-      expect(packageForTag(root.path, 'telosnex_a-v2.0.0-dev.1'), (
+      expect(packageForTag(root.path, 'pub-telosnex_a-v2.0.0-dev.1'), (
         dir: 'packages/a',
         error: null,
       ));
-      expect(packageForTag(root.path, 'v1.0.0').error, contains('has 2'));
       expect(
-        packageForTag(root.path, 'c-v1.0.0').error,
+        packageForTag(root.path, 'pub-c-v1.0.0').error,
         contains('No published'),
       );
       expect(packageForTag(root.path, 'release-1').error, contains('is not'));

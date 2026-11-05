@@ -9,7 +9,7 @@ inputs:
     required: false
     default: '.'
   tag:
-    description: The release tag (v1.2.3, or <package>-v1.2.3).
+    description: The release tag (pub-<package>-v1.2.3).
     required: true
   repository:
     description: The repository URL; the renamed packages' repository becomes its published branch.
