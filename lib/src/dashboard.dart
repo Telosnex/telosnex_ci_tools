@@ -597,8 +597,8 @@ void _pubSection(
       'or hook/, and only on pub.dev.',
     )
     ..writeln()
-    ..writeln('| Repository | pub.dev | Badges | Published | Default branch |')
-    ..writeln('|---|---|---|---|---|');
+    ..writeln('| Repository | pub.dev | Published | Default branch |')
+    ..writeln('|---|---|---|---|');
   for (final status in packages) {
     final repo =
         '[${status.package.name}](https://github.com/'
@@ -606,13 +606,12 @@ void _pubSection(
     final mine = [...published.where(status.publishes)]
       ..sort((a, b) => a.name.compareTo(b.name));
     if (mine.isEmpty) {
-      out.writeln('| $repo | — | | | |');
+      out.writeln('| $repo | — | | |');
       continue;
     }
     for (final pub in mine) {
       out.writeln(
-        '| $repo | [${pub.name} ${pub.version}](https://pub.dev/packages/'
-        '${pub.name}) | ${_pubBadges(pub.name)} | '
+        '| $repo | ${_pubBadges(pub.name)} | '
         '${_age(pub.published, now)} | '
         '${_driftCell(pub, status.currentRepo ?? status.package.repo)} |',
       );
@@ -620,10 +619,10 @@ void _pubSection(
   }
 }
 
-/// shields.io badges: the version, and pana's points, each linked to its
-/// pub.dev page.
+/// shields.io badges: the version, labelled with the package's name, and
+/// pana's points, each linked to its pub.dev page.
 String _pubBadges(String name) =>
-    '[![version](https://img.shields.io/pub/v/$name)]'
+    '[![$name](https://img.shields.io/pub/v/$name?label=$name)]'
     '(https://pub.dev/packages/$name) '
     '[![pub points](https://img.shields.io/pub/points/$name)]'
     '(https://pub.dev/packages/$name/score)';

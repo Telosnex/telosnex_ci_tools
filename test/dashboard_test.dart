@@ -568,8 +568,7 @@ packages:
       expect(
         mono[0],
         endsWith(
-          '| [mono_a 1.0.3](https://pub.dev/packages/mono_a) | '
-          '[![version](https://img.shields.io/pub/v/mono_a)]'
+          '| [![mono_a](https://img.shields.io/pub/v/mono_a?label=mono_a)]'
           '(https://pub.dev/packages/mono_a) '
           '[![pub points](https://img.shields.io/pub/points/mono_a)]'
           '(https://pub.dev/packages/mono_a/score) | 3d | ✅ same |',
@@ -584,10 +583,10 @@ packages:
           'lib/new.dart. Only on pub.dev: lib/gone.dart.")',
         ),
       );
-      expect(rowsOf(md, 'libmonet').single, contains('monet_ui 1.0.4'));
+      expect(rowsOf(md, 'libmonet').single, contains('pub/v/monet_ui'));
       expect(
         rowsOf(md, 'none').single,
-        '| [none](https://github.com/Telosnex/none) | — | | | |',
+        '| [none](https://github.com/Telosnex/none) | — | | |',
       );
     });
 
@@ -599,7 +598,7 @@ packages:
         pubRepositories: [status('Telosnex/mono'), status('Telosnex/kiln')],
       );
       expect(md.split('## pub.dev').first, isNot(contains('[kiln]')));
-      expect(rowsOf(md, 'kiln').single, contains('kiln 1.0.1'));
+      expect(rowsOf(md, 'kiln').single, contains('pub/v/kiln'));
       expect(rowsOf(md, 'mono').single, contains('| — |'));
     });
 
