@@ -286,6 +286,72 @@ Future<({bool kiln, bool ciTools, Set<String> workflows})> _adoption(
   return (kiln: kiln, ciTools: ciTools, workflows: workflows);
 }
 
+/// The `owner/name` of a GitHub repository URL, or null.
+String? gitHubRepoOf(String? url) {
+  final match = RegExp(
+    r'github\.com[/:]([^/\s]+)/([^/#?\s]+)',
+  ).firstMatch(url ?? '');
+  if (match == null) return null;
+  final name = match.group(2)!;
+  return '${match.group(1)}/'
+      '${name.endsWith('.git') ? name.substring(0, name.length - 4) : name}';
+}
+
+/// The packages of [publisher] on pub.dev, each at its newest version.
+Future<List<PubPackage>> fetchPublisherPackages(String publisher) async {
+  final client = HttpClient()..userAgent = 'telosnex_ci_tools-dashboard';
+  Future<Map<String, Object?>> get(Uri uri) async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        final response = await (await client.getUrl(uri)).close();
+        final body = await response.transform(utf8.decoder).join();
+        if (response.statusCode == 200) {
+          return jsonDecode(body) as Map<String, Object?>;
+        }
+        if (response.statusCode < 500 || attempt == 3) {
+          throw HttpException('GET $uri: ${response.statusCode}', uri: uri);
+        }
+      } on SocketException {
+        if (attempt == 3) rethrow;
+      }
+      await Future<void>.delayed(Duration(seconds: 2 * attempt));
+    }
+  }
+
+  try {
+    final names = <String>[];
+    Uri? page = Uri.https('pub.dev', '/api/search', {
+      'q': 'publisher:$publisher',
+    });
+    while (page != null) {
+      final result = await get(page);
+      names.addAll([
+        for (final p in result['packages'] as List? ?? const [])
+          (p as Map)['package'] as String,
+      ]);
+      final next = result['next'] as String?;
+      page = next == null ? null : Uri.parse(next);
+    }
+    return await Future.wait([
+      for (final name in names)
+        get(Uri.https('pub.dev', '/api/packages/$name')).then((info) {
+          final latest = info['latest'] as Map;
+          final pubspec = latest['pubspec'] as Map;
+          return PubPackage(
+            name: name,
+            version: latest['version'] as String,
+            published: DateTime.parse(latest['published'] as String),
+            repo: gitHubRepoOf(
+              (pubspec['repository'] ?? pubspec['homepage']) as String?,
+            ),
+          );
+        }),
+    ]);
+  } finally {
+    client.close();
+  }
+}
+
 /// Reads one package: the newest finished run of each workflow and its jobs.
 Future<PackageStatus> fetchPackage(
   GitHubReader github,
@@ -353,6 +419,7 @@ Future<PackageStatus> fetchPackage(
       runs,
       usesKiln: adoption.kiln,
       usesCiTools: adoption.ciTools,
+      currentRepo: info['full_name'] as String?,
     );
   } on Exception catch (error) {
     return PackageStatus(package, '', const {}, error: '$error');

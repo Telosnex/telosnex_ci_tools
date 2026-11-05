@@ -130,6 +130,31 @@ final class DashboardRun {
   };
 }
 
+/// A package of our pub.dev publisher: its newest version.
+final class PubPackage {
+  const PubPackage({
+    required this.name,
+    required this.version,
+    required this.published,
+    required this.repo,
+  });
+
+  final String name;
+  final String version;
+  final DateTime published;
+
+  /// `owner/name` of the GitHub repository in its pubspec (`repository`,
+  /// else `homepage`), or null when it names none.
+  final String? repo;
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'version': version,
+    'published': published.toUtc().toIso8601String(),
+    'repo': ?repo,
+  };
+}
+
 /// What the dashboard found for one package.
 final class PackageStatus {
   const PackageStatus(
@@ -139,7 +164,20 @@ final class PackageStatus {
     this.error,
     this.usesKiln = false,
     this.usesCiTools = false,
+    this.currentRepo,
   });
+
+  /// The repository's `owner/name` on GitHub now, which differs from
+  /// [DashboardPackage.repo] after a rename; null when not read.
+  final String? currentRepo;
+
+  /// Whether [pub]'s repository is this package's, by either name.
+  bool publishes(PubPackage pub) {
+    final repo = pub.repo?.toLowerCase();
+    return repo != null &&
+        (repo == package.repo.toLowerCase() ||
+            repo == currentRepo?.toLowerCase());
+  }
 
   /// Whether the default branch has kiln in its pubspec.
   final bool usesKiln;
@@ -282,8 +320,15 @@ String updatedAt(DateTime now) {
   return '$date ${hm(local)} ${daylight ? 'PDT' : 'PST'} (${hm(utc)} UTC)';
 }
 
-/// The dashboard: every test cell, then failing and cancelled runs.
-String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
+/// The dashboard: every test cell, then failing and cancelled runs. The
+/// pub.dev column holds the packages of [published] each package's
+/// repository publishes; with [published] null (pub.dev could not be read),
+/// `?`.
+String renderDashboard(
+  List<PackageStatus> unsorted,
+  DateTime now, {
+  List<PubPackage>? published = const [],
+}) {
   // Alphabetical, ignoring case, in every section.
   final packages = [...unsorted]
     ..sort(
@@ -354,10 +399,10 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
   );
   out
     ..writeln(
-      '| Package | Unit | '
+      '| Package | pub.dev | Unit | '
       '${[...ordered, ...List.filled(extraColumns, ' ')].join(' | ')} |',
     )
-    ..writeln('|---|---|${'---|' * (ordered.length + extraColumns)}');
+    ..writeln('|---|---|---|${'---|' * (ordered.length + extraColumns)}');
   for (final status in packages) {
     final byColumn = <String, List<(JobCell, DashboardJob)>>{};
     for (final entry in status.cellJobs) {
@@ -368,7 +413,18 @@ String renderDashboard(List<PackageStatus> unsorted, DateTime now) {
         ? status.package.name
         : '${status.package.name} ⚠️ ${_escape(status.error!)}';
     final unit = status.unitJobs;
+    final pub = published == null
+        ? '?'
+        : ([...published.where(status.publishes)]
+                ..sort((a, b) => a.name.compareTo(b.name)))
+              .map(
+                (p) =>
+                    '[${p.name} ${p.version}](https://pub.dev/packages/'
+                    '${p.name}) ${_age(p.published, now)}',
+              )
+              .join('<br>');
     final cells = [
+      pub.isEmpty ? '—' : pub,
       unit.isEmpty ? '—' : unit.map(_link).join(' '),
       for (final column in ordered)
         byColumn[column] == null

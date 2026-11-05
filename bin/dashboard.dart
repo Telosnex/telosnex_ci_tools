@@ -15,13 +15,16 @@ import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
 /// writes README.md and dashboard.json to that directory instead. With
 /// --packages-md, writes the packages table, unless a package could not be
 /// read (then the file stays). A package that could not be read is a
-/// warning on the dashboard, not a failure. The token: GITHUB_TOKEN or
+/// warning on the dashboard, not a failure. The pub.dev column: the packages
+/// of --publisher (telosnex.com) whose pubspec's repository is the
+/// package's; when pub.dev cannot be read, a warning and `?`. The token: GITHUB_TOKEN or
 /// GH_TOKEN, else `gh auth token`.
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addOption('config', defaultsTo: 'status/packages.yaml')
     ..addOption('out')
     ..addOption('packages-md')
+    ..addOption('publisher', defaultsTo: 'telosnex.com')
     ..addFlag('help', abbr: 'h', negatable: false);
   final args = parser.parse(arguments);
   if (args.flag('help')) {
@@ -37,6 +40,17 @@ Future<void> main(List<String> arguments) async {
     File(args.option('config')!).readAsStringSync(),
   );
   final github = await GitHubReader.fromEnvironment();
+  final prefix = Platform.environment['GITHUB_ACTIONS'] == 'true'
+      ? '::warning::'
+      : 'Warning: ';
+  final publisher = args.option('publisher')!;
+  final pubFuture = fetchPublisherPackages(publisher).then<List<PubPackage>?>(
+    (packages) => packages,
+    onError: (Object error) {
+      stderr.writeln('${prefix}pub.dev publisher $publisher: $error');
+      return null;
+    },
+  );
   final List<PackageStatus> statuses;
   try {
     statuses = await Future.wait([
@@ -45,12 +59,13 @@ Future<void> main(List<String> arguments) async {
   } finally {
     github.close();
   }
+  final published = await pubFuture;
   final now = DateTime.now();
   final shown = [
     for (final status in statuses)
       if (status.adopted || status.error != null) status,
   ];
-  final markdown = renderDashboard(shown, now);
+  final markdown = renderDashboard(shown, now, published: published);
   final out = args.option('out');
   if (out == null) {
     stdout.write(markdown);
@@ -62,14 +77,12 @@ Future<void> main(List<String> arguments) async {
         'version': 1,
         'updatedAt': now.toUtc().toIso8601String(),
         'packages': [for (final status in shown) status.toJson()],
+        'published': [...?published?.map((p) => p.toJson())],
       })}\n',
     );
     stdout.writeln('Wrote ${p.join(out, 'README.md')} and dashboard.json.');
   }
   final unreadable = statuses.where((status) => status.error != null).toList();
-  final prefix = Platform.environment['GITHUB_ACTIONS'] == 'true'
-      ? '::warning::'
-      : 'Warning: ';
   for (final status in unreadable) {
     stderr.writeln('$prefix${status.package.repo}: ${status.error}');
   }

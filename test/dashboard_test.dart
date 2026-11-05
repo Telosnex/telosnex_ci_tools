@@ -3,6 +3,13 @@ import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
 import 'package:telosnex_ci_tools/src/job_names.dart';
 import 'package:test/test.dart';
 
+extension on String {
+  T let<T>(T Function(String) f) => f(this);
+}
+
+/// A table row's cells, without the pub.dev column.
+List<String> _cells(String line) => line.split(' | ')..removeAt(1);
+
 DashboardJob _job(String name, [String? conclusion = 'success']) =>
     DashboardJob(name: name, conclusion: conclusion, url: 'https://x/$name');
 
@@ -122,7 +129,7 @@ void main() {
             (line) =>
                 line.startsWith('| $name') || line.startsWith('| [$name]'),
           )
-          .split(' | ');
+          .let(_cells);
     }
 
     test('Unit first, a column per cell, then one blank-headed column per '
@@ -131,7 +138,8 @@ void main() {
       expect(
         markdown,
         contains(
-          '| Package | Unit | Android x64 | Linux x64 | Web Chrome |   |\n',
+          '| Package | pub.dev | Unit | Android x64 | Linux x64 | Web Chrome '
+          '|   |\n',
         ),
       );
       final cells = row('pkg');
@@ -177,7 +185,7 @@ void main() {
           .last
           .split('\n')
           .firstWhere((l) => l.startsWith('| [cam]'))
-          .split(' | ');
+          .let(_cells);
       // Linux x64 is a column (pkg's plain job): both, by name.
       expect(cells[3], contains('"Linux x64 fake camera"'));
       expect(
@@ -321,7 +329,7 @@ void main() {
             .last
             .split('\n')
             .firstWhere((line) => line.startsWith('| [p]('))
-            .split(' | ');
+            .let(_cells);
         expect(cells[1], contains('"Rustfmt"'));
         expect(cells[1], contains('"Rust (ubuntu-latest, stable)"'));
         // A job that names a platform keeps its column.
@@ -478,7 +486,7 @@ packages:
     expect(md, isNot(contains('## Test cells')));
     final table = md.split('| Package |').last.split('\n');
     List<String> cellsOf(String name) =>
-        table.firstWhere((line) => line.startsWith('| [$name](')).split(' | ');
+        _cells(table.firstWhere((line) => line.startsWith('| [$name](')));
     final a = cellsOf('a');
     // Unit, Linux x64, then the other cells in alphabetical order of their
     // label, ignoring case.
@@ -496,6 +504,83 @@ packages:
     expect(a[6], 'upstream_watch.yml: no run |');
     // A package with none: empty cells.
     expect(cellsOf('b').sublist(3), everyElement(anyOf('', ' |', ' ')));
+  });
+
+  group('pub.dev column', () {
+    final now = DateTime.utc(2026, 1, 10);
+    PackageStatus status(String repo, {String? current}) => PackageStatus(
+      DashboardPackage(repo: repo, checks: const [], releases: const []),
+      'main',
+      const {},
+      usesCiTools: true,
+      currentRepo: current,
+    );
+    PubPackage pub(String name, String? repo, int daysAgo) => PubPackage(
+      name: name,
+      version: '1.0.$daysAgo',
+      published: now.subtract(Duration(days: daysAgo)),
+      repo: repo,
+    );
+    String pubCell(String md, String name) => md
+        .split('\n')
+        .firstWhere((l) => l.startsWith('| [$name]('))
+        .split(' | ')[1];
+
+    test(
+      'the packages a repository publishes, by name, with version and '
+      'age; matched ignoring case and by the current name after a rename',
+      () {
+        final md = renderDashboard(
+          [
+            status('Telosnex/mono'),
+            status('Telosnex/libmonet', current: 'Telosnex/monet_ui'),
+            status('Telosnex/none'),
+          ],
+          now,
+          published: [
+            pub('mono_b', 'telosnex/Mono', 2),
+            pub('mono_a', 'Telosnex/mono', 3),
+            pub('monet_ui', 'Telosnex/monet_ui', 4),
+            pub('stray', null, 1),
+          ],
+        );
+        expect(
+          pubCell(md, 'mono'),
+          '[mono_a 1.0.3](https://pub.dev/packages/mono_a) 3d<br>'
+          '[mono_b 1.0.2](https://pub.dev/packages/mono_b) 2d',
+        );
+        expect(
+          pubCell(md, 'libmonet'),
+          '[monet_ui 1.0.4](https://pub.dev/packages/monet_ui) 4d',
+        );
+        expect(pubCell(md, 'none'), '—');
+      },
+    );
+
+    test('? when pub.dev could not be read', () {
+      final md = renderDashboard(
+        [status('Telosnex/mono')],
+        now,
+        published: null,
+      );
+      expect(pubCell(md, 'mono'), '?');
+    });
+
+    test('gitHubRepoOf', () {
+      expect(
+        gitHubRepoOf('https://github.com/Telosnex/fonnx'),
+        'Telosnex/fonnx',
+      );
+      expect(
+        gitHubRepoOf(
+          'https://github.com/Telosnex/highlight_fork/tree/master/x',
+        ),
+        'Telosnex/highlight_fork',
+      );
+      expect(gitHubRepoOf('git@github.com:o/r.git'), 'o/r');
+      expect(gitHubRepoOf('https://example.com'), isNull);
+      expect(gitHubRepoOf(null), isNull);
+    });
   });
 
   group('updatedAt', () {
