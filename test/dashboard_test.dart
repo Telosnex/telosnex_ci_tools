@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:telosnex_ci_tools/src/dashboard.dart';
 import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
 import 'package:telosnex_ci_tools/src/job_names.dart';
@@ -7,8 +9,8 @@ extension on String {
   T let<T>(T Function(String) f) => f(this);
 }
 
-/// A table row's cells, without the pub.dev column.
-List<String> _cells(String line) => line.split(' | ')..removeAt(1);
+/// A table row's cells.
+List<String> _cells(String line) => line.split(' | ');
 
 DashboardJob _job(String name, [String? conclusion = 'success']) =>
     DashboardJob(name: name, conclusion: conclusion, url: 'https://x/$name');
@@ -138,8 +140,7 @@ void main() {
       expect(
         markdown,
         contains(
-          '| Package | pub.dev | Unit | Android x64 | Linux x64 | Web Chrome '
-          '|   |\n',
+          '| Package | Unit | Android x64 | Linux x64 | Web Chrome |   |\n',
         ),
       );
       final cells = row('pkg');
@@ -506,7 +507,7 @@ packages:
     expect(cellsOf('b').sublist(3), everyElement(anyOf('', ' |', ' ')));
   });
 
-  group('pub.dev column', () {
+  group('pub.dev section', () {
     final now = DateTime.utc(2026, 1, 10);
     PackageStatus status(String repo, {String? current}) => PackageStatus(
       DashboardPackage(repo: repo, checks: const [], releases: const []),
@@ -515,55 +516,88 @@ packages:
       usesCiTools: true,
       currentRepo: current,
     );
-    PubPackage pub(String name, String? repo, int daysAgo) => PubPackage(
-      name: name,
-      version: '1.0.$daysAgo',
-      published: now.subtract(Duration(days: daysAgo)),
-      repo: repo,
-    );
-    String pubCell(String md, String name) => md
-        .split('\n')
-        .firstWhere((l) => l.startsWith('| [$name]('))
-        .split(' | ')[1];
+    PubPackage pub(String name, String? repo, int daysAgo, [PubDrift? d]) =>
+        PubPackage(
+          name: name,
+          version: '1.0.$daysAgo',
+          published: now.subtract(Duration(days: daysAgo)),
+          repo: repo,
+          drift: d,
+        );
+    List<String> rowsOf(String md, String name) => [
+      for (final line in md.split('## pub.dev').last.split('\n'))
+        if (line.startsWith('| [$name](')) line,
+    ];
 
-    test(
-      'the packages a repository publishes, by name, with version and '
-      'age; matched ignoring case and by the current name after a rename',
-      () {
-        final md = renderDashboard(
-          [
-            status('Telosnex/mono'),
-            status('Telosnex/libmonet', current: 'Telosnex/monet_ui'),
-            status('Telosnex/none'),
-          ],
-          now,
-          published: [
-            pub('mono_b', 'telosnex/Mono', 2),
-            pub('mono_a', 'Telosnex/mono', 3),
-            pub('monet_ui', 'Telosnex/monet_ui', 4),
-            pub('stray', null, 1),
-          ],
-        );
-        expect(
-          pubCell(md, 'mono'),
-          '[mono_a 1.0.3](https://pub.dev/packages/mono_a) 3d<br>'
-          '[mono_b 1.0.2](https://pub.dev/packages/mono_b) 2d',
-        );
-        expect(
-          pubCell(md, 'libmonet'),
-          '[monet_ui 1.0.4](https://pub.dev/packages/monet_ui) 4d',
-        );
-        expect(pubCell(md, 'none'), '—');
-      },
-    );
+    test('a row per repository, even with no package; a row per package, '
+        'matched ignoring case and by the current name after a rename', () {
+      final md = renderDashboard(
+        [
+          status('Telosnex/mono'),
+          status('Telosnex/libmonet', current: 'Telosnex/monet_ui'),
+          status('Telosnex/none'),
+        ],
+        now,
+        published: [
+          pub(
+            'mono_b',
+            'telosnex/Mono',
+            2,
+            const PubDrift(
+              branch: 'main',
+              directory: 'b',
+              changed: ['lib/b.dart'],
+              added: ['lib/new.dart'],
+              onlyPublished: ['lib/gone.dart'],
+            ),
+          ),
+          pub(
+            'mono_a',
+            'Telosnex/mono',
+            3,
+            const PubDrift(branch: 'main', directory: ''),
+          ),
+          pub('monet_ui', 'Telosnex/monet_ui', 4),
+          pub('stray', null, 1),
+        ],
+      );
+      expect(md.indexOf('## pub.dev'), greaterThan(md.indexOf('| Package |')));
+      expect(md.split('## pub.dev').first, isNot(contains('pub.dev/packages')));
+      final mono = rowsOf(md, 'mono');
+      expect(mono, hasLength(2));
+      expect(
+        mono[0],
+        endsWith(
+          '| [mono_a 1.0.3](https://pub.dev/packages/mono_a) | 3d | '
+          '✅ same |',
+        ),
+      );
+      expect(
+        mono[1],
+        contains(
+          '[⚠️ 1 changed · 1 new · 1 only on pub.dev]'
+          '(https://github.com/Telosnex/mono/commits/main?since='
+          '2026-01-08T00:00:00.000Z&path=b "Changed: lib/b.dart. New: '
+          'lib/new.dart. Only on pub.dev: lib/gone.dart.")',
+        ),
+      );
+      expect(rowsOf(md, 'libmonet').single, contains('monet_ui 1.0.4'));
+      expect(
+        rowsOf(md, 'none').single,
+        '| [none](https://github.com/Telosnex/none) | — | | |',
+      );
+    });
 
-    test('? when pub.dev could not be read', () {
+    test('a warning when pub.dev could not be read', () {
       final md = renderDashboard(
         [status('Telosnex/mono')],
         now,
         published: null,
       );
-      expect(pubCell(md, 'mono'), '?');
+      expect(
+        md.split('## pub.dev').last,
+        contains('⚠️ pub.dev could not be read.'),
+      );
     });
 
     test('gitHubRepoOf', () {
@@ -580,6 +614,78 @@ packages:
       expect(gitHubRepoOf('git@github.com:o/r.git'), 'o/r');
       expect(gitHubRepoOf('https://example.com'), isNull);
       expect(gitHubRepoOf(null), isNull);
+    });
+
+    test('gitBlobHash is git hash-object', () {
+      // printf 'hello\n' | git hash-object --stdin
+      expect(
+        gitBlobHash(utf8.encode('hello\n')),
+        'ce013625030ba8dba906f756967f9e9ca394464a',
+      );
+    });
+
+    test('readTarGz reads files, long names, and skips directories', () async {
+      final dir = Directory.systemTemp.createTempSync('tar_test');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final long = 'd/${'x' * 120}.dart';
+      File('${dir.path}/$long').createSync(recursive: true);
+      File('${dir.path}/$long').writeAsStringSync('long');
+      File('${dir.path}/pubspec.yaml').writeAsStringSync('name: p\n');
+      final r = await Process.run(
+        'tar',
+        ['czf', 'out.tgz', 'pubspec.yaml', 'd'],
+        workingDirectory: dir.path,
+        // macOS tar adds ._ AppleDouble files otherwise.
+        environment: {'COPYFILE_DISABLE': '1'},
+      );
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      final files = readTarGz(File('${dir.path}/out.tgz').readAsBytesSync());
+      expect(files.keys, unorderedEquals(['pubspec.yaml', long]));
+      expect(utf8.decode(files[long]!), 'long');
+    });
+
+    test('comparePublished: picks the matching package directory; counts '
+        'changed, new under lib/bin/hook, and only-published; skips '
+        'submodules, symlinks, dotfiles and nested packages', () {
+      Map<String, Object?> blob(String path, String sha) => {
+        'path': path,
+        'type': 'blob',
+        'mode': '100644',
+        'sha': sha,
+      };
+      final drift = comparePublished(
+        {
+          'pubspec.yaml': 'p1',
+          'lib/a.dart': 'a1',
+          'lib/b.dart': 'b1',
+          'lib/gone.dart': 'g1',
+          'src/vendor/x.c': 'x1',
+          'lib/link.dart': 'l1',
+        },
+        [
+          blob('pubspec.yaml', 'root'),
+          blob('pkg/pubspec.yaml', 'p1'),
+          blob('pkg/lib/a.dart', 'a1'),
+          blob('pkg/lib/b.dart', 'b2'),
+          blob('pkg/lib/new.dart', 'n1'),
+          blob('pkg/lib/.hidden.dart', 'h1'),
+          blob('pkg/tool/new.dart', 't1'),
+          blob('pkg/example/pubspec.yaml', 'e1'),
+          blob('pkg/example/lib/main.dart', 'm1'),
+          {'path': 'pkg/src/vendor', 'type': 'commit', 'sha': 's'},
+          {
+            'path': 'pkg/lib/link.dart',
+            'type': 'blob',
+            'mode': '120000',
+            'sha': 'l2',
+          },
+        ],
+        'main',
+      );
+      expect(drift.directory, 'pkg');
+      expect(drift.changed, ['lib/b.dart']);
+      expect(drift.added, ['lib/new.dart']);
+      expect(drift.onlyPublished, ['lib/gone.dart']);
     });
   });
 

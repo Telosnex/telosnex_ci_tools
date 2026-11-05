@@ -15,9 +15,10 @@ import 'package:telosnex_ci_tools/src/dashboard_fetch.dart';
 /// writes README.md and dashboard.json to that directory instead. With
 /// --packages-md, writes the packages table, unless a package could not be
 /// read (then the file stays). A package that could not be read is a
-/// warning on the dashboard, not a failure. The pub.dev column: the packages
-/// of --publisher (telosnex.com) whose pubspec's repository is the
-/// package's; when pub.dev cannot be read, a warning and `?`. The token: GITHUB_TOKEN or
+/// warning on the dashboard, not a failure. The pub.dev section: the
+/// packages of --publisher (telosnex.com) whose pubspec's repository is the
+/// package's, and how the default branch differs from each newest version;
+/// when pub.dev cannot be read, a warning. The token: GITHUB_TOKEN or
 /// GH_TOKEN, else `gh auth token`.
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
@@ -52,14 +53,30 @@ Future<void> main(List<String> arguments) async {
     },
   );
   final List<PackageStatus> statuses;
+  List<PubPackage>? published;
   try {
     statuses = await Future.wait([
       for (final package in packages) fetchPackage(github, package),
     ]);
+    final found = await pubFuture;
+    if (found != null) {
+      published = await Future.wait([
+        for (final pub in found)
+          if (statuses.where((s) => s.publishes(pub)).firstOrNull
+              case final status?)
+            fetchPubDrift(
+              github,
+              pub,
+              status.currentRepo ?? status.package.repo,
+              status.defaultBranch,
+            )
+          else
+            Future.value(pub),
+      ]);
+    }
   } finally {
     github.close();
   }
-  final published = await pubFuture;
   final now = DateTime.now();
   final shown = [
     for (final status in statuses)

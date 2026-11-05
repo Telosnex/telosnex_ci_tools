@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:yaml/yaml.dart';
 
@@ -344,11 +347,182 @@ Future<List<PubPackage>> fetchPublisherPackages(String publisher) async {
             repo: gitHubRepoOf(
               (pubspec['repository'] ?? pubspec['homepage']) as String?,
             ),
+            archiveUrl: latest['archive_url'] as String?,
           );
         }),
     ]);
   } finally {
     client.close();
+  }
+}
+
+/// The regular files of a .tar.gz, by path.
+Map<String, Uint8List> readTarGz(List<int> bytes) {
+  final tar = Uint8List.fromList(gzip.decode(bytes));
+  String text(int start, int length) {
+    var end = start;
+    while (end < start + length && tar[end] != 0) {
+      end++;
+    }
+    return utf8.decode(tar.sublist(start, end), allowMalformed: true);
+  }
+
+  int octal(int start, int length) {
+    final value = text(start, length).trim();
+    return value.isEmpty ? 0 : int.parse(value, radix: 8);
+  }
+
+  final files = <String, Uint8List>{};
+  String? longName;
+  var offset = 0;
+  while (offset + 512 <= tar.length && tar[offset] != 0) {
+    final size = octal(offset + 124, 12);
+    final type = String.fromCharCode(tar[offset + 156]);
+    final body = tar.sublist(offset + 512, offset + 512 + size);
+    var name = text(offset, 100);
+    final prefix = text(offset + 345, 155);
+    if (prefix.isNotEmpty) name = '$prefix/$name';
+    if (type == 'L') {
+      longName = utf8.decode(body).replaceAll('\x00', '');
+    } else if (type == 'x') {
+      // PAX: "<length> path=<name>\n" records.
+      final path = RegExp(
+        r'\d+ path=([^\n]*)\n',
+      ).firstMatch(utf8.decode(body, allowMalformed: true));
+      if (path != null) longName = path.group(1);
+    } else {
+      if (type == '0' || type == '\x00') {
+        final path = longName ?? name;
+        files[path.startsWith('./') ? path.substring(2) : path] = body;
+      }
+      longName = null;
+    }
+    offset += 512 + (size + 511) ~/ 512 * 512;
+  }
+  return files;
+}
+
+/// The git blob hash of [bytes].
+String gitBlobHash(List<int> bytes) => sha1.convert([
+  ...utf8.encode('blob ${bytes.length}\x00'),
+  ...bytes,
+]).toString();
+
+/// How [files] (a published version, by path and git blob hash) differs from
+/// a repository's [tree] (`git/trees?recursive=1` entries). The package's
+/// directory is the one with a pubspec.yaml that matches the most files.
+/// Paths under a submodule or symlink are not compared.
+PubDrift comparePublished(
+  Map<String, String> files,
+  List<Map<String, Object?>> tree,
+  String branch,
+) {
+  final blobs = <String, String>{};
+  final opaque = <String>[];
+  for (final entry in tree) {
+    final path = entry['path'] as String;
+    if (entry['type'] == 'commit' || entry['mode'] == '120000') {
+      opaque.add(path);
+    } else if (entry['type'] == 'blob') {
+      blobs[path] = entry['sha'] as String;
+    }
+  }
+  String dirOf(String path) {
+    final slash = path.lastIndexOf('/');
+    return slash < 0 ? '' : path.substring(0, slash);
+  }
+
+  String prefix(String directory) => directory.isEmpty ? '' : '$directory/';
+  final candidates = [
+    for (final path in blobs.keys)
+      if (path == 'pubspec.yaml' || path.endsWith('/pubspec.yaml')) dirOf(path),
+  ];
+  int score(String directory) => files.entries
+      .where((f) => blobs['${prefix(directory)}${f.key}'] == f.value)
+      .length;
+  var directory = '';
+  var best = -1;
+  for (final candidate in candidates) {
+    final s = score(candidate);
+    if (s > best) (directory, best) = (candidate, s);
+  }
+  final at = prefix(directory);
+  bool isOpaque(String path) =>
+      opaque.any((o) => path == o || path.startsWith('$o/'));
+  final nested = [
+    for (final c in candidates)
+      if (c != directory && c.startsWith(at)) '$c/',
+  ];
+  final changed = <String>[];
+  final onlyPublished = <String>[];
+  for (final MapEntry(key: path, value: hash) in files.entries) {
+    final inTree = blobs['$at$path'];
+    if (inTree == null) {
+      if (!isOpaque('$at$path')) onlyPublished.add(path);
+    } else if (inTree != hash) {
+      changed.add(path);
+    }
+  }
+  final added = [
+    for (final path in blobs.keys)
+      if (path.startsWith(at))
+        if (path.substring(at.length) case final relative
+            when RegExp(r'^(lib|bin|hook)/').hasMatch(relative) &&
+                !files.containsKey(relative) &&
+                !relative.split('/').any((s) => s.startsWith('.')) &&
+                !nested.any(path.startsWith))
+          relative,
+  ];
+  return PubDrift(
+    branch: branch,
+    directory: directory,
+    changed: changed..sort(),
+    added: added..sort(),
+    onlyPublished: onlyPublished..sort(),
+  );
+}
+
+/// [pub] with how [repo]'s [branch] differs from its newest version.
+Future<PubPackage> fetchPubDrift(
+  GitHubReader github,
+  PubPackage pub,
+  String repo,
+  String branch,
+) async {
+  final url = pub.archiveUrl;
+  if (url == null) return pub.withDrift(null, 'no archive');
+  try {
+    final client = HttpClient()..userAgent = 'telosnex_ci_tools-dashboard';
+    final List<int> bytes;
+    try {
+      final response = await (await client.getUrl(Uri.parse(url))).close();
+      if (response.statusCode != 200) {
+        return pub.withDrift(null, 'archive: ${response.statusCode}');
+      }
+      bytes = [for (final chunk in await response.toList()) ...chunk];
+    } finally {
+      client.close();
+    }
+    final files = {
+      for (final MapEntry(:key, :value) in readTarGz(bytes).entries)
+        key: gitBlobHash(value),
+    };
+    final tree = await github.get(
+      'repos/$repo/git/trees/${Uri.encodeComponent(branch)}?recursive=1',
+    );
+    if (tree == null) return pub.withDrift(null, 'no $branch tree');
+    if (tree['truncated'] == true) {
+      return pub.withDrift(null, 'repository too large to compare');
+    }
+    return pub.withDrift(
+      comparePublished(
+        files,
+        (tree['tree'] as List).cast<Map<String, Object?>>(),
+        branch,
+      ),
+    );
+  } on Object catch (error) {
+    return pub.withDrift(null, '$error'.split('\n').first);
   }
 }
 

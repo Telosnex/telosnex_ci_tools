@@ -137,6 +137,9 @@ final class PubPackage {
     required this.version,
     required this.published,
     required this.repo,
+    this.archiveUrl,
+    this.drift,
+    this.driftError,
   });
 
   final String name;
@@ -147,11 +150,69 @@ final class PubPackage {
   /// else `homepage`), or null when it names none.
   final String? repo;
 
+  /// The newest version's archive.
+  final String? archiveUrl;
+
+  /// How the default branch differs from the newest version; null when not
+  /// compared, with [driftError] saying why when comparing failed.
+  final PubDrift? drift;
+  final String? driftError;
+
+  PubPackage withDrift(PubDrift? drift, [String? error]) => PubPackage(
+    name: name,
+    version: version,
+    published: published,
+    repo: repo,
+    archiveUrl: archiveUrl,
+    drift: drift,
+    driftError: error,
+  );
+
   Map<String, Object?> toJson() => {
     'name': name,
     'version': version,
     'published': published.toUtc().toIso8601String(),
     'repo': ?repo,
+    if (drift != null) 'drift': drift!.toJson(),
+    'driftError': ?driftError,
+  };
+}
+
+/// The files of a published version that differ from the package's
+/// directory on the default branch, by git blob hash.
+final class PubDrift {
+  const PubDrift({
+    required this.branch,
+    required this.directory,
+    this.changed = const [],
+    this.added = const [],
+    this.onlyPublished = const [],
+  });
+
+  final String branch;
+
+  /// The package's directory in the repository, '' for its root.
+  final String directory;
+
+  /// In both, with different contents.
+  final List<String> changed;
+
+  /// New on the branch under lib/, bin/ or hook/: what users get. New files
+  /// elsewhere are not counted, as .pubignore often keeps them off pub.dev.
+  final List<String> added;
+
+  /// Published, but not on the branch: deleted or moved since, or published
+  /// without being committed.
+  final List<String> onlyPublished;
+
+  bool get same => changed.isEmpty && added.isEmpty && onlyPublished.isEmpty;
+
+  Map<String, Object?> toJson() => {
+    'branch': branch,
+    'directory': directory,
+    'changed': changed,
+    'added': added,
+    'onlyPublished': onlyPublished,
   };
 }
 
@@ -320,10 +381,9 @@ String updatedAt(DateTime now) {
   return '$date ${hm(local)} ${daylight ? 'PDT' : 'PST'} (${hm(utc)} UTC)';
 }
 
-/// The dashboard: every test cell, then failing and cancelled runs. The
-/// pub.dev column holds the packages of [published] each package's
-/// repository publishes; with [published] null (pub.dev could not be read),
-/// `?`.
+/// The dashboard: every test cell, failing and cancelled runs, then the
+/// packages of [published] each repository publishes (every repository has
+/// a row; with [published] null, pub.dev could not be read).
 String renderDashboard(
   List<PackageStatus> unsorted,
   DateTime now, {
@@ -399,10 +459,10 @@ String renderDashboard(
   );
   out
     ..writeln(
-      '| Package | pub.dev | Unit | '
+      '| Package | Unit | '
       '${[...ordered, ...List.filled(extraColumns, ' ')].join(' | ')} |',
     )
-    ..writeln('|---|---|---|${'---|' * (ordered.length + extraColumns)}');
+    ..writeln('|---|---|${'---|' * (ordered.length + extraColumns)}');
   for (final status in packages) {
     final byColumn = <String, List<(JobCell, DashboardJob)>>{};
     for (final entry in status.cellJobs) {
@@ -413,18 +473,7 @@ String renderDashboard(
         ? status.package.name
         : '${status.package.name} ⚠️ ${_escape(status.error!)}';
     final unit = status.unitJobs;
-    final pub = published == null
-        ? '?'
-        : ([...published.where(status.publishes)]
-                ..sort((a, b) => a.name.compareTo(b.name)))
-              .map(
-                (p) =>
-                    '[${p.name} ${p.version}](https://pub.dev/packages/'
-                    '${p.name}) ${_age(p.published, now)}',
-              )
-              .join('<br>');
     final cells = [
-      pub.isEmpty ? '—' : pub,
       unit.isEmpty ? '—' : unit.map(_link).join(' '),
       for (final column in ordered)
         byColumn[column] == null
@@ -509,7 +558,80 @@ String renderDashboard(
         'took them. Re-run them.',
     cancelledRuns,
   );
+  _pubSection(out, packages, published, now);
   return out.toString();
+}
+
+void _pubSection(
+  StringBuffer out,
+  List<PackageStatus> packages,
+  List<PubPackage>? published,
+  DateTime now,
+) {
+  out
+    ..writeln()
+    ..writeln('## pub.dev')
+    ..writeln();
+  if (published == null) {
+    out.writeln('⚠️ pub.dev could not be read.');
+    return;
+  }
+  out
+    ..writeln(
+      'The packages each repository publishes, and how its default branch '
+      'differs from the newest version: files changed, new under lib/, bin/ '
+      'or hook/, and only on pub.dev.',
+    )
+    ..writeln()
+    ..writeln('| Repository | pub.dev | Published | Default branch |')
+    ..writeln('|---|---|---|---|');
+  for (final status in packages) {
+    final repo =
+        '[${status.package.name}](https://github.com/'
+        '${status.package.repo})';
+    final mine = [...published.where(status.publishes)]
+      ..sort((a, b) => a.name.compareTo(b.name));
+    if (mine.isEmpty) {
+      out.writeln('| $repo | — | | |');
+      continue;
+    }
+    for (final pub in mine) {
+      out.writeln(
+        '| $repo | [${pub.name} ${pub.version}](https://pub.dev/packages/'
+        '${pub.name}) | ${_age(pub.published, now)} | '
+        '${_driftCell(pub, status.currentRepo ?? status.package.repo)} |',
+      );
+    }
+  }
+}
+
+String _driftCell(PubPackage pub, String repo) {
+  final drift = pub.drift;
+  if (drift == null) {
+    return pub.driftError == null ? '—' : '⚠️ ${_escape(pub.driftError!)}';
+  }
+  if (drift.same) return '✅ same';
+  final parts = [
+    if (drift.changed.isNotEmpty) '${drift.changed.length} changed',
+    if (drift.added.isNotEmpty) '${drift.added.length} new',
+    if (drift.onlyPublished.isNotEmpty)
+      '${drift.onlyPublished.length} only on pub.dev',
+  ];
+  String list(String label, List<String> files) => files.isEmpty
+      ? ''
+      : '$label: ${files.take(8).join(', ')}'
+            '${files.length > 8 ? ', …' : ''}. ';
+  final tip = _escape(
+    (list('Changed', drift.changed) +
+            list('New', drift.added) +
+            list('Only on pub.dev', drift.onlyPublished))
+        .trim(),
+  );
+  // The branch's commits since the version was published.
+  final since = pub.published.toUtc().toIso8601String();
+  final path = drift.directory.isEmpty ? '' : '&path=${drift.directory}';
+  return '[⚠️ ${parts.join(' · ')}](https://github.com/$repo/commits/'
+      '${drift.branch}?since=$since$path "$tip")';
 }
 
 /// The live dashboard.
