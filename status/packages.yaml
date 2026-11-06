@@ -103,11 +103,11 @@ packages:
   - repo: Telosnex/flutter_secure_storage
     checks: []
     releases: []
-  # Ours, published on pub.dev; no CI workflows yet, so only in the pub.dev
-  # section.
   - repo: Telosnex/kiln
     checks: []
     releases: []
+  # Ours, published on pub.dev; no CI workflows (no tests), so only in the
+  # pub.dev section.
   - repo: Telosnex/perf_tester
     checks: []
     releases: []
