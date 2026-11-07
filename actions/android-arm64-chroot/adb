@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# The adb of actions/android-arm64-chroot: the commands that device test
+# scripts use, run in the Android chroot at $ANDROID_CHROOT. getprop answers
+# from $ANDROID_CHROOT_PROPS: the chroot runs no property service.
+set -euo pipefail
+root="${ANDROID_CHROOT:?ANDROID_CHROOT is not set: run actions/android-arm64-chroot first}"
+props="${ANDROID_CHROOT_PROPS:?ANDROID_CHROOT_PROPS is not set}"
+
+# Device selection options select the one device.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|-t) shift 2 ;;
+    -d|-e) shift ;;
+    *) break ;;
+  esac
+done
+
+in_chroot() {
+  sudo env -i \
+    PATH=/apex/com.android.runtime/bin:/system/bin:/system/xbin \
+    ANDROID_ROOT=/system ANDROID_DATA=/data TMPDIR=/data/local/tmp HOME=/data \
+    chroot "$root" /system/bin/sh -c "$1"
+}
+
+# The chroot path of an adb device path.
+target() { printf '%s/%s' "$root" "${1#/}"; }
+
+command="${1:-}"
+[[ $# -gt 0 ]] && shift
+case "$command" in
+  get-state) echo device ;;
+  wait-for-device|start-server|kill-server|reconnect|root|remount) ;;
+  devices) printf 'List of devices attached\nchroot\tdevice\n' ;;
+  emu) ;; # No emulator to stop.
+  shell)
+    if [[ $# -eq 0 ]]; then echo 'adb shell: give a command.' >&2; exit 1; fi
+    if [[ $# -le 2 && "$1" == getprop ]]; then
+      if [[ $# -eq 1 ]]; then sed 's/^\([^=]*\)=\(.*\)$/[\1]: [\2]/' "$props"; exit 0; fi
+      grep -m1 "^$2=" "$props" | cut -d= -f2- || true
+      exit 0
+    fi
+    in_chroot "$*"
+    ;;
+  push)
+    [[ $# -ge 2 ]] || { echo 'usage: adb push SOURCE... DEST' >&2; exit 1; }
+    dest="${*: -1}"
+    count=0
+    for source in "${@:1:$#-1}"; do
+      if [[ "$dest" == */ ]] || sudo test -d "$(target "$dest")"; then
+        sudo cp -R "$source" "$(target "$dest")/"
+      else
+        sudo cp -R "$source" "$(target "$dest")"
+      fi
+      count=$((count + 1))
+    done
+    echo "$count file(s) pushed to the chroot."
+    ;;
+  pull)
+    [[ $# -ge 1 ]] || { echo 'usage: adb pull SOURCE [DEST]' >&2; exit 1; }
+    dest="${2:-.}"
+    sudo cp -R "$(target "$1")" "$dest"
+    sudo chown -R "$(id -u):$(id -g)" "$dest"
+    ;;
+  *)
+    echo "adb $command: not available in the Android chroot (actions/android-arm64-chroot)." >&2
+    exit 1
+    ;;
+esac

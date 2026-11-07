@@ -1,0 +1,167 @@
+# An arm64 Android userspace on an arm64 Linux runner (ubuntu-24.04-arm), for
+# native code tests: a chroot of an AOSP system image, the bionic runtime
+# APEX mounted, on the runner's own CPU. GitHub's runners have no emulator
+# for arm64 Android: macOS arm64 VMs have no hypervisor (kern.hv_support 0),
+# the Linux arm64 ones no KVM, and Google builds no Linux arm64 emulator.
+#
+# It runs executables, not apps: no Android framework, property service or
+# package manager. The kernel is the runner's.
+#
+# After it, ANDROID_HOME and ANDROID_NDK_HOME name an SDK and an NDK that
+# the tool/*android*.sh device scripts work with unchanged:
+#   - platform-tools/adb: get-state, wait-for-device, shell, push, pull and
+#     getprop (from the image's build.prop) in the chroot (adb file here).
+#   - the NDK's sysroot and clang resource directory, and the NDK's
+#     toolchains/llvm/prebuilt/linux-x86_64/bin/<triple><api>-clang[++] file
+#     names, which run the runner's clang (clang file here).
+# Run actions/setup-flutter first: the steps use dart.
+name: Android ARM64 chroot
+description: An arm64 Android chroot on an arm64 Linux runner, with an adb and an NDK for it.
+
+inputs:
+  api-level:
+    description: The Android API level of the AOSP arm64-v8a system image.
+    required: false
+    default: '36'
+  ndk:
+    description: The NDK release (its sysroot and clang resource directory).
+    required: false
+    default: r28c
+  clang-version:
+    description: The major version of the runner's clang; the NDK's clang version.
+    required: false
+    default: '19'
+
+outputs:
+  root:
+    description: The chroot directory.
+    value: ${{ steps.chroot.outputs.root }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != ARM64 ]]; then
+          echo "::error::android-arm64-chroot needs an arm64 Linux runner (ubuntu-24.04-arm), not $RUNNER_OS $RUNNER_ARCH."
+          exit 1
+        fi
+        command -v dart > /dev/null || { echo '::error::Run actions/setup-flutter first.'; exit 1; }
+    - id: image
+      name: Find the system image
+      shell: bash
+      env:
+        API_LEVEL: ${{ inputs.api-level }}
+      run: |
+        url=$(dart "$GITHUB_ACTION_PATH/system_image.dart" "$API_LEVEL")
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+        echo "file=$(basename "$url")" >> "$GITHUB_OUTPUT"
+    - name: Cache the system image and the NDK
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/android-arm64-chroot-downloads
+        key: android-arm64-chroot-${{ steps.image.outputs.file }}-ndk-${{ inputs.ndk }}
+    - name: Install clang and lld
+      shell: bash
+      env:
+        CLANG_VERSION: ${{ inputs.clang-version }}
+      run: |
+        if ! command -v "clang-$CLANG_VERSION" > /dev/null || ! command -v "ld.lld-$CLANG_VERSION" > /dev/null; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "clang-$CLANG_VERSION" "lld-$CLANG_VERSION" > /dev/null
+        fi
+        # clang -fuse-ld=lld runs ld.lld.
+        sudo ln -sf "$(command -v "ld.lld-$CLANG_VERSION")" /usr/local/bin/ld.lld
+    - id: chroot
+      name: Set up the chroot
+      shell: bash
+      env:
+        IMAGE_URL: ${{ steps.image.outputs.url }}
+        IMAGE_FILE: ${{ steps.image.outputs.file }}
+        NDK: ${{ inputs.ndk }}
+        CLANG_VERSION: ${{ inputs.clang-version }}
+      run: |
+        downloads="$RUNNER_TEMP/android-arm64-chroot-downloads"
+        mkdir -p "$downloads"
+        # Google's mirror sometimes serves a truncated file: check the zip.
+        fetch() {
+          local url=$1 file=$2
+          if [[ -f "$file" ]] && unzip -tq "$file" > /dev/null 2>&1; then return; fi
+          for try in 1 2 3; do
+            curl -fsSL --retry 3 -o "$file" "$url" && unzip -tq "$file" > /dev/null 2>&1 && return
+            echo "::warning::$url did not download (try $try)."
+            sleep 30
+          done
+          echo "::error::$url did not download."
+          exit 1
+        }
+        fetch "$IMAGE_URL" "$downloads/$IMAGE_FILE"
+        fetch "https://dl.google.com/android/repository/android-ndk-$NDK-linux.zip" "$downloads/ndk-$NDK.zip"
+
+        work="$RUNNER_TEMP/android-arm64-chroot"
+        root="$work/root"
+        mkdir -p "$work" "$root"
+        unzip -q -o -j -d "$work" "$downloads/$IMAGE_FILE" '*/system.img' '*/build.prop'
+        read -r offset length < <(dart "$GITHUB_ACTION_PATH/partition.dart" "$work/system.img" system)
+        sudo mount -o loop,ro,offset="$offset",sizelimit="$length" "$work/system.img" "$root"
+        # Android 10 and newer: bionic is in the runtime APEX.
+        sudo mount -t tmpfs tmpfs "$root/apex"
+        if [[ -f "$root/system/apex/com.android.runtime.apex" ]]; then
+          unzip -q -o -d "$work" "$root/system/apex/com.android.runtime.apex" apex_payload.img
+          sudo mkdir "$root/apex/com.android.runtime"
+          sudo mount -o loop,ro "$work/apex_payload.img" "$root/apex/com.android.runtime"
+        fi
+        # The linker's configuration, which linkerconfig writes at boot: the
+        # default namespace, unrestricted.
+        if [[ -d "$root/linkerconfig" ]]; then
+          sudo mount -t tmpfs tmpfs "$root/linkerconfig"
+          printf '%s\n' 'dir.system = /' '[system]' \
+            'namespace.default.isolated = false' \
+            'namespace.default.search.paths = /system/${LIB}:/apex/com.android.runtime/${LIB}/bionic:/odm/${LIB}:/vendor/${LIB}' \
+            | sudo tee "$root/linkerconfig/ld.config.txt" > /dev/null
+        fi
+        sudo mount -t tmpfs tmpfs "$root/data"
+        sudo mkdir -p "$root/data/local/tmp"
+        sudo chmod 1777 "$root/data/local/tmp"
+        for d in dev proc sys; do sudo mount --bind "/$d" "$root/$d"; done
+
+        props="$work/props"
+        sdk_level=$(grep -m1 '^ro.build.version.sdk=' "$work/build.prop" | cut -d= -f2)
+        release=$(grep -m1 '^ro.build.version.release=' "$work/build.prop" | cut -d= -f2)
+        printf '%s\n' sys.boot_completed=1 ro.product.cpu.abi=arm64-v8a \
+          ro.product.cpu.abilist=arm64-v8a "ro.build.version.sdk=$sdk_level" \
+          "ro.build.version.release=$release" ro.kernel.qemu=0 > "$props"
+
+        sdk="$work/sdk"
+        mkdir -p "$sdk/platform-tools"
+        cp "$GITHUB_ACTION_PATH/adb" "$sdk/platform-tools/adb"
+        ndk="$work/ndk"
+        prebuilt="$ndk/toolchains/llvm/prebuilt/linux-x86_64"
+        rm -rf "$ndk" && mkdir -p "$work/ndk-unzip"
+        unzip -q -o -d "$work/ndk-unzip" "$downloads/ndk-$NDK.zip" \
+          "android-ndk-$NDK/source.properties" \
+          "android-ndk-$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/*" \
+          "android-ndk-$NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/*"
+        mv "$work/ndk-unzip/android-ndk-$NDK" "$ndk"
+        mkdir -p "$prebuilt/bin"
+        for triple in aarch64-linux-android armv7a-linux-androideabi x86_64-linux-android i686-linux-android; do
+          for api in $(seq 21 36); do
+            for suffix in clang clang++; do
+              ln -s "$GITHUB_ACTION_PATH/clang" "$prebuilt/bin/$triple$api-$suffix"
+            done
+          done
+        done
+
+        {
+          echo "ANDROID_CHROOT=$root"
+          echo "ANDROID_CHROOT_PROPS=$props"
+          echo "ANDROID_CHROOT_CLANG_VERSION=$CLANG_VERSION"
+          echo "ANDROID_HOME=$sdk"
+          echo "ANDROID_SDK_ROOT=$sdk"
+          echo "ANDROID_NDK_HOME=$ndk"
+          echo "ANDROID_NDK_ROOT=$ndk"
+        } >> "$GITHUB_ENV"
+        echo "$sdk/platform-tools" >> "$GITHUB_PATH"
+        echo "root=$root" >> "$GITHUB_OUTPUT"
+        echo "Android $release (API $sdk_level) arm64 chroot, NDK $NDK sysroot with clang-$CLANG_VERSION" | tee -a "$GITHUB_STEP_SUMMARY"

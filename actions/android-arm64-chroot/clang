@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# An NDK clang of actions/android-arm64-chroot, for an arm64 Linux host:
+# the NDK has no linux-aarch64 build. The file name is the NDK's
+# (aarch64-linux-android24-clang, ...-clang++): it gives the target and
+# whether to compile C++. The host's clang compiles with the NDK's sysroot
+# and clang resource directory.
+set -euo pipefail
+name="$(basename "$0")"
+prebuilt="$(cd "$(dirname "$0")/.." && pwd)"
+driver=clang-${ANDROID_CHROOT_CLANG_VERSION:?}
+[[ "$name" == *++ ]] && driver=clang++-$ANDROID_CHROOT_CLANG_VERSION
+target="${name%-clang*}"
+exec "$driver" --target="$target" --sysroot="$prebuilt/sysroot" \
+  -resource-dir="$(ls -d "$prebuilt"/lib/clang/* | head -1)" -fuse-ld=lld "$@"
