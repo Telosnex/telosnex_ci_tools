@@ -1,6 +1,6 @@
 # An arm64 Android userspace on an arm64 Linux runner (ubuntu-24.04-arm), for
-# native code tests: a chroot of an AOSP system image, the bionic runtime
-# APEX mounted, on the runner's own CPU. GitHub's runners have no emulator
+# native code tests: a chroot of an AOSP system image, its APEXes mounted, on
+# the runner's own CPU. GitHub's runners have no emulator
 # for arm64 Android: macOS arm64 VMs have no hypervisor (kern.hv_support 0),
 # the Linux arm64 ones no KVM, and Google builds no Linux arm64 emulator.
 #
@@ -105,21 +105,42 @@ runs:
         unzip -q -o -j -d "$work" "$downloads/$IMAGE_FILE" '*/system.img' '*/build.prop'
         read -r offset length < <(dart "$GITHUB_ACTION_PATH/partition.dart" "$work/system.img" system)
         sudo mount -o loop,ro,offset="$offset",sizelimit="$length" "$work/system.img" "$root"
-        # Android 10 and newer: bionic is in the runtime APEX.
+        # Android 10 and newer: bionic, ICU and other libraries are in APEXes,
+        # which apexd mounts at boot. A .capex is a compressed .apex.
         sudo mount -t tmpfs tmpfs "$root/apex"
-        if [[ -f "$root/system/apex/com.android.runtime.apex" ]]; then
-          unzip -q -o -d "$work" "$root/system/apex/com.android.runtime.apex" apex_payload.img
-          sudo mkdir "$root/apex/com.android.runtime"
-          sudo mount -o loop,ro "$work/apex_payload.img" "$root/apex/com.android.runtime"
-        fi
+        apex_libs=()
+        mkdir -p "$work/apex"
+        for apex in "$root"/system/apex/*.apex "$root"/system/apex/*.capex; do
+          [[ -f "$apex" ]] || continue
+          name=$(basename "${apex%.*}")
+          dir="$work/apex/$name"
+          mkdir -p "$dir"
+          if [[ "$apex" == *.capex ]]; then
+            unzip -q -o -d "$dir" "$apex" original_apex
+            unzip -q -o -d "$dir" "$dir/original_apex" apex_payload.img
+            rm "$dir/original_apex"
+          else
+            unzip -q -o -d "$dir" "$apex" apex_payload.img
+          fi
+          sudo mkdir "$root/apex/$name"
+          if ! sudo mount -o loop,ro "$dir/apex_payload.img" "$root/apex/$name" 2> "$dir/mount.log"; then
+            echo "::warning::$name: not mounted ($(file -b "$dir/apex_payload.img" | cut -d, -f1))."
+            continue
+          fi
+          if [[ -d "$root/apex/$name/lib64" ]]; then apex_libs+=("/apex/$name/\${LIB}"); fi
+        done
+        echo "Mounted ${#apex_libs[@]} APEXes with libraries."
         # The linker's configuration, which linkerconfig writes at boot: the
-        # default namespace, unrestricted.
+        # default namespace, unrestricted, over the system and APEX libraries.
         if [[ -d "$root/linkerconfig" ]]; then
           sudo mount -t tmpfs tmpfs "$root/linkerconfig"
+          paths="/system/\${LIB}:/apex/com.android.runtime/\${LIB}/bionic"
+          for lib in "${apex_libs[@]}"; do paths="$paths:$lib"; done
+          paths="$paths:/odm/\${LIB}:/vendor/\${LIB}"
           printf '%s\n' 'dir.system = /system/bin/' 'dir.system = /system/xbin/' \
             'dir.system = /apex/com.android.runtime/bin/' 'dir.system = /data/' '[system]' \
             'namespace.default.isolated = false' \
-            'namespace.default.search.paths = /system/${LIB}:/apex/com.android.runtime/${LIB}/bionic:/odm/${LIB}:/vendor/${LIB}' \
+            "namespace.default.search.paths = $paths" \
             | sudo tee "$root/linkerconfig/ld.config.txt" > /dev/null
         fi
         sudo mount -t tmpfs tmpfs "$root/data"
