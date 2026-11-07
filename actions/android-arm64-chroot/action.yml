@@ -116,7 +116,8 @@ runs:
         # default namespace, unrestricted.
         if [[ -d "$root/linkerconfig" ]]; then
           sudo mount -t tmpfs tmpfs "$root/linkerconfig"
-          printf '%s\n' 'dir.system = /' '[system]' \
+          printf '%s\n' 'dir.system = /system/bin/' 'dir.system = /system/xbin/' \
+            'dir.system = /apex/com.android.runtime/bin/' 'dir.system = /data/' '[system]' \
             'namespace.default.isolated = false' \
             'namespace.default.search.paths = /system/${LIB}:/apex/com.android.runtime/${LIB}/bionic:/odm/${LIB}:/vendor/${LIB}' \
             | sudo tee "$root/linkerconfig/ld.config.txt" > /dev/null
