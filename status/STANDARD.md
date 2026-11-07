@@ -42,6 +42,7 @@ Other workflows are named for their topic (`cuda_pack.yml`). The `name:` matches
 - **iOS**: boot with `actions/ios-simulator-boot` (`id: simulator`), then `actions/ios-flutter-test` with `udid: ${{ steps.simulator.outputs.udid }}`. **Don't build ahead** with `flutter build ios --simulator`: Xcode rebuilds everything for flutter test's destination anyway. **One target**: each target is a build, install and launch, so import all integration test files into one entry point (fonnx: `integration_test/ios_all.dart`, not named `*_test.dart`).
 - **iOS without Flutter** (Dart tests run by a script on a simulator): boot with `actions/ios-simulator-boot`, and upload the script's logs with `if: failure() || cancelled()`.
 - **Android**: `actions/android-emulator`; building the APK before the emulator boots does help (Gradle and the emulator share the CPUs).
+- **Android ARM64**: a package with arm64 Android native code runs its device script (`adb` and the NDK) in `actions/android-arm64-chroot` on ubuntu-24.04-arm too, in a job named `Android ARM64 chroot`. The x64 emulator runs the x86_64 library only.
 
 ## 5. Dependencies between Telosnex packages
 

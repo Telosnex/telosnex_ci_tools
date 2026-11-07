@@ -72,6 +72,12 @@ void main() {
       expect(parseJobName('desktop / linux-x64'), isNull);
     });
 
+    test('chroot is the usual way to run Android ARM64', () {
+      final cell = parseJobName('Android ARM64 chroot')!;
+      expect(cell.column, 'Android ARM64');
+      expect(cell.isNormal, isTrue);
+    });
+
     test('columns: alphabetical ignoring case, web last', () {
       final names = [
         'Web Linux x64 Safari',

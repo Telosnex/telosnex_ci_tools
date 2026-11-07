@@ -45,6 +45,37 @@ jobs:
             | tar -xz -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
+  # The action on its runner: the C++ test program with the NDK's file
+  # names, run with the action's adb; the exit codes come through.
+  android-arm64-chroot:
+    name: Android ARM64 chroot
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - uses: ./actions/android-arm64-chroot
+      - name: Build, push and run
+        run: |
+          bin="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          libcxx="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          "$bin/aarch64-linux-android24-clang++" -std=c++17 -O2 -Wall -Werror \
+            test/fixtures/android_arm64_chroot.cc -o "$RUNNER_TEMP/program"
+          [[ "$(adb get-state)" == device ]]
+          [[ "$(adb shell getprop ro.product.cpu.abi)" == arm64-v8a ]]
+          adb shell 'rm -rf /data/local/tmp/t && mkdir /data/local/tmp/t'
+          adb push "$RUNNER_TEMP/program" "$libcxx" /data/local/tmp/t/
+          out=$(adb shell 'cd /data/local/tmp/t && LD_LIBRARY_PATH=. ./program' 2>&1)
+          echo "$out"
+          [[ "$out" == 'arm64 chroot: 0 args, sqrt(2)=1.414214' ]]
+          rc=0
+          adb shell 'cd /data/local/tmp/t && LD_LIBRARY_PATH=. ./program 7' || rc=$?
+          [[ "$rc" == 7 ]] || { echo "::error::adb shell gave exit code $rc, not 7."; exit 1; }
+          adb pull /data/local/tmp/t/program "$RUNNER_TEMP/pulled"
+          cmp "$RUNNER_TEMP/program" "$RUNNER_TEMP/pulled"
+
   web-test-package:
     name: Package telosnex_web_test
     runs-on: ubuntu-24.04
