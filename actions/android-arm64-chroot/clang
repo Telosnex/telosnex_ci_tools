@@ -3,12 +3,26 @@
 # the NDK has no linux-aarch64 build. The file name is the NDK's
 # (aarch64-linux-android24-clang, ...-clang++): it gives the target and
 # whether to compile C++. The host's clang compiles with the NDK's sysroot
-# and clang resource directory.
+# and clang resource directory, and the NDK clang's defaults: libc++,
+# compiler-rt, libunwind and lld.
 set -euo pipefail
 name="$(basename "$0")"
 prebuilt="$(cd "$(dirname "$0")/.." && pwd)"
-driver=clang-${ANDROID_CHROOT_CLANG_VERSION:?}
-[[ "$name" == *++ ]] && driver=clang++-$ANDROID_CHROOT_CLANG_VERSION
-target="${name%-clang*}"
-exec "$driver" --target="$target" --sysroot="$prebuilt/sysroot" \
-  -resource-dir="$(ls -d "$prebuilt"/lib/clang/* | head -1)" -fuse-ld=lld "$@"
+version=${ANDROID_CHROOT_CLANG_VERSION:?}
+args=(--target="${name%-clang*}" --sysroot="$prebuilt/sysroot"
+  -resource-dir="$(ls -d "$prebuilt"/lib/clang/* | head -1)")
+driver=clang-$version
+if [[ "$name" == *++ ]]; then
+  driver=clang++-$version
+  args+=(-stdlib=libc++)
+fi
+# The link options only when it links: an unused option is a warning, and an
+# error with -Werror.
+links=true
+for arg in "$@"; do
+  case "$arg" in -c|-S|-E|-M|-MM|-fsyntax-only) links=false ;; esac
+done
+if [[ "$links" == true ]]; then
+  args+=(-fuse-ld=lld -rtlib=compiler-rt -unwindlib=libunwind)
+fi
+exec "$driver" "${args[@]}" "$@"
