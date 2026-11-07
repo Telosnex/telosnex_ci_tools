@@ -23,6 +23,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [image_ffmpeg](https://github.com/Telosnex/image_ffmpeg) | ✅ | ✅ |
 | [irondash](https://github.com/Telosnex/irondash) | — | ✅ |
 | [kiln](https://github.com/Telosnex/kiln) | — | ✅ |
+| [lame](https://github.com/Telosnex/lame) | ✅ | ✅ |
 | [lua_dart](https://github.com/Telosnex/lua_dart) | ✅ | ✅ |
 | [monet_ui](https://github.com/Telosnex/monet_ui) | — | ✅ |
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
