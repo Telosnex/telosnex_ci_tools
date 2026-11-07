@@ -19,6 +19,7 @@ packages:
     checks: [kiln_check.yml, cuda_pack.yml]
   - repo: Telosnex/fonnx
   - repo: Telosnex/image_ffmpeg
+  - repo: Telosnex/lame
   - repo: Telosnex/lua_dart
   - repo: Telosnex/nutdart
   - repo: Telosnex/telosnex_audio
