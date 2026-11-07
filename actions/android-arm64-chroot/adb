@@ -19,7 +19,7 @@ in_chroot() {
   sudo env -i \
     PATH=/apex/com.android.runtime/bin:/system/bin:/system/xbin \
     ANDROID_ROOT=/system ANDROID_DATA=/data TMPDIR=/data/local/tmp HOME=/data \
-    chroot "$root" /system/bin/sh -c "$1"
+    /usr/sbin/chroot "$root" /system/bin/sh -c "$1"
 }
 
 # The chroot path of an adb device path.
