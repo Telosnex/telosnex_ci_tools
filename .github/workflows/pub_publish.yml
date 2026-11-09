@@ -68,9 +68,9 @@ jobs:
           persist-credentials: false
       # Exchanges the OIDC token for a pub.dev token.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@5775736bac784eed742ab6b8a3c3ad99e42340c2 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@e1b53524845e75c3343a31f85819a03575e0da10 # self
       - id: rename
-        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@5775736bac784eed742ab6b8a3c3ad99e42340c2 # self
+        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@e1b53524845e75c3343a31f85819a03575e0da10 # self
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           repository: ${{ github.server_url }}/${{ github.repository }}
