@@ -106,6 +106,31 @@ Outcome? resultOf(String message) {
   );
 }
 
+/// The test counts of a run, from its reporter lines. The reporter counts
+/// `(setUpAll)` and `(tearDownAll)` as tests; these counts do not.
+final class Progress {
+  var _counts = (passed: 0, skipped: 0, failed: 0);
+  final _hooks = <String>{};
+
+  /// Reads one flutter log line.
+  void add(String message) {
+    final counts = countsOf(message);
+    if (counts == null) return;
+    _counts = counts;
+    final name = message.substring(message.indexOf(': ') + 2);
+    if (name == '(setUpAll)' || name == '(tearDownAll)') _hooks.add(name);
+  }
+
+  int get passed => (_counts.passed - _hooks.length).clamp(0, _counts.passed);
+  int get failed => _counts.failed;
+  int get skipped => _counts.skipped;
+
+  @override
+  String toString() =>
+      '$passed passed, $failed failed'
+      '${skipped > 0 ? ', $skipped skipped' : ''}';
+}
+
 /// The tag and message of a `logcat -v tag` line ("I/flutter ( 123): text"
 /// or "I/flutter: text"), or null.
 (String, String)? parseLogcat(String line) {
@@ -144,14 +169,8 @@ Future<RunResult> runOne({
   final tail = <String>[];
   final done = Completer<RunResult>();
   var lastLine = DateTime.now();
-  ({int passed, int skipped, int failed}) counts = (
-    passed: 0,
-    skipped: 0,
-    failed: 0,
-  );
-  String counted() =>
-      '${counts.passed} passed, ${counts.failed} failed'
-      '${counts.skipped > 0 ? ', ${counts.skipped} skipped' : ''}';
+  final progress = Progress();
+  String counted() => '$progress';
   final sub = logcat.stdout
       .transform(utf8.decoder)
       .transform(const LineSplitter())
@@ -167,7 +186,7 @@ Future<RunResult> runOne({
         if (tag == 'flutter') {
           stdout.writeln(message);
           lastLine = DateTime.now();
-          counts = countsOf(message) ?? counts;
+          progress.add(message);
           final outcome = resultOf(message);
           if (outcome != null && !done.isCompleted) {
             done.complete(RunResult(outcome, counted()));

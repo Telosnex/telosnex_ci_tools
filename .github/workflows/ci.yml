@@ -134,7 +134,8 @@ jobs:
         run: |
           rc=0
           dart actions/android-arm64-container/run_tests.dart "$RUNNER_TEMP/apks/fail" 2 5 > "$RUNNER_TEMP/fail.txt" || rc=$?
-          cat "$RUNNER_TEMP/fail.txt"
+          # The expected failure, not as an annotation.
+          sed 's/^::error::/error: /' "$RUNNER_TEMP/fail.txt"
           [[ "$rc" == 1 ]] || { echo "::error::The failing test file gave exit code $rc, not 1."; exit 1; }
           grep -q '^::error::integration_test/fail.dart: 1 passed, 1 failed$' "$RUNNER_TEMP/fail.txt"
 

@@ -48,4 +48,20 @@ void main() {
     ));
     expect(countsOf('Expected: <2>'), isNull);
   });
+
+  test('Progress does not count setUpAll and tearDownAll', () {
+    final progress = Progress();
+    for (final line in [
+      '00:00 +0: (setUpAll)',
+      '00:00 +1: passes',
+      '00:00 +2: fails',
+      '00:00 +2 -1: fails [E]',
+      'Expected: <2>',
+      '00:00 +2 -1: (tearDownAll)',
+      '00:00 +3 -1: Some tests failed.',
+    ]) {
+      progress.add(line);
+    }
+    expect('$progress', '1 passed, 1 failed');
+  });
 }
