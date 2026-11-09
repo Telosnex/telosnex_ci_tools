@@ -1,0 +1,172 @@
+# Runs a full arm64 Android system, with its app framework, on an arm64
+# Linux runner (ubuntu-24.04-arm): Redroid, AOSP in a Docker container on
+# the runner's own CPU and kernel. GitHub's runners have no arm64 Android
+# emulator (actions/android-arm64-chroot). Android uses the kernel's binder
+# driver, a module of the runner's kernel.
+#
+# With `apks`, it runs the integration test APKs of actions/android-test-apks
+# (download the artifact first, and run actions/setup-flutter: the runner is
+# a Dart script). Without, it boots the system, and later steps use adb.
+#
+# The kernel is the runner's: 4 KB memory pages (android-test-apks checks
+# the 16 KB alignment). Graphics are software (SwiftShader). There is no
+# Google Play services.
+name: Android ARM64 container
+description: Boots arm64 Android (Redroid) in a container on an arm64 Linux runner; runs test APKs.
+
+inputs:
+  image:
+    description: The Redroid image, pinned by digest.
+    required: false
+    # Android 15, 64-bit only. The images are built by the Redroid project
+    # (github.com/remote-android/redroid-doc) from AOSP. Android 16
+    # (16.0.0-250627, with or without _64only) never sets boot_completed on
+    # the runner's kernel (6.x azure, 2026-11-09); 14 and 15 boot in 15 s.
+    default: redroid/redroid:15.0.0_64only-250627@sha256:b51bde9cef80f7bd7581148192f2b2f4d41f23c6344cfe88eceeb8ddd67490ee
+  apks:
+    description: >-
+      A directory with the APKs and apks.tsv of actions/android-test-apks, to
+      run one after another. Empty: only boot.
+    required: false
+    default: ''
+  idle-minutes:
+    description: Fail a test file after this many minutes without flutter output.
+    required: false
+    default: '5'
+  file-minutes:
+    description: Fail a test file after this many minutes.
+    required: false
+    default: '20'
+  boot-timeout-minutes:
+    description: Minutes for the boot, with the image download.
+    required: false
+    default: '10'
+  artifact-name:
+    description: 'Upload the logcat, props and dmesg under this name when the action fails. Empty: no upload.'
+    required: false
+    default: android-arm64-container-logs
+
+outputs:
+  serial:
+    description: >-
+      The adb serial of the container, also set as ANDROID_SERIAL. adb also
+      lists the container as emulator-5554: name the device.
+    value: localhost:5555
+  logcat:
+    description: The logcat from boot on (adb logcat keeps writing it).
+    value: ${{ runner.temp }}/android-arm64-container/logcat.txt
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      shell: bash
+      env:
+        APKS: ${{ inputs.apks }}
+      run: |
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != ARM64 ]]; then
+          echo "::error::android-arm64-container needs an arm64 Linux runner (ubuntu-24.04-arm), not $RUNNER_OS $RUNNER_ARCH."
+          exit 1
+        fi
+        if [[ -n "$APKS" ]]; then
+          command -v dart > /dev/null || { echo '::error::Run actions/setup-flutter first: the test runner is a Dart script.'; exit 1; }
+          [[ -f "$APKS/apks.tsv" ]] || { echo "::error::$APKS has no apks.tsv: download the actions/android-test-apks artifact there."; exit 1; }
+        fi
+    - name: Binder and adb
+      shell: bash
+      run: |
+        # The image's kernel has binder as a module (CONFIG_ANDROID_BINDER_IPC=m);
+        # an image without it may have it in linux-modules-extra.
+        if ! sudo modprobe binder_linux devices=binder,hwbinder,vndbinder 2> /dev/null; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)" > /dev/null
+          sudo modprobe binder_linux devices=binder,hwbinder,vndbinder
+        fi
+        if ! command -v adb > /dev/null; then
+          sudo apt-get install -y -qq adb > /dev/null 2>&1 ||
+            { sudo apt-get update -qq && sudo apt-get install -y -qq adb > /dev/null; }
+        fi
+        adb version | head -2
+    - name: Boot Android
+      id: boot
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
+      run: |
+        start=$(date +%s)
+        deadline=$(( start + BOOT_TIMEOUT_MINUTES * 60 ))
+        serial=localhost:5555
+        logs="$RUNNER_TEMP/android-arm64-container"
+        mkdir -p "$logs"
+        echo "ANDROID_SERIAL=$serial" >> "$GITHUB_ENV"
+        export ANDROID_SERIAL=$serial
+        for try in 1 2 3; do
+          docker pull -q "$IMAGE" > /dev/null && break
+          (( try == 3 )) && { echo "::error::$IMAGE did not download."; exit 1; }
+          echo "::warning::$IMAGE did not download (try $try); trying again in 30 s."
+          sleep 30
+        done
+        docker run -d --privileged --name android -p 5555:5555 "$IMAGE" > /dev/null
+        # Redroid logs to logcat, not to Docker. Until boot_completed, the
+        # failure reports what Android started.
+        boot_failed() {
+          echo "::error::$1"
+          adb shell getprop > "$logs/getprop.txt" 2>&1 || true
+          adb logcat -d -v threadtime > "$logcat" 2>&1 || true
+          sudo dmesg > "$logs/dmesg.txt" 2>&1 || true
+          grep -E '^\[init\.svc\.' "$logs/getprop.txt" | grep -v running || true
+          exit 1
+        }
+        logcat="$logs/logcat.txt"
+        until [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]]; do
+          if (( $(date +%s) > deadline )); then
+            boot_failed "Android did not boot in $BOOT_TIMEOUT_MINUTES minutes."
+          fi
+          adb connect "$serial" > /dev/null 2>&1 || true
+          sleep 3
+        done
+        nohup adb logcat -v threadtime > "$logcat" 2>&1 &
+        # boot_completed comes before every system service answers: wait for
+        # the package manager, the window manager and the power service, 5
+        # times in a row.
+        ready=0
+        while (( ready < 5 )); do
+          if (( $(date +%s) > deadline )); then
+            boot_failed "Android booted but its services did not start in $BOOT_TIMEOUT_MINUTES minutes."
+          fi
+          if adb shell pm path android > /dev/null 2>&1 &&
+            adb shell service check window 2> /dev/null | grep -q ': found' &&
+            adb shell service check power 2> /dev/null | grep -q ': found'; then
+            ready=$(( ready + 1 ))
+          else
+            ready=0
+          fi
+          sleep 2
+        done
+        # An app gets its window size only when the screen is on and
+        # unlocked: before, a Flutter view is 0x0 and taps miss.
+        adb shell svc power stayon true
+        adb shell input keyevent KEYCODE_WAKEUP
+        adb shell wm dismiss-keyguard
+        adb shell locksettings set-disabled true > /dev/null 2>&1 || true
+        for s in window_animation_scale transition_animation_scale animator_duration_scale; do
+          adb shell settings put global "$s" 0
+        done
+        release=$(adb shell getprop ro.build.version.release | tr -d '\r')
+        abi=$(adb shell getprop ro.product.cpu.abi | tr -d '\r')
+        echo "Android $release $abi container ready after $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+    - if: inputs.apks != ''
+      name: Run the test APKs
+      shell: bash
+      env:
+        APKS: ${{ inputs.apks }}
+        IDLE_MINUTES: ${{ inputs.idle-minutes }}
+        FILE_MINUTES: ${{ inputs.file-minutes }}
+      run: dart "$GITHUB_ACTION_PATH/run_tests.dart" "$APKS" "$IDLE_MINUTES" "$FILE_MINUTES"
+    - if: (failure() || cancelled()) && inputs.artifact-name != ''
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/android-arm64-container
+        if-no-files-found: ignore

@@ -1,0 +1,163 @@
+# Builds one debug APK per integration test file of a Flutter app, with the
+# test file as the app's entry point, on an x64 Linux runner (ubuntu-24.04).
+# actions/android-arm64-container runs them on an arm64 runner: Google
+# builds no arm64 Linux aapt2, adb or NDK, so the APKs cannot be built there.
+#
+# Each APK runs its test file when launched and logs flutter_test's result
+# line; the app needs no androidTest code. It also checks that the 64-bit
+# native libraries of the first APK work with 16 KB memory pages
+# (page_alignment.dart).
+#
+# Run actions/setup-flutter and flutter pub get first. The APKs and
+# apks.tsv (file, package, activity, test file) are uploaded as the
+# artifact `artifact-name`.
+name: Android test APKs
+description: Builds a debug APK per integration test file, for actions/android-arm64-container.
+
+inputs:
+  working-directory:
+    description: The Flutter app.
+    required: true
+  targets:
+    description: >-
+      The test files, relative to working-directory: paths or bash globs, one
+      per line.
+    required: false
+    default: integration_test/*_test.dart
+  target-platform:
+    description: flutter build apk --target-platform.
+    required: false
+    default: android-arm64
+  build-args:
+    description: More flutter build apk arguments, split on spaces (for example --dart-define=X=1).
+    required: false
+    default: ''
+  check-page-alignment:
+    description: Fail if a 64-bit native library would not load with 16 KB memory pages.
+    required: false
+    default: 'true'
+  artifact-name:
+    description: The name of the uploaded artifact.
+    required: false
+    default: android-test-apks
+  gradle-wrappers:
+    description: >-
+      Git pathspecs (one per line) of the gradle-wrapper.properties files whose
+      Gradle distributions to cache and download first. Empty: none.
+    required: false
+    default: ':(glob)**/example/**/android/gradle/wrapper/gradle-wrapper.properties'
+
+outputs:
+  artifact-name:
+    description: The name of the uploaded artifact.
+    value: ${{ inputs.artifact-name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the runner
+      shell: bash
+      run: |
+        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != X64 ]]; then
+          echo "::error::android-test-apks needs an x64 Linux runner (ubuntu-24.04), not $RUNNER_OS $RUNNER_ARCH: Google builds no arm64 Linux Android build tools."
+          exit 1
+        fi
+        command -v flutter > /dev/null || { echo '::error::Run actions/setup-flutter first.'; exit 1; }
+    # The Gradle wrapper downloads its distribution from GitHub releases with
+    # no retry: see actions/android-emulator.
+    - name: Gradle distributions
+      id: gradle
+      shell: bash
+      env:
+        WRAPPERS: ${{ inputs.gradle-wrappers }}
+      run: |
+        list="$RUNNER_TEMP/gradle-distributions.txt"
+        echo "list=$list" >> "$GITHUB_OUTPUT"
+        "$GITHUB_ACTION_PATH/../android-emulator/gradle_distributions.sh" list "$WRAPPERS" "$list" >> "$GITHUB_OUTPUT"
+    - if: steps.gradle.outputs.key != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.gradle/wrapper/dists
+        key: ${{ steps.gradle.outputs.key }}
+    - if: steps.gradle.outputs.key != ''
+      name: Download the Gradle distributions
+      shell: bash
+      env:
+        LIST: ${{ steps.gradle.outputs.list }}
+      run: '"$GITHUB_ACTION_PATH/../android-emulator/gradle_distributions.sh" download "$LIST"'
+    - id: build
+      name: Build the APKs
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TARGETS: ${{ inputs.targets }}
+        TARGET_PLATFORM: ${{ inputs.target-platform }}
+        BUILD_ARGS: ${{ inputs.build-args }}
+      run: |
+        out="$RUNNER_TEMP/android-test-apks"
+        rm -rf "$out" && mkdir -p "$out"
+        echo "out=$out" >> "$GITHUB_OUTPUT"
+        files=()
+        shopt -s nullglob
+        while IFS= read -r pattern; do
+          [[ -n "$pattern" ]] || continue
+          # shellcheck disable=SC2206 # The pattern is a glob.
+          matched=($pattern)
+          (( ${#matched[@]} )) || { echo "::error::No test file matches $pattern."; exit 1; }
+          files+=("${matched[@]}")
+        done <<< "$TARGETS"
+        (( ${#files[@]} )) || { echo '::error::targets names no test file.'; exit 1; }
+        aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+        for target in "${files[@]}"; do
+          echo "::group::$target"
+          # Gradle downloads dependencies with no retry, some through GitHub
+          # releases (the wrapper's distribution, Kotlin), which sometimes
+          # answer 504: try again after a download failure.
+          for try in 1 2 3 4; do
+            rc=0
+            # shellcheck disable=SC2086 # BUILD_ARGS splits on spaces.
+            flutter build apk --debug --target-platform "$TARGET_PLATFORM" -t "$target" $BUILD_ARGS 2>&1 \
+              | tee "$RUNNER_TEMP/flutter-build.txt" || rc=$?
+            (( rc == 0 )) && break
+            if (( try == 4 )) || ! grep -qE 'error while downloading artifacts from the network|(HTTP response code:|status code) 5[0-9][0-9]' "$RUNNER_TEMP/flutter-build.txt"; then
+              echo "::endgroup::"
+              echo "::error::$target: flutter build apk failed."
+              exit "$rc"
+            fi
+            echo "::warning::$target: a Gradle download failed (try $try); building again in 60 s."
+            sleep 60
+          done
+          echo "::endgroup::"
+          name=$(echo "${target%.dart}" | tr '/' '_').apk
+          cp build/app/outputs/flutter-apk/app-debug.apk "$out/$name"
+          badging=$("$aapt2" dump badging "$out/$name")
+          package=$(sed -nE "s/^package: name='([^']+)'.*/\1/p" <<< "$badging")
+          activity=$(sed -nE "s/^launchable-activity: name='([^']+)'.*/\1/p" <<< "$badging")
+          if [[ -z "$package" || -z "$activity" ]]; then
+            echo "::error::$target: the APK has no package name or launchable activity."
+            exit 1
+          fi
+          printf '%s\t%s\t%s\t%s\n' "$name" "$package" "$activity" "$target" >> "$out/apks.tsv"
+        done
+        echo "${#files[@]} test APKs for $TARGET_PLATFORM:" >> "$GITHUB_STEP_SUMMARY"
+        cut -f4 "$out/apks.tsv" | sed 's/^/- `/; s/$/`/' >> "$GITHUB_STEP_SUMMARY"
+    # Every APK has the same native libraries: the Dart entry point is not
+    # native code.
+    - if: inputs.check-page-alignment == 'true'
+      name: Check the 16 KB page alignment
+      shell: bash
+      env:
+        OUT: ${{ steps.build.outputs.out }}
+      run: |
+        first=$(head -1 "$OUT/apks.tsv" | cut -f1)
+        if ! dart "$GITHUB_ACTION_PATH/page_alignment.dart" "$OUT/$first" > "$RUNNER_TEMP/page_alignment.txt"; then
+          while IFS= read -r line; do echo "::error::$line"; done < "$RUNNER_TEMP/page_alignment.txt"
+          exit 1
+        fi
+        echo "The 64-bit native libraries work with 16 KB pages."
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.build.outputs.out }}
+        retention-days: 3
+        if-no-files-found: error
