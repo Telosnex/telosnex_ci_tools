@@ -3,7 +3,8 @@
 # arm64 image on the arm runner, is too slow for tests.
 #
 # The emulator keeps running for the later steps of the job. adb is on PATH
-# after this action (it is not on ubuntu-24.04).
+# after this action (it is not on ubuntu-24.04). It also caches the Gradle
+# distributions of the checkout's example apps, for the later flutter build.
 name: Android emulator
 description: Boots an x86_64 Android emulator with KVM, and puts adb on PATH.
 
@@ -36,6 +37,12 @@ inputs:
     description: More emulator options, split on spaces (for example -feature -Name).
     required: false
     default: ''
+  gradle-wrappers:
+    description: >-
+      Git pathspecs (one per line) of the gradle-wrapper.properties files whose
+      Gradle distributions to cache and download first. Empty: none.
+    required: false
+    default: ':(glob)**/example/**/android/gradle/wrapper/gradle-wrapper.properties'
   boot-timeout-minutes:
     description: Minutes for the boot, with the system image download.
     required: false
@@ -55,6 +62,67 @@ outputs:
 runs:
   using: composite
   steps:
+    # The Gradle wrapper downloads its distribution from GitHub releases with
+    # no retry: a 504 there failed flutter_local_notifications and
+    # receive_sharing_intent (2026-11-08). The distributions are cached, and
+    # on a miss downloaded here with retries.
+    - name: Gradle distributions
+      id: gradle
+      shell: bash
+      env:
+        WRAPPERS: ${{ inputs.gradle-wrappers }}
+      run: |
+        list="$RUNNER_TEMP/gradle-distributions.txt"
+        : > "$list"
+        pathspecs=()
+        while IFS= read -r spec; do [[ -n "$spec" ]] && pathspecs+=("$spec"); done <<< "$WRAPPERS"
+        if (( ${#pathspecs[@]} )) && git rev-parse --git-dir > /dev/null 2>&1; then
+          git ls-files -z -- "${pathspecs[@]}" | while IFS= read -r -d '' f; do
+            url=$(sed -nE 's/^distributionUrl=//p' "$f" | sed 's/\\:/:/g' | tr -d '\r')
+            sha=$(sed -nE 's/^distributionSha256Sum=//p' "$f" | tr -d '\r')
+            [[ -n "$url" ]] && echo "$url $sha" >> "$list"
+          done
+        fi
+        sort -u -o "$list" "$list"
+        echo "list=$list" >> "$GITHUB_OUTPUT"
+        if [[ -s "$list" ]]; then
+          echo "key=gradle-dists-$RUNNER_OS-$(sha256sum "$list" | cut -c1-16)" >> "$GITHUB_OUTPUT"
+          echo "Gradle distributions:"; sed 's/^/  /' "$list"
+        fi
+    - if: steps.gradle.outputs.key != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.gradle/wrapper/dists
+        key: ${{ steps.gradle.outputs.key }}
+    - if: steps.gradle.outputs.key != ''
+      name: Download the Gradle distributions
+      shell: bash
+      env:
+        LIST: ${{ steps.gradle.outputs.list }}
+      run: |
+        dists="${GRADLE_USER_HOME:-$HOME/.gradle}/wrapper/dists"
+        while read -r url sha; do
+          zip=${url##*/}
+          # The wrapper's folder: <zip name>/<MD5 of the URL in base 36>.
+          hash=$(python3 -c 'import hashlib,sys
+        n=int(hashlib.md5(sys.argv[1].encode()).hexdigest(),16); s=""
+        while n: n,r=divmod(n,36); s="0123456789abcdefghijklmnopqrstuvwxyz"[r]+s
+        print(s)' "$url")
+          dir="$dists/${zip%.zip}/$hash"
+          if [[ -f "$dir/$zip.ok" ]]; then echo "$zip: cached"; continue; fi
+          mkdir -p "$dir"
+          if ! curl -fsSL --retry 6 --retry-all-errors --retry-delay 20 -o "$dir/$zip" "$url"; then
+            echo "::warning::$url did not download; the Gradle wrapper tries again itself."
+            rm -rf "$dir"; continue
+          fi
+          if [[ -n "$sha" ]] && ! echo "$sha  $dir/$zip" | sha256sum -c --status; then
+            echo "::warning::$zip does not have the SHA-256 of its gradle-wrapper.properties."
+            rm -rf "$dir"; continue
+          fi
+          unzip -q "$dir/$zip" -d "$dir"
+          touch "$dir/$zip.ok"
+          echo "$zip: downloaded"
+        done < "$LIST"
     - name: KVM
       shell: bash
       run: |
