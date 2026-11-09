@@ -111,15 +111,15 @@ runs:
         for target in "${files[@]}"; do
           echo "::group::$target"
           # Gradle downloads dependencies with no retry, some through GitHub
-          # releases (Kotlin), which sometimes answer 504: try again when
-          # flutter says that a download failed.
-          for try in 1 2 3; do
+          # releases (the wrapper's distribution, Kotlin), which sometimes
+          # answer 504: try again after a download failure.
+          for try in 1 2 3 4; do
             rc=0
             # shellcheck disable=SC2086 # BUILD_ARGS splits on spaces.
             flutter build apk --debug --target-platform "$TARGET_PLATFORM" -t "$target" $BUILD_ARGS 2>&1 \
               | tee "$RUNNER_TEMP/flutter-build.txt" || rc=$?
             (( rc == 0 )) && break
-            if (( try == 3 )) || ! grep -q 'error while downloading artifacts from the network' "$RUNNER_TEMP/flutter-build.txt"; then
+            if (( try == 4 )) || ! grep -qE 'error while downloading artifacts from the network|(HTTP response code:|status code) 5[0-9][0-9]' "$RUNNER_TEMP/flutter-build.txt"; then
               echo "::endgroup::"
               echo "::error::$target: flutter build apk failed."
               exit "$rc"
