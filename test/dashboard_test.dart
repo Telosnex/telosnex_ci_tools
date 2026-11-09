@@ -78,6 +78,12 @@ void main() {
       expect(cell.isNormal, isTrue);
     });
 
+    test('container is the usual way to run Android ARM64', () {
+      final cell = parseJobName('Android ARM64 container')!;
+      expect(cell.column, 'Android ARM64');
+      expect(cell.isNormal, isTrue);
+    });
+
     test('columns: alphabetical ignoring case, web last', () {
       final names = [
         'Web Linux x64 Safari',

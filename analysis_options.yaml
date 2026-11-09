@@ -4,3 +4,5 @@ analyzer:
   exclude:
     # Flutter packages, each with its own pub get and job in ci.yml.
     - packages/**
+    # Flutter test files, built into an app by ci.yml.
+    - test/fixtures/android_test_apks/**

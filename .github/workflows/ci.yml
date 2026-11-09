@@ -76,6 +76,68 @@ jobs:
           adb pull /data/local/tmp/t/program "$RUNNER_TEMP/pulled"
           cmp "$RUNNER_TEMP/program" "$RUNNER_TEMP/pulled"
 
+  # actions/android-test-apks and actions/android-arm64-container together:
+  # a new Flutter app with the fixture test files, built on x64 and run on
+  # arm64. The passing file passes, and the failing one fails the run.
+  test-apks:
+    name: Test APKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - name: Create the fixture app
+        run: |
+          flutter create --org dev.telosnex --platforms android --project-name fixture build/fixture
+          cd build/fixture
+          flutter pub add 'dev:integration_test:{"sdk":"flutter"}'
+          mkdir integration_test
+          cp ../../test/fixtures/android_test_apks/*.dart integration_test/
+          # The action reads the Gradle wrapper files that Git lists.
+          git add --intent-to-add -f android/gradle/wrapper/gradle-wrapper.properties
+      - uses: ./actions/android-test-apks
+        with:
+          working-directory: build/fixture
+          targets: |
+            integration_test/pass.dart
+            integration_test/fail.dart
+          gradle-wrappers: build/fixture/android/gradle/wrapper/gradle-wrapper.properties
+
+  android-arm64-container:
+    name: Android ARM64 container
+    needs: test-apks
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - uses: ./actions/download-artifact
+        with:
+          name: android-test-apks
+          path: ${{ runner.temp }}/apks
+      - name: Split the passing and failing APKs
+        run: |
+          apks="$RUNNER_TEMP/apks"
+          for kind in pass fail; do
+            mkdir -p "$apks/$kind"
+            grep -P "\tintegration_test/$kind\.dart$" "$apks/apks.tsv" > "$apks/$kind/apks.tsv"
+            ln -s "$apks/$(cut -f1 "$apks/$kind/apks.tsv")" "$apks/$kind/"
+          done
+      - uses: ./actions/android-arm64-container
+        with:
+          apks: ${{ runner.temp }}/apks/pass
+      - name: A failing test fails the run
+        run: |
+          rc=0
+          dart actions/android-arm64-container/run_tests.dart "$RUNNER_TEMP/apks/fail" 2 5 > "$RUNNER_TEMP/fail.txt" || rc=$?
+          cat "$RUNNER_TEMP/fail.txt"
+          [[ "$rc" == 1 ]] || { echo "::error::The failing test file gave exit code $rc, not 1."; exit 1; }
+          grep -q '^::error::integration_test/fail.dart: 1 passed, 1 failed$' "$RUNNER_TEMP/fail.txt"
+
   web-test-package:
     name: Package telosnex_web_test
     runs-on: ubuntu-24.04

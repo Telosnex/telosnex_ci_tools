@@ -41,10 +41,11 @@ final class JobCell {
   bool get isNormal => detail == null || normalDetails.contains(detail);
 
   /// The details that name the usual way to run a column: a device for
-  /// mobile (`chroot`: actions/android-arm64-chroot), a compiler for the
-  /// web.
+  /// mobile (`chroot`: actions/android-arm64-chroot, `container`:
+  /// actions/android-arm64-container), a compiler for the web.
   static const normalDetails = {
     'chroot',
+    'container',
     'emulator',
     'simulator',
     'dart2js',
