@@ -10,6 +10,7 @@ import '../actions/watch/watch.dart';
 Future<(int, String)> _watch(
   List<String> command, {
   int idle = 1,
+  int? limit,
   String? ignore,
   String? onStall,
 }) async {
@@ -19,6 +20,7 @@ Future<(int, String)> _watch(
   final code = await watch(
     WatchOptions(
       idle: Duration(seconds: idle),
+      limit: limit == null ? null : Duration(seconds: limit),
       command: command,
       ignore: ignore == null ? null : RegExp(ignore),
       onStall: onStall,
@@ -79,21 +81,43 @@ void main() {
     expect(code, stallExitCode);
   });
 
+  test('--limit stops a command that keeps printing', () async {
+    final clock = Stopwatch()..start();
+    final (code, out) = await _watch(
+      ['bash', '-c', r'while true; do echo progress; sleep 0.2; done'],
+      idle: 5,
+      limit: 1,
+      onStall: 'echo saving diagnostics',
+    );
+    expect(code, stallExitCode);
+    expect(clock.elapsed, lessThan(const Duration(seconds: 5)));
+    expect(out, contains('ran for more than 1 s'));
+  });
+
+  test('a command within --limit passes on its exit code', () async {
+    final (code, _) = await _watch(['bash', '-c', 'echo hi; exit 2'], limit: 5);
+    expect(code, 2);
+  });
+
   group('WatchOptions.parse', () {
     test('every option', () {
       final o = WatchOptions.parse([
-        '--idle', '480', '--ignore', 'x', '--on-stall', 'y', '--', 'a', 'b', //
+        '--idle', '480', '--limit', '60', '--ignore', 'x', '--on-stall', 'y', //
+        '--', 'a', 'b',
       ]);
       expect(o.idle, const Duration(minutes: 8));
+      expect(o.limit, const Duration(minutes: 1));
       expect(o.ignore?.pattern, 'x');
       expect(o.onStall, 'y');
       expect(o.command, ['a', 'b']);
     });
 
-    test('empty --ignore and --on-stall are unset', () {
+    test('empty --limit, --ignore and --on-stall are unset', () {
       final o = WatchOptions.parse([
         '--idle',
         '1',
+        '--limit',
+        '',
         '--ignore',
         '',
         '--on-stall',
@@ -101,6 +125,7 @@ void main() {
         '--',
         'a',
       ]);
+      expect(o.limit, isNull);
       expect(o.ignore, isNull);
       expect(o.onStall, isNull);
     });
@@ -109,6 +134,7 @@ void main() {
       ['--idle', '1'],
       ['--', 'a'],
       ['--idle', 'x', '--', 'a'],
+      ['--idle', '1', '--limit', '0', '--', 'a'],
       ['--nope', '--', 'a'],
     ]) {
       test('rejects $args', () {

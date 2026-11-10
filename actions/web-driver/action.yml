@@ -55,6 +55,13 @@ inputs:
     description: Minutes without output before `run` is stopped.
     required: false
     default: '10'
+  run-minutes:
+    description: >-
+      Optional. Minutes before `run` is stopped, output or not (a driver that
+      prints progress never goes idle). Use it instead of the step's
+      timeout-minutes: that timeout also cancels the log upload.
+    required: false
+    default: ''
   working-directory:
     description: The directory of `run`.
     required: false
@@ -173,6 +180,7 @@ runs:
         BROWSER: ${{ inputs.browser }}
         WATCH_RUN: ${{ inputs.run }}
         WATCH_IDLE_MINUTES: ${{ inputs.idle-minutes }}
+        WATCH_RUN_MINUTES: ${{ inputs.run-minutes }}
         REQUIRE_RESULT: ${{ inputs.require-result }}
         LOGS: ${{ steps.start.outputs.logs }}
       run: |
@@ -192,10 +200,12 @@ runs:
           sdk_dart="$(dirname "$(command -v dart)")/cache/dart-sdk/bin/dart.exe"
           if [[ -f "$sdk_dart" ]]; then dart_exe=$sdk_dart; fi
         fi
+        limit=''
+        if [[ -n "$WATCH_RUN_MINUTES" ]]; then limit=$(( WATCH_RUN_MINUTES * 60 )); fi
         for attempt in 1 2 3; do
           out="$LOGS/run_$attempt.log"
           status=0
-          "$dart_exe" "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" \
+          "$dart_exe" "$GITHUB_ACTION_PATH/../watch/watch.dart" --idle "$(( WATCH_IDLE_MINUTES * 60 ))" --limit "$limit" \
             -- "$bash_exe" -eo pipefail -c "$WATCH_RUN" 2>&1 | tee "$out" || status=$?
           grep -q "SessionNotCreatedException" "$out" || break
           echo "::warning::$BROWSER: the driver could not start a session (attempt $attempt)"

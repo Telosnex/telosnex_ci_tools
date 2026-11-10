@@ -1,13 +1,18 @@
 // Runs a command, and stops it when it prints nothing for a time.
 //
-//   dart watch.dart --idle <seconds> [--ignore <regex>] [--on-stall <cmd>]
-//       -- <command> [<args>...]
+//   dart watch.dart --idle <seconds> [--limit <seconds>] [--ignore <regex>]
+//       [--on-stall <cmd>] -- <command> [<args>...]
 //
 // A test command that waits forever (an app that never connects, a page that
 // never loads) prints nothing until the job times out. This stops it after
 // --idle seconds without output, runs --on-stall first (a shell command that
 // saves diagnostics), and exits 124, as timeout(1). Otherwise the exit code
 // is the command's.
+//
+// --limit: the most seconds the command may run, output or not. It is stopped
+// the same way. A test that prints progress while it waits never stalls; a
+// limit shorter than the step's timeout-minutes leaves time for the steps
+// after it (a log upload), which that timeout would cancel too.
 //
 // --ignore: lines that match do not count as output (verbose log lines that
 // a stalled tool still prints).
@@ -29,8 +34,8 @@ Future<void> main(List<String> arguments) async {
     stderr
       ..writeln('watch: ${e.message}')
       ..writeln(
-        'Usage: dart watch.dart --idle <seconds> [--ignore <regex>] '
-        '[--on-stall <cmd>] -- <command> [<args>...]',
+        'Usage: dart watch.dart --idle <seconds> [--limit <seconds>] '
+        '[--ignore <regex>] [--on-stall <cmd>] -- <command> [<args>...]',
       );
     exit(64);
   }
@@ -39,6 +44,7 @@ Future<void> main(List<String> arguments) async {
 
 class WatchOptions {
   final Duration idle;
+  final Duration? limit;
   final RegExp? ignore;
   final String? onStall;
   final List<String> command;
@@ -46,6 +52,7 @@ class WatchOptions {
   WatchOptions({
     required this.idle,
     required this.command,
+    this.limit,
     this.ignore,
     this.onStall,
   });
@@ -58,6 +65,7 @@ class WatchOptions {
     final options = args.sublist(0, split);
     final command = args.sublist(split + 1);
     Duration? idle;
+    Duration? limit;
     RegExp? ignore;
     String? onStall;
     for (var i = 0; i < options.length; i++) {
@@ -68,14 +76,20 @@ class WatchOptions {
         return options[++i];
       }
 
+      Duration seconds(String option, String v) {
+        final n = int.tryParse(v);
+        if (n == null || n <= 0) {
+          throw FormatException('$option $v: not a number of seconds.');
+        }
+        return Duration(seconds: n);
+      }
+
       switch (options[i]) {
         case '--idle':
+          idle = seconds('--idle', value());
+        case '--limit':
           final v = value();
-          final seconds = int.tryParse(v);
-          if (seconds == null || seconds <= 0) {
-            throw FormatException('--idle $v: not a number of seconds.');
-          }
-          idle = Duration(seconds: seconds);
+          if (v.isNotEmpty) limit = seconds('--limit', v);
         case '--ignore':
           final v = value();
           if (v.isNotEmpty) ignore = RegExp(v);
@@ -89,6 +103,7 @@ class WatchOptions {
     if (idle == null) throw const FormatException('--idle is required.');
     return WatchOptions(
       idle: idle,
+      limit: limit,
       command: command,
       ignore: ignore,
       onStall: onStall,
@@ -113,7 +128,8 @@ Future<int> watch(
     runInShell:
         Platform.isWindows && !options.command.first.contains(RegExp(r'[\\/]')),
   );
-  var lastOutput = DateTime.now();
+  final started = DateTime.now();
+  var lastOutput = started;
   final done = <Future<void>>[];
   for (final (stream, sink) in [(process.stdout, out), (process.stderr, err)]) {
     done.add(
@@ -130,6 +146,7 @@ Future<int> watch(
   }
 
   var stalled = false;
+  String? reason;
   final exit = Completer<int>();
   unawaited(
     process.exitCode.then((code) {
@@ -138,7 +155,14 @@ Future<int> watch(
   );
   final timer = Timer.periodic(tick, (timer) {
     if (exit.isCompleted || stalled) return;
-    if (DateTime.now().difference(lastOutput) > options.idle) {
+    final now = DateTime.now();
+    if (now.difference(lastOutput) > options.idle) {
+      reason = 'no output for ${options.idle.inSeconds} s';
+    } else if (options.limit case final limit?
+        when now.difference(started) > limit) {
+      reason = 'ran for more than ${limit.inSeconds} s';
+    }
+    if (reason != null) {
       stalled = true;
       timer.cancel();
       exit.complete(-1);
@@ -151,10 +175,7 @@ Future<int> watch(
     return code;
   }
 
-  err.writeln(
-    '::warning::watch: no output for ${options.idle.inSeconds} s: '
-    '${options.command.join(' ')}',
-  );
+  err.writeln('::warning::watch: $reason: ${options.command.join(' ')}');
   if (options.onStall case final onStall?) {
     err.writeln('watch: running --on-stall');
     final diag = await Process.start(
