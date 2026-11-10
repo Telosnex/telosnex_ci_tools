@@ -6,10 +6,11 @@
 #    checks that it has a pubspec with the published name).
 # 2. Unit on the renamed package: analyze, then the test command.
 # 3. The pana gate: at most max-lost-points below pub.dev's maximum.
-# 4. Publishes through pub.dev's GitHub trust (OIDC): no token. On
-#    pub.dev, the package's Admin page enables automated publishing from
-#    the caller's repository, with tag pattern pub-<package>-v{{version}}
-#    and environment pub.dev.
+# 4. Publishes through pub.dev's GitHub trust (OIDC): no stored secret.
+#    The OIDC token is requested just before the upload: it expires in
+#    minutes, and Unit plus pana can take longer. On pub.dev, the package's
+#    Admin page enables automated publishing from the caller's repository,
+#    with tag pattern pub-<package>-v{{version}} and environment pub.dev.
 #
 # The first version of a package is published by hand: pub.dev sets up
 # automated publishing on a package that exists.
@@ -66,7 +67,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Exchanges the OIDC token for a pub.dev token.
+      # Also registers PUB_TOKEN as the pub.dev credential. Its token can
+      # expire before the upload: Publish requests a new one.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
       - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@e1b53524845e75c3343a31f85819a03575e0da10 # self
       - id: rename
@@ -127,7 +129,18 @@ jobs:
       - name: Publish
         if: ${{ !inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}
-        run: flutter pub publish --force
+        # A new OIDC token for pub.dev, as setup-dart requests it: the one
+        # from setup-dart is from before Unit and pana, and pub.dev rejects
+        # an expired token ("Invalid JWT token: invalid timestamps").
+        run: |
+          PUB_TOKEN=$(curl -sSf --retry 3 \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https%3A%2F%2Fpub.dev" |
+            jq -er .value)
+          echo "::add-mask::$PUB_TOKEN"
+          export PUB_TOKEN
+          flutter pub token add https://pub.dev --env-var PUB_TOKEN
+          flutter pub publish --force
       - name: Dry run
         if: ${{ inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}
