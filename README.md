@@ -187,6 +187,12 @@ sources:
 - A `tags` pin is a version, or the commit of a version tag.
 - `seen` skips an update: a version (`tags`) or a commit (`branch`) to treat
   as taken. The alert comes back with the next newer one.
+- `paths` (`branch` only) limits the alert to commits that change those
+  directories or files: in a repository of many packages, the ones that
+  you use. `paths: [packages/a, packages/b]`.
+- A fork watches the repository that it is a fork of: a `branch` source
+  named after it, pinned to the last upstream commit merged into the fork.
+  Update the pin with each merge.
 
 The caller workflow, `.github/workflows/upstream_watch.yml`:
 

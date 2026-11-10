@@ -164,6 +164,154 @@ sources:
     expect(upstreamNote('', 'Process completed with exit code 1.'), isNull);
   });
 
+  group('branch', () {
+    final pin = 'a' * 40;
+    Map<String, Object?> commit(String c, String day) => {
+      'sha': c * 40,
+      'commit': {
+        'committer': {'date': '2026-11-${day}T12:00:00Z'},
+        'message': 'commit $c\nbody',
+      },
+    };
+    // Five commits after the pin, oldest first: b (Nov 1) to f (Nov 5).
+    final all = [
+      for (final (c, d) in [
+        ('b', '01'),
+        ('c', '02'),
+        ('d', '03'),
+        ('e', '04'),
+        ('f', '05'),
+      ])
+        commit(c, d),
+    ];
+    final now = DateTime.utc(2026, 11, 10, 12);
+    late List<String> requests;
+
+    // A GitHub with the commits above on main, two per compare page, and
+    // the commits of each path, newest first.
+    GitHubGet github(Map<String, List<String>> byPath) => (path) async {
+      requests.add(path);
+      final uri = Uri.parse('https://x/$path');
+      if (uri.path == '/repos/o/r') return {'default_branch': 'main'};
+      if (uri.path == '/repos/o/r/compare/$pin...main') {
+        final page = int.parse(uri.queryParameters['page'] ?? '1');
+        return {
+          'status': 'ahead',
+          'ahead_by': all.length,
+          'commits': all.skip((page - 1) * 2).take(2).toList(),
+        };
+      }
+      if (uri.path == '/repos/o/r/commits') {
+        expect(uri.queryParameters['sha'], 'main');
+        expect(uri.queryParameters['since'], '2026-11-01T12:00:00.000Z');
+        return [
+          for (final c in byPath[uri.queryParameters['path']] ?? <String>[])
+            {'sha': c * 40},
+        ];
+      }
+      return null;
+    };
+    setUp(() => requests = []);
+
+    BranchSource source({List<String> paths = const [], int lag = 0}) =>
+        BranchSource('o/r', repo: 'o/r', pin: pin, lagDays: lag, paths: paths);
+
+    test('every page of new commits counts', () async {
+      final r = await checkBranch(source(), github({}), now: now);
+      expect(r.status, UpstreamStatus.update);
+      expect(
+        r.summary,
+        'Pinned aaaaaaaaaa; main is 5 commit(s) ahead, the oldest 9 day(s) '
+        'old.',
+      );
+      expect(r.detail.split('\n').first, 'ffffffffff 2026-11-05 commit f');
+    });
+
+    test('paths: only the commits that change them', () async {
+      final r = await checkBranch(
+        source(paths: ['pkg/a', 'pkg/b']),
+        github({
+          'pkg/a': ['d', 'b', '9'], // 9: before the pin
+          'pkg/b': ['d'],
+        }),
+        now: now,
+      );
+      expect(r.status, UpstreamStatus.update);
+      expect(
+        r.summary,
+        'Pinned aaaaaaaaaa, in 2 path(s); main is 2 commit(s) ahead, the '
+        'oldest 9 day(s) old.',
+      );
+      expect(
+        r.detail,
+        'dddddddddd 2026-11-03 commit d\n'
+        'bbbbbbbbbb 2026-11-01 commit b',
+      );
+      expect(
+        upstreamNote('o/r: update', r.summary),
+        'o/r: 2 commits behind main, the oldest 9 days old',
+      );
+    });
+
+    test('paths: lag_days starts at the oldest commit that counts', () async {
+      final r = await checkBranch(
+        source(paths: ['pkg/a'], lag: 7),
+        github({
+          'pkg/a': ['e'],
+        }),
+        now: now,
+      );
+      expect(r.status, UpstreamStatus.upToDate);
+      expect(r.summary, contains('the oldest 6 day(s) old (alert after 7)'));
+    });
+
+    test('paths: nothing new there is up to date', () async {
+      final r = await checkBranch(
+        source(paths: ['pkg/c']),
+        github({}),
+        now: now,
+      );
+      expect(r.status, UpstreamStatus.upToDate);
+      expect(
+        r.summary,
+        'Pinned aaaaaaaaaa, in 1 path(s); main has nothing newer there '
+        '(5 commit(s) elsewhere).',
+      );
+    });
+
+    test('a pin that is not in the repository is an error', () async {
+      final r = await checkBranch(
+        BranchSource('o/r', repo: 'o/r', pin: 'f' * 40),
+        github({}),
+        now: now,
+      );
+      expect(r.status, UpstreamStatus.error);
+    });
+
+    test('parse: paths', () {
+      final b =
+          parse('''
+sources:
+  - name: B
+    branch: https://github.com/o/b
+    pin: '$pin'
+    paths: [packages/a/, packages/b]
+''').single
+              as BranchSource;
+      expect(b.paths, ['packages/a', 'packages/b']);
+      for (final bad in ['[]', '[/abs]', '[a/../b]', 'packages/a', '[1]']) {
+        expect(
+          () => parse(
+            'sources:\n  - name: B\n    branch: https://github.com/o/b\n'
+            "    pin: '$pin'\n    paths: $bad\n",
+          ),
+          throwsA(isA<UpstreamException>()),
+          reason: bad,
+        );
+      }
+    });
+  });
+
   test('run: exit 0 is up to date, 1 an update, others an error', () async {
     Future<UpstreamStatus> run(String c) async =>
         (await checkRun(RunSource('R', c), root.path)).status;

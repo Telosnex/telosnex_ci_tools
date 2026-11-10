@@ -35,7 +35,7 @@ Future<void> main(List<String> args) async {
       try {
         results.add(switch (source) {
           TagsSource() => checkTags(source, await _lsRemote(source.url)),
-          BranchSource() => await checkBranch(source, github),
+          BranchSource() => await checkBranch(source, github.getJson),
           RunSource() => await checkRun(source, root),
         });
       } on Exception catch (e) {

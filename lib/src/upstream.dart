@@ -4,15 +4,19 @@
 ///
 /// ```yaml
 /// sources:
-///   - name: FFmpeg
+///   - name: FFmpeg/FFmpeg
 ///     tags: https://github.com/FFmpeg/FFmpeg.git
 ///     version: 'n(\d+(?:\.\d+)*)'
 ///     pin: {file: tool/fetch_ffmpeg.sh, pattern: 'revision=([0-9a-f]{40})'}
-///   - name: wllama
+///   - name: ngxson/wllama
 ///     branch: https://github.com/ngxson/wllama
 ///     pin: {file: web_build/wllama.json, pattern: '"commit": "([0-9a-f]{40})"'}
 ///     lag_days: 7
-///   - name: WebRTC
+///   - name: riverpod/riverpod
+///     branch: https://github.com/rrousselGit/riverpod
+///     pin: 0123456789abcdef0123456789abcdef01234567
+///     paths: [packages/riverpod, packages/flutter_riverpod]
+///   - name: 3 upstreams
 ///     run: dart .github/vendor_watch.dart
 /// ```
 ///
@@ -24,7 +28,8 @@
 ///   of a tag.
 /// - `branch`: a GitHub URL, and optional `ref` (default: the default
 ///   branch). An update is a commit after the pin that is older than
-///   `lag_days` (default 0).
+///   `lag_days` (default 0). With `paths` (directories or files of the
+///   repository), only commits that change one of them count.
 /// - `run`: a bash command, run in the package. Exit 0: up to date; 1: an
 ///   update, and its output says which; other: an error.
 ///
@@ -85,6 +90,7 @@ final class BranchSource extends UpstreamSource {
     this.ref,
     this.lagDays = 0,
     this.seen,
+    this.paths = const [],
   });
 
   /// `owner/name` on GitHub.
@@ -93,6 +99,9 @@ final class BranchSource extends UpstreamSource {
   final String? ref;
   final int lagDays;
   final String? seen;
+
+  /// Only commits that change one of these count; all when empty.
+  final List<String> paths;
 }
 
 final class RunSource extends UpstreamSource {
@@ -198,6 +207,20 @@ UpstreamSource _source(Object? entry, int index, String root) {
       if (lag is! int || lag < 0) {
         throw UpstreamException('$name: lag_days must be a whole number.');
       }
+      final paths = entry['paths'] ?? YamlList();
+      if (paths is! YamlList ||
+          paths.isEmpty && entry.containsKey('paths') ||
+          paths.any(
+            (path) =>
+                path is! String ||
+                path.isEmpty ||
+                path.startsWith('/') ||
+                path.split('/').contains('..'),
+          )) {
+        throw UpstreamException(
+          '$name: paths must be a list of paths in the repository.',
+        );
+      }
       return BranchSource(
         name,
         repo: m[1]!,
@@ -205,6 +228,10 @@ UpstreamSource _source(Object? entry, int index, String root) {
         ref: text('ref'),
         lagDays: lag,
         seen: text('seen'),
+        paths: [
+          for (final path in paths)
+            (path as String).replaceAll(RegExp(r'/+$'), ''),
+        ],
       );
   }
 }
@@ -337,15 +364,18 @@ UpstreamResult checkTags(TagsSource source, Map<String, String> tags) {
   );
 }
 
+/// The JSON of a GitHub API path, null on 404: [GitHubReader.getJson].
+typedef GitHubGet = Future<Object?> Function(String path);
+
 /// The result of a `branch` source, from GitHub.
 Future<UpstreamResult> checkBranch(
   BranchSource source,
-  GitHubReader github, {
+  GitHubGet get, {
   DateTime? now,
 }) async {
   final ref =
       source.ref ??
-      ((await github.get('repos/${source.repo}'))?['default_branch']
+      ((await get('repos/${source.repo}') as Map?)?['default_branch']
           as String?);
   if (ref == null) {
     return UpstreamResult(
@@ -355,7 +385,9 @@ Future<UpstreamResult> checkBranch(
     );
   }
   final base = source.seen ?? source.pin;
-  final compare = await github.get('repos/${source.repo}/compare/$base...$ref');
+  final comparePath =
+      'repos/${source.repo}/compare/$base...${Uri.encodeComponent(ref)}';
+  final compare = await get('$comparePath?per_page=100') as Map?;
   if (compare == null) {
     return UpstreamResult(
       source.name,
@@ -371,12 +403,23 @@ Future<UpstreamResult> checkBranch(
       summary: '${base.substring(0, 10)} is not on $ref ($status).',
     );
   }
-  final ahead = compare['ahead_by'] as int;
-  final commits = (compare['commits'] as List).cast<Map<String, Object?>>();
+  final aheadAll = compare['ahead_by'] as int;
+  // Oldest first. A page has at most 100.
+  var commits = (compare['commits'] as List).cast<Map<String, Object?>>();
+  for (var page = 2; commits.length < aheadAll; page++) {
+    final more =
+        ((await get('$comparePath?per_page=100&page=$page') as Map?)?['commits']
+                    as List? ??
+                const [])
+            .cast<Map<String, Object?>>();
+    if (more.isEmpty) break;
+    commits = [...commits, ...more];
+  }
   final pinText =
       'Pinned ${source.pin.substring(0, 10)}'
-      '${source.seen == null ? '' : ', seen ${source.seen!.substring(0, 10)}'}';
-  if (ahead == 0) {
+      '${source.seen == null ? '' : ', seen ${source.seen!.substring(0, 10)}'}'
+      '${source.paths.isEmpty ? '' : ', in ${source.paths.length} path(s)'}';
+  if (aheadAll == 0) {
     return UpstreamResult(
       source.name,
       status: UpstreamStatus.upToDate,
@@ -386,6 +429,45 @@ Future<UpstreamResult> checkBranch(
   DateTime date(Map<String, Object?> c) => DateTime.parse(
     ((c['commit'] as Map)['committer'] as Map)['date'] as String,
   );
+  if (source.paths.isNotEmpty) {
+    // The commits of the paths on ref since the oldest new commit, kept if
+    // they are new: the compare list has no files per commit.
+    final since = commits
+        .map(date)
+        .reduce((a, b) => a.isBefore(b) ? a : b)
+        .toIso8601String();
+    final touching = <String>{};
+    for (final path in source.paths) {
+      for (var page = 1; ; page++) {
+        final list =
+            (await get(
+                          'repos/${source.repo}/commits?sha=${Uri.encodeQueryComponent(ref)}'
+                          '&path=${Uri.encodeQueryComponent(path)}'
+                          '&since=${Uri.encodeQueryComponent(since)}'
+                          '&per_page=100&page=$page',
+                        )
+                        as List? ??
+                    const [])
+                .cast<Map<String, Object?>>();
+        touching.addAll(list.map((c) => c['sha'] as String));
+        if (list.length < 100) break;
+      }
+    }
+    commits = [
+      for (final c in commits)
+        if (touching.contains(c['sha'])) c,
+    ];
+    if (commits.isEmpty) {
+      return UpstreamResult(
+        source.name,
+        status: UpstreamStatus.upToDate,
+        summary:
+            '$pinText; $ref has nothing newer there ($aheadAll commit(s) '
+            'elsewhere).',
+      );
+    }
+  }
+  final ahead = commits.length;
   final oldest = date(commits.first);
   final age = (now ?? DateTime.now().toUtc()).difference(oldest).inDays;
   final lines = [
