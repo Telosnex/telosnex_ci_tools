@@ -169,16 +169,16 @@ vendored tree) lists it in `.github/upstream.yaml`. The file is in
 
 ```yaml
 sources:
-  - name: FFmpeg
+  - name: FFmpeg/FFmpeg                          # the repository (owner/name, or host/path off GitHub)
     tags: https://github.com/FFmpeg/FFmpeg.git    # any git URL
     version: 'n(\d+(?:\.\d+)*)'                  # the tag name; group 1 is the version
     pin: {file: tool/fetch_ffmpeg.sh, pattern: '^revision=([0-9a-f]{40})'}
     alert: patch                                  # major, minor (default) or patch
-  - name: BoringSSL
+  - name: google/boringssl
     branch: https://github.com/google/boringssl   # GitHub; `ref` is the branch, default the default branch
     pin: {file: tool/REVISION, pattern: '([0-9a-f]{40})'}
     lag_days: 30                                  # alert when the oldest commit not taken is this old
-  - name: WebRTC
+  - name: 3 upstreams                            # a command that checks several: how many
     run: dart .github/vendor_watch.dart           # exit 0: up to date, 1: update, other: error
 ```
 
