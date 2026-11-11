@@ -308,7 +308,10 @@ void main() {
         md.indexOf('## Failing'),
         md.indexOf('## Cancelled'),
       );
-      final cancelled = md.substring(md.indexOf('## Cancelled'));
+      final cancelled = md.substring(
+        md.indexOf('## Cancelled'),
+        md.indexOf('| Package |'),
+      );
       expect(
         failing,
         contains(
@@ -319,6 +322,13 @@ void main() {
       expect(failing, isNot(contains('**c**')));
       expect(cancelled, contains('- **c** · Integration · [macOS ARM64]'));
       expect(cancelled, isNot(contains('**f**')));
+      // Updated, then Failing and Cancelled, then the table; the refresh
+      // note last.
+      expect(md, isNot(contains('packages maintained')));
+      expect(md.indexOf('Updated '), lessThan(md.indexOf('## Failing')));
+      expect(md.indexOf('## Cancelled'), lessThan(md.indexOf('| Package |')));
+      expect(md.indexOf('## pub.dev'), lessThan(md.indexOf('GitHub runs')));
+      expect(md.trimRight(), endsWith('actions/workflows/dashboard.yml).'));
     });
 
     test(
@@ -719,13 +729,13 @@ packages:
     test('daylight time', () {
       expect(
         updatedAt(DateTime.utc(2026, 10, 29, 10, 11)),
-        '2026-10-29 03:11 PDT (10:11 UTC)',
+        '2026-10-29 3:11 AM PDT (10:11 AM UTC)',
       );
     });
     test('standard time, across midnight', () {
       expect(
         updatedAt(DateTime.utc(2026, 12, 1, 5, 30)),
-        '2026-11-30 21:30 PST (05:30 UTC)',
+        '2026-11-30 9:30 PM PST (5:30 AM UTC)',
       );
     });
     test('the switches', () {

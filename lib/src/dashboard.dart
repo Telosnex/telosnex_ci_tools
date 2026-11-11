@@ -360,8 +360,8 @@ String _otherRunCell(
       '"${_escape(file)}") ${_age(run.finishedAt, now)}$branch';
 }
 
-/// [now] in Pacific time (PDT or PST, whichever is in force) and UTC:
-/// `2026-10-29 03:11 PDT (10:11 UTC)`.
+/// [now] in Pacific time (PDT or PST, whichever is in force) and UTC, on a
+/// 12-hour clock: `2026-10-29 3:11 AM PDT (10:11 AM UTC)`.
 String updatedAt(DateTime now) {
   final utc = now.toUtc();
   // US daylight time: from 2:00 PST on the second Sunday of March to 2:00
@@ -376,7 +376,8 @@ String updatedAt(DateTime now) {
   final daylight = !utc.isBefore(start) && utc.isBefore(end);
   final local = utc.subtract(Duration(hours: daylight ? 7 : 8));
   String hm(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      '${(t.hour + 11) % 12 + 1}:${t.minute.toString().padLeft(2, '0')} '
+      '${t.hour < 12 ? 'AM' : 'PM'}';
   final date = local.toIso8601String().substring(0, 10);
   return '$date ${hm(local)} ${daylight ? 'PDT' : 'PST'} (${hm(utc)} UTC)';
 }
@@ -401,18 +402,9 @@ String renderDashboard(
   final out = StringBuffer()
     ..writeln('# Telosnex CI dashboard')
     ..writeln()
-    ..writeln(
-      '${packages.length} packages maintained by Telosnex for the Telosnex '
-      'app.',
-    )
-    ..writeln()
-    ..writeln('Updated ${updatedAt(now)}.')
-    ..writeln()
-    ..writeln(
-      'GitHub runs the refresh a few times a day, not every 30 min as '
-      'scheduled. To refresh now, run the '
-      '[Dashboard workflow](https://github.com/Telosnex/telosnex_ci_tools/actions/workflows/dashboard.yml).',
-    )
+    ..writeln('Updated ${updatedAt(now)}.');
+  _statusSections(out, packages, now);
+  out
     ..writeln()
     ..writeln(
       '✅ passed · ❌ failed · 🚫 cancelled · ⏭️ skipped · ⏳ running · '
@@ -497,6 +489,34 @@ String renderDashboard(
     );
   }
 
+  _pubSection(
+    out,
+    pubRepositories == null
+        ? packages
+        : ([...pubRepositories]..sort(
+            (a, b) => a.package.name.toLowerCase().compareTo(
+              b.package.name.toLowerCase(),
+            ),
+          )),
+    published,
+    now,
+  );
+  out
+    ..writeln()
+    ..writeln(
+      'GitHub runs the refresh a few times a day, not every 30 min as '
+      'scheduled. To refresh now, run the '
+      '[Dashboard workflow](https://github.com/Telosnex/telosnex_ci_tools/actions/workflows/dashboard.yml).',
+    );
+  return out.toString();
+}
+
+/// The Failing and Cancelled sections, at the top of the dashboard.
+void _statusSections(
+  StringBuffer out,
+  List<PackageStatus> packages,
+  DateTime now,
+) {
   // Failing: runs where a job failed. Cancelled: failed runs where no job
   // failed but GitHub cancelled some, often because no runner took them.
   // Apart, so that real failures do not hide among many cancellations.
@@ -561,19 +581,6 @@ String renderDashboard(
         'took them. Re-run them.',
     cancelledRuns,
   );
-  _pubSection(
-    out,
-    pubRepositories == null
-        ? packages
-        : ([...pubRepositories]..sort(
-            (a, b) => a.package.name.toLowerCase().compareTo(
-              b.package.name.toLowerCase(),
-            ),
-          )),
-    published,
-    now,
-  );
-  return out.toString();
 }
 
 void _pubSection(
