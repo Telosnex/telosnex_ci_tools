@@ -15,7 +15,7 @@
 #             Default: [kiln_release.yml].
 # Only public repositories: the views are public.
 packages:
-  - repo: Telosnex/fllama
+  - repo: Telosnex/fllama_cpp
     checks: [kiln_check.yml, cuda_pack.yml]
   - repo: Telosnex/fonnx
   - repo: Telosnex/image_ffmpeg

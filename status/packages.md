@@ -11,7 +11,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [cmark_gfm_dart](https://github.com/Telosnex/cmark_gfm_dart) | — | ✅ |
 | [cmark_gfm_widget](https://github.com/Telosnex/cmark_gfm_widget) | — | ✅ |
 | [dart-vector-tile-renderer](https://github.com/Telosnex/dart-vector-tile-renderer) | — | ✅ |
-| [fllama](https://github.com/Telosnex/fllama) | ✅ | ✅ |
+| [fllama_cpp](https://github.com/Telosnex/fllama_cpp) | ✅ | ✅ |
 | [flutter_lite_camera](https://github.com/Telosnex/flutter_lite_camera) | — | ✅ |
 | [flutter_local_notifications](https://github.com/Telosnex/flutter_local_notifications) | — | ✅ |
 | [flutter_math_fork_fork](https://github.com/Telosnex/flutter_math_fork_fork) | — | ✅ |

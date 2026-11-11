@@ -1,6 +1,6 @@
 # The package standard
 
-What a Telosnex package does so that its CI reads the same as the others' and shows up properly on the [dashboard](https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard). fllama is the reference: copy its `.github/workflows/` and adapt.
+What a Telosnex package does so that its CI reads the same as the others' and shows up properly on the [dashboard](https://github.com/Telosnex/telosnex_ci_tools/tree/dashboard). [fllama_cpp](https://github.com/Telosnex/fllama_cpp) is the reference: copy its `.github/workflows/` and adapt.
 
 The lint enforces the items marked **(lint)**. Every package runs it in `unit.yml`, after `setup-flutter`:
 
