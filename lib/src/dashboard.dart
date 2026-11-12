@@ -402,9 +402,7 @@ String renderDashboard(
   final out = StringBuffer()
     ..writeln('# Telosnex CI dashboard')
     ..writeln()
-    ..writeln('Updated ${updatedAt(now)}.');
-  _statusSections(out, packages, now);
-  out
+    ..writeln('Updated ${updatedAt(now)}.')
     ..writeln()
     ..writeln(
       '✅ passed · ❌ failed · 🚫 cancelled · ⏭️ skipped · ⏳ running · '
@@ -501,6 +499,7 @@ String renderDashboard(
     published,
     now,
   );
+  _statusSections(out, packages, now);
   out
     ..writeln()
     ..writeln(
@@ -511,7 +510,7 @@ String renderDashboard(
   return out.toString();
 }
 
-/// The Failing and Cancelled sections, at the top of the dashboard.
+/// The Failing and Cancelled sections, at the bottom of the dashboard.
 void _statusSections(
   StringBuffer out,
   List<PackageStatus> packages,

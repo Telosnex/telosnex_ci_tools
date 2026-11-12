@@ -310,7 +310,7 @@ void main() {
       );
       final cancelled = md.substring(
         md.indexOf('## Cancelled'),
-        md.indexOf('| Package |'),
+        md.indexOf('GitHub runs'),
       );
       expect(
         failing,
@@ -322,12 +322,12 @@ void main() {
       expect(failing, isNot(contains('**c**')));
       expect(cancelled, contains('- **c** · Integration · [macOS ARM64]'));
       expect(cancelled, isNot(contains('**f**')));
-      // Updated, then Failing and Cancelled, then the table; the refresh
-      // note last.
+      // Updated, the table, pub.dev, then Failing and Cancelled; the
+      // refresh note last.
       expect(md, isNot(contains('packages maintained')));
-      expect(md.indexOf('Updated '), lessThan(md.indexOf('## Failing')));
-      expect(md.indexOf('## Cancelled'), lessThan(md.indexOf('| Package |')));
-      expect(md.indexOf('## pub.dev'), lessThan(md.indexOf('GitHub runs')));
+      expect(md.indexOf('Updated '), lessThan(md.indexOf('| Package |')));
+      expect(md.indexOf('## pub.dev'), lessThan(md.indexOf('## Failing')));
+      expect(md.indexOf('## Cancelled'), lessThan(md.indexOf('GitHub runs')));
       expect(md.trimRight(), endsWith('actions/workflows/dashboard.yml).'));
     });
 
