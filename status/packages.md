@@ -26,6 +26,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [lame](https://github.com/Telosnex/lame) | ✅ | ✅ |
 | [lua_dart](https://github.com/Telosnex/lua_dart) | ✅ | ✅ |
 | [monet_ui](https://github.com/Telosnex/monet_ui) | — | ✅ |
+| [mxc_sdk_dart](https://github.com/Telosnex/mxc_sdk_dart) | ✅ | ✅ |
 | [nutdart](https://github.com/Telosnex/nutdart) | ✅ | ✅ |
 | [packages](https://github.com/Telosnex/packages) | — | ✅ |
 | [pdfrx](https://github.com/Telosnex/pdfrx) | — | ✅ |
@@ -33,6 +34,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [pixel_snap_fork](https://github.com/Telosnex/pixel_snap_fork) | — | ✅ |
 | [receive_sharing_intent](https://github.com/Telosnex/receive_sharing_intent) | — | ✅ |
 | [riverpod](https://github.com/Telosnex/riverpod) | — | ✅ |
+| [sandbox-runtime-dart](https://github.com/Telosnex/sandbox-runtime-dart) | — | ✅ |
 | [shine_dart](https://github.com/Telosnex/shine_dart) | — | ✅ |
 | [supabase-flutter](https://github.com/Telosnex/supabase-flutter) | — | ✅ |
 | [super_native_extensions](https://github.com/Telosnex/super_native_extensions) | ✅ | ✅ |
@@ -41,5 +43,3 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
-
-Not on the default branch yet: [mxc_sdk_dart](https://github.com/Telosnex/mxc_sdk_dart), [sandbox-runtime-dart](https://github.com/Telosnex/sandbox-runtime-dart).
