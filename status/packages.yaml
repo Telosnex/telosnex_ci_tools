@@ -20,7 +20,7 @@ packages:
   - repo: Telosnex/fonnx
   - repo: Telosnex/image_ffmpeg
   - repo: Telosnex/mxc_sdk_dart
-  - repo: Telosnex/sandbox-runtime-dart
+  - repo: Telosnex/sandbox_runtime_dart
     checks: []
     releases: []
   - repo: Telosnex/lame
