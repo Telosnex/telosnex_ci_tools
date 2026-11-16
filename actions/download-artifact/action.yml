@@ -21,6 +21,14 @@ inputs:
     description: With several artifacts, put all their files in `path`.
     required: false
     default: 'false'
+  run-id:
+    description: The run to download from. Empty for this run.
+    required: false
+    default: ''
+  github-token:
+    description: A token that can read the run of `run-id`. Needed with `run-id`.
+    required: false
+    default: ''
   retry-seconds:
     description: Seconds to wait before the second try.
     required: false
@@ -37,6 +45,8 @@ runs:
         pattern: ${{ inputs.pattern }}
         path: ${{ inputs.path }}
         merge-multiple: ${{ inputs.merge-multiple }}
+        run-id: ${{ inputs.run-id || github.run_id }}
+        github-token: ${{ inputs.github-token }}
     - if: steps.first.outcome == 'failure'
       shell: bash
       env:
@@ -51,3 +61,5 @@ runs:
         pattern: ${{ inputs.pattern }}
         path: ${{ inputs.path }}
         merge-multiple: ${{ inputs.merge-multiple }}
+        run-id: ${{ inputs.run-id || github.run_id }}
+        github-token: ${{ inputs.github-token }}
