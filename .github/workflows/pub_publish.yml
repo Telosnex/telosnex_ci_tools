@@ -70,9 +70,9 @@ jobs:
       # Also registers PUB_TOKEN as the pub.dev credential. Its token can
       # expire before the upload: Publish requests a new one.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@9fe2f07915cd7eb0819352ca4136b5039d33ecf8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@9be752adaafbb864b79a50d39aefc5c549e7d4ce # self
       - id: rename
-        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@9fe2f07915cd7eb0819352ca4136b5039d33ecf8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@9be752adaafbb864b79a50d39aefc5c549e7d4ce # self
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           repository: ${{ github.server_url }}/${{ github.repository }}
