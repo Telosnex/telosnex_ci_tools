@@ -207,9 +207,11 @@ runs:
           # "00:00 +0: loading <file>" is printed before the app connects,
           # and the summary ("00:00 +0 -1: Some tests failed.") also when the
           # app never started: neither is a test. In JSON, the loading test
-          # is a testStart named "loading <file>".
+          # is a testStart named "loading <file>". Not grep -q: it exits at
+          # the first match, the first grep then fails with SIGPIPE, and
+          # pipefail makes a long output look like no test started.
           if grep -E "$started_pattern" "$out" |
-            grep -qvE ': (loading |Some tests failed\.$|All tests passed!$|No tests ran\.$)|"name":"loading '; then
+            grep -vE ': (loading |Some tests failed\.$|All tests passed!$|No tests ran\.$)|"name":"loading ' > /dev/null; then
             started=1
           fi
           xcrun simctl shutdown "$udid" || true
