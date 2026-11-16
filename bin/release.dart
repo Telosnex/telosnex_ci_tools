@@ -13,7 +13,9 @@
 ///    pushes to the default branch. If the push is refused (a protected
 ///    branch), it pushes a branch and opens a pull request instead.
 ///
-/// A repository is left alone if the new pins add lint findings.
+/// A repository is left alone if the new pins add lint findings, or if its
+/// `.github/telosnex_ci_tools.yaml` sets `release: manual`: it moves its pins
+/// itself.
 /// --dry-run makes no tag, commit or push, and prints what would change.
 library;
 
@@ -25,6 +27,7 @@ import 'package:path/path.dart' as p;
 import 'package:telosnex_ci_tools/src/lint.dart';
 import 'package:telosnex_ci_tools/src/pin_self.dart';
 import 'package:telosnex_ci_tools/src/release.dart';
+import 'package:telosnex_ci_tools/src/repo_settings.dart';
 
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
@@ -223,6 +226,9 @@ Future<String> _update(
     ];
     final using = files.where((f) => usesTools(f.readAsStringSync())).toList();
     if (using.isEmpty) return '';
+    if (RepoSettings.read(repo).releaseManual) {
+      return 'skipped (release: manual)';
+    }
 
     final before = lintRepository(repo).map((f) => '$f').toSet();
     for (final file in using) {

@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
 import 'job_names.dart';
+import 'repo_settings.dart';
 
 /// The prefix of every action and reusable workflow of this repository.
 const selfRepository = 'Telosnex/telosnex_ci_tools';
@@ -28,8 +29,19 @@ final class Finding {
 }
 
 /// The findings of every workflow file in `<repo>/.github/workflows`, and
-/// of the `web/index.html` of each Flutter app in the repository.
+/// of the `web/index.html` of each Flutter app in the repository, less the
+/// `lint_exceptions` of `.github/telosnex_ci_tools.yaml`.
 List<Finding> lintRepository(String repo) {
+  final RepoSettings settings;
+  try {
+    settings = RepoSettings.read(repo);
+  } on SettingsException catch (e) {
+    return [Finding(settingsPath, e.line, 'settings', e.message)];
+  }
+  return applyExceptions(_lintRepository(repo), settings);
+}
+
+List<Finding> _lintRepository(String repo) {
   final allowMatrix = _isSelf(repo);
   final dir = Directory(p.join(repo, '.github', 'workflows'));
   final files = dir.existsSync()

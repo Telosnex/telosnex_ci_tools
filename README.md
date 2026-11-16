@@ -54,6 +54,22 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `no-matrix` | No `strategy.matrix` (except in this repository's reusable workflows). GitHub draws a matrix as one box in the run graph; write the jobs out and share their steps with a YAML anchor: `steps: &desktop_steps` in the first job, `steps: *desktop_steps` in the others, and what differs in job `env:` and step `if:`. |
 | `no-merge-key` | No YAML merge key (`<<: *anchor`). GitHub rejects it at startup; alias whole values. |
 
+### Repository settings
+
+A repository can have `.github/telosnex_ci_tools.yaml`. An unknown key is a finding (`settings`).
+
+```yaml
+# The release command does not change this repository. It moves its pins itself.
+release: manual
+
+# Lint rules that do not apply here. `file` is one path, or '*'.
+# An exception that matches no finding is a finding (`stale-exception`).
+lint_exceptions:
+  - rule: job-name
+    file: '*'
+    reason: The dashboard does not show private repositories.
+```
+
 ## Call a shared workflow
 
 The caller has the triggers and the `run-name`. The shared workflow has the jobs. A caller passes only what is different about its package. This is the kiln release of fonnx, `.github/workflows/kiln_release.yml`:
@@ -229,7 +245,7 @@ The reusable workflows use the composite actions of this repository. A `uses:` c
 2. Run `dart run telosnex_ci_tools:pin_self`, commit the changed workflow files, and push.
 3. Run `dart run telosnex_ci_tools:release vX.Y.Z`.
 
-`release` checks the checkout (clean, at `origin/main`, self pins current, lint clean), tags HEAD and pushes the tag. Then it pins every repository of the organization that uses this one to the tag's commit, lints it, and pushes to its default branch. Where a push is refused (a protected branch), it opens a pull request. `--dry-run` shows what would change; `--only a,b` limits it to some repositories.
+`release` checks the checkout (clean, at `origin/main`, self pins current, lint clean), tags HEAD and pushes the tag. Then it pins every repository of the organization that uses this one to the tag's commit, lints it, and pushes to its default branch. Where a push is refused (a protected branch), it opens a pull request. It skips a repository with `release: manual` (see Repository settings). `--dry-run` shows what would change; `--only a,b` limits it to some repositories.
 
 To undo a release, run `release` with the previous tag: an existing tag is not moved, only pinned again.
 
