@@ -20,5 +20,5 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@431b08c4630aed13a8715c03ac36ac28e5979186 # self
-      - uses: Telosnex/telosnex_ci_tools/actions/upstream-watch@431b08c4630aed13a8715c03ac36ac28e5979186 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@9e93eb4b37428f8619732a63e764f41eb2d5f4a2 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/upstream-watch@9e93eb4b37428f8619732a63e764f41eb2d5f4a2 # self
