@@ -5,6 +5,11 @@
 # The emulator keeps running for the later steps of the job. adb is on PATH
 # after this action (it is not on ubuntu-24.04). It also caches the Gradle
 # distributions of the checkout's example apps, for the later flutter build.
+#
+# android.dart does the work (README.md). Dart must be on PATH: set up
+# Flutter or Dart first. With prepare-only, the action boots nothing; run
+# `dart "$tool" run` later for a supervised test run with one retry.
+# The action uploads nothing and prints no raw log lines.
 name: Android emulator
 description: Boots an x86_64 Android emulator with KVM, and puts adb on PATH.
 
@@ -22,13 +27,15 @@ inputs:
     required: false
     default: pixel_6
   ram-mb:
-    description: The RAM of the emulator.
+    description: The RAM of the emulator. default keeps the value of the AVD.
     required: false
     default: '4096'
   cores:
-    description: The CPU cores of the emulator.
+    description: >-
+      The CPU cores of the emulator, 1 to 16. default keeps the value of the
+      AVD. Empty: TELOSNEX_ANDROID_EMULATOR_CORES, else 4.
     required: false
-    default: '4'
+    default: ''
   gpu:
     description: The emulator's -gpu mode.
     required: false
@@ -47,17 +54,45 @@ inputs:
     description: Minutes for the boot, with the system image download.
     required: false
     default: '15'
+  gdb:
+    description: >-
+      Start the emulator under GDB, for a backtrace of a crash. Only false
+      turns it off. Empty: TELOSNEX_ANDROID_GDB, else true.
+    required: false
+    default: ''
+  adb-trace:
+    description: >-
+      Trace the host adb server and the emulator's adb (noisy). Only true
+      turns it on. Empty: TELOSNEX_ANDROID_ADB_TRACE, else false.
+    required: false
+    default: ''
+  adb-transport:
+    description: >-
+      emulator (the console serial) or tcp (127.0.0.1:5600, guest adbd over
+      an emulator redirect).
+    required: false
+    default: emulator
+  prepare-only:
+    description: Install and create the AVD, but boot nothing.
+    required: false
+    default: 'false'
 
 outputs:
   serial:
-    description: The adb serial of the emulator, for flutter -d.
-    value: emulator-5554
+    description: The adb serial of the emulator, for flutter -d. Empty with prepare-only.
+    value: ${{ steps.boot.outputs.serial }}
   log:
     description: The emulator log file.
-    value: ${{ steps.boot.outputs.log }}
+    value: ${{ steps.prepare.outputs.session }}/emulator.log
   logcat:
-    description: The logcat of the emulator from boot on (adb logcat keeps writing it).
-    value: ${{ steps.boot.outputs.logcat }}
+    description: The logcat of the emulator from boot on (the capture keeps writing it).
+    value: ${{ steps.prepare.outputs.session }}/logcat.txt
+  tool:
+    description: The path of android.dart.
+    value: ${{ steps.prepare.outputs.tool }}
+  session:
+    description: The session directory, for the --session of android.dart.
+    value: ${{ steps.prepare.outputs.session }}
 
 runs:
   using: composite
@@ -85,23 +120,8 @@ runs:
       env:
         LIST: ${{ steps.gradle.outputs.list }}
       run: '"$GITHUB_ACTION_PATH/gradle_distributions.sh" download "$LIST"'
-    - name: KVM
-      shell: bash
-      run: |
-        if [[ "$RUNNER_OS" != Linux || "$RUNNER_ARCH" != X64 ]]; then
-          echo "::error::android-emulator needs an x64 Linux runner (ubuntu-24.04), not $RUNNER_OS $RUNNER_ARCH."
-          exit 1
-        fi
-        if [[ ! -e /dev/kvm ]]; then
-          echo "::error::This runner has no /dev/kvm."
-          exit 1
-        fi
-        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
-          | sudo tee /etc/udev/rules.d/99-kvm4all.rules > /dev/null
-        sudo udevadm control --reload-rules
-        sudo udevadm trigger --name-match=kvm
-    - name: Boot the emulator
-      id: boot
+    - name: Prepare the emulator
+      id: prepare
       shell: bash
       env:
         API_LEVEL: ${{ inputs.api-level }}
@@ -109,79 +129,36 @@ runs:
         DEVICE: ${{ inputs.device }}
         RAM_MB: ${{ inputs.ram-mb }}
         CORES: ${{ inputs.cores }}
-        BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
         GPU: ${{ inputs.gpu }}
         EMULATOR_ARGS: ${{ inputs.emulator-args }}
+        BOOT_TIMEOUT_MINUTES: ${{ inputs.boot-timeout-minutes }}
+        GDB: ${{ inputs.gdb }}
+        ADB_TRACE: ${{ inputs.adb-trace }}
+        ADB_TRANSPORT: ${{ inputs.adb-transport }}
+      run: |
+        if ! command -v dart > /dev/null; then
+          echo "::error::android-emulator needs Dart on PATH. Set up Flutter or Dart first."
+          exit 1
+        fi
+        tool="$GITHUB_ACTION_PATH/android.dart"
+        session="$RUNNER_TEMP/android-emulator"
+        echo "tool=$tool" >> "$GITHUB_OUTPUT"
+        echo "session=$session" >> "$GITHUB_OUTPUT"
+        dart "$tool" prepare --session "$session" \
+          --api-level "$API_LEVEL" --target "$TARGET" --device "$DEVICE" \
+          --ram-mb "$RAM_MB" --cores "$CORES" --gpu "$GPU" \
+          --emulator-args "$EMULATOR_ARGS" \
+          --boot-timeout-minutes "$BOOT_TIMEOUT_MINUTES" \
+          --gdb "$GDB" --adb-trace "$ADB_TRACE" --adb-transport "$ADB_TRANSPORT"
+    - name: Boot the emulator
+      id: boot
+      if: inputs.prepare-only != 'true'
+      shell: bash
+      env:
+        TOOL: ${{ steps.prepare.outputs.tool }}
+        SESSION: ${{ steps.prepare.outputs.session }}
+        API_LEVEL: ${{ inputs.api-level }}
       run: |
         start=$(date +%s)
-        deadline=$(( start + BOOT_TIMEOUT_MINUTES * 60 ))
-        sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
-        image="system-images;android-$API_LEVEL;$TARGET;x86_64"
-        # avdmanager does not always use ~/.android/avd: set the directory.
-        export ANDROID_AVD_HOME="$RUNNER_TEMP/avd"
-        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
-        echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-        export PATH="$ANDROID_HOME/platform-tools:$PATH"
-        mkdir -p "$ANDROID_AVD_HOME"
-        # yes ends with SIGPIPE when sdkmanager stops reading.
-        (yes || true) | "$sdk/sdkmanager" --licenses > /dev/null
-        # Google's mirror sometimes serves a truncated system image ("Error on
-        # ZipFile unknown archive"; zxing_dart, 2026-10-30). Try again, and
-        # judge by the installed image rather than sdkmanager's exit code.
-        image_dir="$ANDROID_HOME/${image//;//}"
-        for try in 1 2 3; do
-          "$sdk/sdkmanager" emulator "$image" > /dev/null || true
-          [[ -f "$image_dir/system.img" ]] && break
-          (( try == 3 )) && { echo "::error::$image did not install."; exit 1; }
-          echo "::warning::$image did not install (try $try); trying again in 30 s."
-          rm -rf "$image_dir"
-          sleep 30
-        done
-        echo no | "$sdk/avdmanager" create avd -n ci -k "$image" -d "$DEVICE" > /dev/null
-        printf 'hw.ramSize=%s\ndisk.dataPartition.size=8G\nhw.cpu.ncore=%s\n' "$RAM_MB" "$CORES" \
-          >> "$ANDROID_AVD_HOME/ci.avd/config.ini"
-        log="$RUNNER_TEMP/emulator.log"
-        echo "log=$log" >> "$GITHUB_OUTPUT"
-        # shellcheck disable=SC2086 # EMULATOR_ARGS splits on spaces.
-        "$ANDROID_HOME/emulator/emulator" -avd ci -no-window -no-audio -no-boot-anim \
-          -gpu "$GPU" -no-snapshot $EMULATOR_ARGS > "$log" 2>&1 &
-        timeout "$(( deadline - $(date +%s) ))" adb wait-for-device
-        until [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]]; do
-          if (( $(date +%s) > deadline )); then
-            echo "::error::The emulator did not boot in $BOOT_TIMEOUT_MINUTES minutes."
-            tail -50 "$log"
-            exit 1
-          fi
-          sleep 5
-        done
-        # Settled: boot_completed, the package manager answers and
-        # system_server keeps its pid for 60 s. On android-37.0 with
-        # swiftshader_indirect, surfaceflinger aborted every ~40 s
-        # (hasReadColorBufferDma) and each abort restarted system_server: an
-        # install then failed ("Failure calling service package: Broken pipe").
-        logcat="$RUNNER_TEMP/logcat.txt"
-        echo "logcat=$logcat" >> "$GITHUB_OUTPUT"
-        nohup adb logcat -v threadtime > "$logcat" 2>&1 &
-        settled=0
-        server_pid=""
-        while (( settled < 12 )); do
-          if (( $(date +%s) > deadline )); then
-            echo "::error::The emulator booted but did not settle in $BOOT_TIMEOUT_MINUTES minutes."
-            tail -50 "$log"
-            exit 1
-          fi
-          sleep 5
-          pid_now=$(adb shell pidof system_server 2> /dev/null | tr -d '\r' || true)
-          if [[ "$(adb shell getprop sys.boot_completed 2> /dev/null | tr -d '\r')" == 1 ]] &&
-            adb shell pm path android > /dev/null 2>&1 &&
-            [[ -n "$pid_now" && ( -z "$server_pid" || "$pid_now" == "$server_pid" ) ]]; then
-            server_pid=$pid_now
-            settled=$(( settled + 1 ))
-          else
-            if (( settled > 0 )); then echo "Android restarted after boot; waiting again."; fi
-            settled=0
-            server_pid=""
-          fi
-        done
-        echo "Boot lines in the emulator log: $(grep -c 'Boot completed' "$log" || true)"
-        echo "Android $API_LEVEL emulator booted after $(( $(date +%s) - start )) s" | tee -a "$GITHUB_STEP_SUMMARY"
+        dart "$TOOL" boot --session "$SESSION"
+        echo "Android $API_LEVEL emulator booted after $(( $(date +%s) - start )) s" >> "$GITHUB_STEP_SUMMARY"

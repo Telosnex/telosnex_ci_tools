@@ -76,6 +76,70 @@ jobs:
           adb pull /data/local/tmp/t/program "$RUNNER_TEMP/pulled"
           cmp "$RUNNER_TEMP/program" "$RUNNER_TEMP/pulled"
 
+  # actions/android-emulator on its runner: a real boot, a supervised run,
+  # two fresh boots that leave one emulator, and the retry rules of I7.
+  android-emulator:
+    name: Android x64 emulator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./actions/setup-flutter
+      - id: emulator
+        uses: ./actions/android-emulator
+        with:
+          adb-transport: tcp
+          gradle-wrappers: ''
+      - name: The booted emulator
+        env:
+          SERIAL: ${{ steps.emulator.outputs.serial }}
+          LOGCAT: ${{ steps.emulator.outputs.logcat }}
+        run: |
+          [[ "$SERIAL" == 127.0.0.1:5600 ]]
+          [[ "$(adb -s "$SERIAL" shell getprop ro.product.cpu.abi | tr -d '\r')" == x86_64 ]]
+          sleep 2
+          [[ -s "$LOGCAT" ]]
+      - name: Supervised runs
+        env:
+          TOOL: ${{ steps.emulator.outputs.tool }}
+          SESSION: ${{ steps.emulator.outputs.session }}
+        run: |
+          run_dir="$RUNNER_TEMP/run"
+          start='{"type":"testStart","test":{"id":1,"name":"t"}}'
+          expect() {
+            local want=$1 attempts=$2; shift 2
+            rc=0
+            dart "$TOOL" run --session "$SESSION" --run-dir "$run_dir" \
+              --startup-protocol flutter-machine --timeout-minutes 10 -- "$@" || rc=$?
+            jq -c '{exitCode, attempts: [.attempts[] | {exitCode, markers, testStarted}]}' "$run_dir/result.json"
+            [[ "$rc" == "$want" ]] || { echo "::error::exit $rc, not $want"; exit 1; }
+            [[ "$(jq '.attempts | length' "$run_dir/result.json")" == "$attempts" ]]
+          }
+          echo "A passing command"
+          expect 0 1 bash -c "adb -s \"\$ANDROID_SERIAL\" shell echo ok | grep -q ok && echo '$start'"
+          echo "adb lost before the first test: one retry, and attempt 2 passes"
+          expect 0 2 bash -c "if [ \"\$ANDROID_ATTEMPT\" = 1 ]; then adb disconnect \"\$ANDROID_SERIAL\"; sleep 120; fi; echo '$start'"
+          jq -e '.attempts[0].markers == ["android-adb-disconnect"]' "$run_dir/result.json"
+          echo "adb lost after the first test: no retry"
+          expect 125 1 bash -c "echo '$start'; adb disconnect \"\$ANDROID_SERIAL\"; sleep 120"
+          echo "The emulator stops: no retry"
+          expect 125 1 bash -c "pkill -9 -f emulator/qemu/; sleep 120"
+          jq -e '.attempts[0].markers == ["android-emulator-exit"]' "$run_dir/result.json"
+          [[ "$(pgrep -c -f emulator/qemu/ || true)" == 0 ]]
+      - name: Two fresh boots leave one emulator
+        env:
+          TOOL: ${{ steps.emulator.outputs.tool }}
+          SESSION: ${{ steps.emulator.outputs.session }}
+        run: |
+          dart "$TOOL" boot --session "$SESSION" --fresh
+          dart "$TOOL" boot --session "$SESSION" --fresh
+          [[ "$(pgrep -c -f emulator/qemu/)" == 1 ]]
+          dart "$TOOL" stop --session "$SESSION"
+          dart "$TOOL" stop --session "$SESSION"
+          [[ "$(pgrep -c -f emulator/qemu/ || true)" == 0 ]]
+
   # actions/android-test-apks and actions/android-arm64-container together:
   # a new Flutter app with the fixture test files, built on x64 and run on
   # arm64. The passing file passes, and the failing one fails the run.

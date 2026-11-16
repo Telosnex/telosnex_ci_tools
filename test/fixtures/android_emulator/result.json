@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "exitCode": 0,
+  "elapsedMs": 1260000,
+  "attempts": [
+    {
+      "attempt": 1,
+      "exitCode": 75,
+      "elapsedMs": 180000,
+      "markers": ["android-adb-disconnect"],
+      "testStarted": false,
+      "emulatorStopped": false,
+      "evidence": ["attempts/1/command.stdout", "attempts/1/logcat.txt"]
+    },
+    {
+      "attempt": 2,
+      "exitCode": 0,
+      "elapsedMs": 1080000,
+      "markers": [],
+      "testStarted": true,
+      "emulatorStopped": false,
+      "evidence": ["attempts/2/command.stdout"]
+    }
+  ]
+}
