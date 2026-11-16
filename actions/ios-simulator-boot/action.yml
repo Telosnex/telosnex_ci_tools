@@ -16,6 +16,13 @@ inputs:
       reuse a booted phone or boot an existing one.
     required: false
     default: 'true'
+  runtime:
+    description: >-
+      Only iOS runtimes of this version, e.g. 26.2 or 26. Empty: any. Set it
+      to the SDK of your Xcode when the runner has newer runtimes: an Xcode
+      cannot run an app on an iOS newer than its SDK.
+    required: false
+    default: ''
 
 outputs:
   udid:
@@ -38,9 +45,11 @@ runs:
       shell: bash
       env:
         FRESH: ${{ inputs.fresh }}
+        RUNTIME: ${{ inputs.runtime }}
       run: |
         args=()
         if [[ "$FRESH" == true ]]; then args+=(--fresh); fi
+        if [[ -n "$RUNTIME" ]]; then args+=(--runtime "$RUNTIME"); fi
         udid=$(dart "$GITHUB_ACTION_PATH/boot.dart" "${args[@]}")
         echo "udid=$udid" >> "$GITHUB_OUTPUT"
         echo "iOS simulator: $(xcrun simctl list devices | grep "$udid" | sed 's/^ *//')" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -1,20 +1,28 @@
 // Boots an iPhone simulator; only its UDID goes to stdout:
-//   udid=$(dart boot.dart --fresh)
+//   udid=$(dart boot.dart --fresh [--runtime 26.2])
 // --fresh creates a new device (the newest runtime first; a Pro model) and
 // deletes it again if its boot fails, then tries the next runtime/type.
 // Without --fresh, it reuses a booted phone or boots an existing one.
+// --runtime limits it to iOS runtimes of that version: 26 is any iOS 26,
+// 26.2 is iOS 26.2. An Xcode cannot run apps on an iOS newer than its SDK.
 import 'dart:convert';
 import 'dart:io';
 
 Future<void> main(List<String> args) async {
   try {
-    final unsupported = args
-        .where((argument) => argument != '--fresh')
-        .toList();
-    if (unsupported.isNotEmpty) {
-      throw ArgumentError('Unsupported arguments: ${unsupported.join(' ')}');
+    var fresh = false;
+    String? runtime;
+    for (var i = 0; i < args.length; i++) {
+      switch (args[i]) {
+        case '--fresh':
+          fresh = true;
+        case '--runtime' when i + 1 < args.length:
+          runtime = args[++i];
+        default:
+          throw ArgumentError('Unsupported argument: ${args[i]}');
+      }
     }
-    stdout.writeln(await bootSimulator(fresh: args.contains('--fresh')));
+    stdout.writeln(await bootSimulator(fresh: fresh, runtime: runtime));
   } catch (error) {
     stderr.writeln('Failed to boot iOS simulator: $error');
     exitCode = 1;
@@ -51,14 +59,31 @@ Future<String> runSimctl(List<String> args, Duration timeout) async {
   return result;
 }
 
+/// The version of a runtime identifier: `...SimRuntime.iOS-26-2` is [26, 2].
+List<int> runtimeVersion(String runtime) =>
+    runtime.split('.iOS-').last.split('-').map(int.parse).toList();
+
 List<SimulatorCandidate> simulatorCandidates(
   Map<String, dynamic> inventory, {
   bool fresh = false,
+  String? runtime,
 }) {
+  final wanted = runtime == null || runtime.isEmpty
+      ? null
+      : runtime.split('.').map(int.parse).toList();
   final candidates = <SimulatorCandidate>[];
   final runtimes = inventory['devices'] as Map<String, dynamic>;
   for (final entry in runtimes.entries) {
     if (!entry.key.contains('.iOS-')) continue;
+    if (wanted != null) {
+      final version = runtimeVersion(entry.key);
+      if (version.length < wanted.length) continue;
+      if (Iterable.generate(
+        wanted.length,
+      ).any((i) => version[i] != wanted[i])) {
+        continue;
+      }
+    }
     for (final device in (entry.value as List).cast<Map<String, dynamic>>()) {
       if (device['isAvailable'] == true &&
           (device['name'] as String).startsWith('iPhone')) {
@@ -68,7 +93,9 @@ List<SimulatorCandidate> simulatorCandidates(
   }
   if (candidates.isEmpty) {
     throw StateError(
-      'No available iPhone simulator. Install an iOS simulator runtime.\n'
+      'No available iPhone simulator'
+      '${wanted == null ? '' : ' with iOS $runtime'}. '
+      'Install an iOS simulator runtime.\n'
       '${const JsonEncoder.withIndent('  ').convert(inventory)}',
     );
   }
@@ -78,8 +105,7 @@ List<SimulatorCandidate> simulatorCandidates(
     'Booting' => 1,
     _ => 0,
   };
-  List<int> version(String runtime) =>
-      runtime.split('.iOS-').last.split('-').map(int.parse).toList();
+  const version = runtimeVersion;
   int devicePriority(Map<String, dynamic> device) {
     final name = device['name'] as String;
     if (name.contains('Pro')) return 2;
@@ -127,6 +153,7 @@ Map<String, dynamic> selectDevice(Map<String, dynamic> inventory) =>
 Future<String> bootSimulator({
   Simctl simctl = runSimctl,
   bool fresh = false,
+  String? runtime,
 }) async {
   final inventory =
       jsonDecode(
@@ -138,7 +165,11 @@ Future<String> bootSimulator({
             ], const Duration(minutes: 1)),
           )
           as Map<String, dynamic>;
-  final candidates = simulatorCandidates(inventory, fresh: fresh);
+  final candidates = simulatorCandidates(
+    inventory,
+    fresh: fresh,
+    runtime: runtime,
+  );
   if (!fresh) return _bootExisting(candidates.first.device, simctl);
 
   final errors = <String>[];

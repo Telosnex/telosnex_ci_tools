@@ -76,6 +76,34 @@ void main() {
     ]);
   });
 
+  test('runtime limits candidates to that iOS version', () {
+    final inventory = {
+      'devices': {
+        'com.apple.CoreSimulator.SimRuntime.iOS-26-0': [device('26.0')],
+        'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [device('26.2')],
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-2': [device('27.2')],
+      },
+    };
+    List<Object?> udids(String? runtime) => simulatorCandidates(
+      inventory,
+      fresh: true,
+      runtime: runtime,
+    ).map((candidate) => candidate.device['udid']).toList();
+    expect(udids(null), ['27.2', '26.2', '26.0']);
+    expect(udids('26'), ['26.2', '26.0']);
+    expect(udids('26.2'), ['26.2']);
+    expect(
+      () => udids('25'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('with iOS 25'),
+        ),
+      ),
+    );
+  });
+
   test('missing simulator has actionable error', () {
     expect(
       () => selectDevice({'devices': <String, dynamic>{}}),

@@ -41,6 +41,17 @@ inputs:
       command it is given: `dart tool/with_secrets.dart --`. Empty for none.
     required: false
     default: ''
+  echo-output:
+    description: >-
+      true: the test output also goes to the job log. false: only to the
+      test-log file, for an app that redacts it before it shows or uploads
+      it (then set upload: never too, as the diagnostics hold it raw).
+    required: false
+    default: 'true'
+  runtime:
+    description: The iOS runtime of the fresh simulators of retries (ios-simulator-boot's runtime). Empty for the newest.
+    required: false
+    default: ''
   working-directory:
     description: The Flutter app directory.
     required: false
@@ -85,6 +96,9 @@ outputs:
   logs:
     description: The diagnostics directory.
     value: ${{ steps.test.outputs.logs }}
+  test-log:
+    description: The test output of the last attempt.
+    value: ${{ steps.test.outputs.test-log }}
 
 runs:
   using: composite
@@ -98,6 +112,8 @@ runs:
         ARGS: ${{ inputs.args }}
         REPORTER: ${{ inputs.reporter }}
         PREFIX: ${{ inputs.command-prefix }}
+        ECHO_OUTPUT: ${{ inputs.echo-output }}
+        RUNTIME: ${{ inputs.runtime }}
         GIVEN_UDID: ${{ inputs.udid }}
         ATTEMPTS: ${{ inputs.attempts }}
         CONNECT_SECONDS: ${{ inputs.connect-seconds }}
@@ -117,19 +133,24 @@ runs:
           json) started_pattern='"type":"testStart"' ;;
           *) echo "::error::reporter must be expanded or json, not $REPORTER."; exit 2 ;;
         esac
+        # Writes stdin to $1, and to the job log unless echo-output is false.
+        output() { if [[ "$ECHO_OUTPUT" == false ]]; then cat > "$1"; else tee "$1"; fi; }
+        boot_args=(--fresh)
+        if [[ -n "$RUNTIME" ]]; then boot_args+=(--runtime "$RUNTIME"); fi
         limit 300 xcrun simctl list runtimes > /dev/null
         status=1
         for (( attempt = 1; attempt <= ATTEMPTS; attempt++ )); do
           if (( attempt == 1 )) && [[ -n "$GIVEN_UDID" ]]; then
             udid=$GIVEN_UDID
           else
-            udid=$(dart "$tools/ios-simulator-boot/boot.dart" --fresh)
+            udid=$(dart "$tools/ios-simulator-boot/boot.dart" "${boot_args[@]}")
           fi
           xcrun simctl spawn "$udid" log stream --level debug --style compact \
             --predicate 'process == "Runner" OR process == "installd" OR process == "SpringBoard"' \
             > "$diag/simulator_$attempt.log" 2>&1 &
           logger=$!
           out="$diag/test_$attempt.log"
+          echo "test-log=$out" >> "$GITHUB_OUTPUT"
           status=0
           # -v: the VM-service lines the watchdog reads. Its "[ +12 ms]"
           # prefixes do not count as output. A subshell, so wait gets the
@@ -138,7 +159,7 @@ runs:
             set -o pipefail
             dart "$tools/watch/watch.dart" --idle "$(( IDLE_MINUTES * 60 ))" --ignore '^\[ *\+ *[0-9]+ ms\]' \
               --on-stall "xcrun simctl listapps $udid > $diag/apps_$attempt.txt 2>&1; xcrun simctl io $udid screenshot $diag/screen_$attempt.png" \
-              -- "${prefix[@]}" flutter test -v "$TARGET" -d "$udid" -r "$REPORTER" "${extra[@]}" 2>&1 | tee "$out"
+              -- "${prefix[@]}" flutter test -v "$TARGET" -d "$udid" -r "$REPORTER" "${extra[@]}" 2>&1 | output "$out"
           ) &
           pipeline=$!
           (
