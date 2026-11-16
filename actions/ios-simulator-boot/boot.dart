@@ -60,8 +60,13 @@ Future<String> runSimctl(List<String> args, Duration timeout) async {
 }
 
 /// The version of a runtime identifier: `...SimRuntime.iOS-26-2` is [26, 2].
-List<int> runtimeVersion(String runtime) =>
-    runtime.split('.iOS-').last.split('-').map(int.parse).toList();
+/// A device-specific runtime such as `iOS-27-2-iPhone19-4` is [27, 2].
+List<int> runtimeVersion(String runtime) => [
+  for (final part
+      in RegExp(r'\.iOS-(\d+(?:-\d+)*)').firstMatch(runtime)?[1]?.split('-') ??
+          const <String>[])
+    int.parse(part),
+];
 
 List<SimulatorCandidate> simulatorCandidates(
   Map<String, dynamic> inventory, {

@@ -82,6 +82,10 @@ void main() {
         'com.apple.CoreSimulator.SimRuntime.iOS-26-0': [device('26.0')],
         'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [device('26.2')],
         'com.apple.CoreSimulator.SimRuntime.iOS-27-2': [device('27.2')],
+        // A device-specific runtime, on WarpBuild's macOS 26 image.
+        'com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4': [
+          device('27.2-device', type: 'iphone-19'),
+        ],
       },
     };
     List<Object?> udids(String? runtime) => simulatorCandidates(
@@ -89,7 +93,8 @@ void main() {
       fresh: true,
       runtime: runtime,
     ).map((candidate) => candidate.device['udid']).toList();
-    expect(udids(null), ['27.2', '26.2', '26.0']);
+    expect(udids(null).take(2), unorderedEquals(['27.2', '27.2-device']));
+    expect(udids(null).skip(2), ['26.2', '26.0']);
     expect(udids('26'), ['26.2', '26.0']);
     expect(udids('26.2'), ['26.2']);
     expect(
@@ -102,6 +107,17 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('runtime versions ignore a device suffix', () {
+    expect(
+      runtimeVersion('com.apple.CoreSimulator.SimRuntime.iOS-27-2-iPhone19-4'),
+      [27, 2],
+    );
+    expect(runtimeVersion('com.apple.CoreSimulator.SimRuntime.iOS-26-2'), [
+      26,
+      2,
+    ]);
   });
 
   test('missing simulator has actionable error', () {
