@@ -125,7 +125,8 @@ jobs:
           echo "adb lost after the first test: no retry"
           expect 125 1 bash -c "echo '$start'; adb disconnect \"\$ANDROID_SERIAL\"; sleep 120"
           echo "The emulator stops: no retry"
-          expect 125 1 bash -c "pkill -9 -f emulator/qemu/; sleep 120"
+          # [q]: the pattern must not match this command line.
+          expect 125 1 bash -c "pkill -9 -f 'emulator/[q]emu/'; sleep 120"
           jq -e '.attempts[0].markers == ["android-emulator-exit"]' "$run_dir/result.json"
           [[ "$(pgrep -c -f emulator/qemu/ || true)" == 0 ]]
       - name: Two fresh boots leave one emulator
