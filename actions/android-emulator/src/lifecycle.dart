@@ -416,19 +416,43 @@ Future<void> _waitReady(
 /// never connects, the tests use the console serial.
 Future<String> _useTcp(Host host, String console) async {
   const serial = '127.0.0.1:$kTcpPort';
+  var answers = '';
   for (var attempt = 1; attempt <= host.tcpTries; attempt++) {
-    await host.device(console, ['emu', 'redir', 'add', 'tcp:$kTcpPort:5555']);
-    await host.adbCommand(['connect', serial]);
-    if ((await host.device(serial, ['get-state'])).line == 'device') {
+    final redirect = await host.device(console, [
+      'emu',
+      'redir',
+      'add',
+      'tcp:$kTcpPort:5555',
+    ]);
+    final connect = await host.adbCommand(['connect', serial]);
+    final state = await host.device(serial, ['get-state']);
+    if (state.line == 'device') {
       _log('adb uses TCP ($serial), attempt $attempt.');
       return serial;
     }
+    answers =
+        'redir: ${_short(redirect)}; connect: ${_short(connect)}; '
+        'state: ${_short(state)}';
+    // A transport that stays offline is not replaced by a new connect.
+    await host.adbCommand(['disconnect', serial]);
     await Future<void>.delayed(host.tcpPause);
   }
   stdout.writeln(
-    '::warning::adb over TCP did not connect; tests use $console.',
+    '::warning::adb over TCP did not connect; tests use $console. '
+    'Last answers: $answers',
   );
   return console;
+}
+
+/// The first line of the output of adb, bounded, with no workflow command.
+String _short(CommandResult result) {
+  final text =
+      (result.line.isEmpty
+              ? const LineSplitter().convert(result.stderr).firstOrNull ?? ''
+              : result.line)
+          .replaceAll(RegExp(r'[^ -~]'), '?')
+          .replaceAll('::', ': :');
+  return '${result.exitCode} ${text.length > 120 ? text.substring(0, 120) : text}';
 }
 
 /// Stops only the processes that this session started. Safe to run twice.
