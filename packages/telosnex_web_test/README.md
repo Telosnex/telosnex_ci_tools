@@ -93,6 +93,10 @@ the response data:
   tests failed.". It never prints the rest of the report data.
 - Fails a run in which no test passed or failed (`requireTests`), and warns
   when the app did not call `installWebTestSupport`.
+- Calls `onConnect` with the connected driver first, for example to give the
+  page test secrets that must not be compiled in.
+- Gives closing the browser session 30 s (`closeTimeout`). flutter drive on
+  the web can hang there after the tests, when the page does not go idle.
 
 Paths: the `consoleLog` and `responseFile` arguments, else
 `TELOSNEX_WEB_TEST_CONSOLE` and `TELOSNEX_WEB_TEST_RESPONSE` (web-driver sets

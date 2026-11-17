@@ -43,7 +43,11 @@ const responseFileEnvironment = 'TELOSNEX_WEB_TEST_RESPONSE';
 /// - prints the details of each failure, and the result counts of
 ///   installWebTestSupport. It never prints the rest of the report data;
 /// - with [requireTests], fails when the counts show no test that passed or
-///   failed: a run that ran nothing does not pass.
+///   failed: a run that ran nothing does not pass;
+/// - calls [onConnect] with the connected driver before it waits for the
+///   results, e.g. to give the page data that must not be compiled in;
+/// - gives closing the browser session [closeTimeout]. flutter drive on the
+///   web can hang there after the tests, when the page does not go idle.
 ///
 /// Paths: the argument, else the environment variable ([consoleLogEnvironment],
 /// [responseFileEnvironment]), else build/web_console.log and
@@ -57,9 +61,12 @@ Future<Never> webIntegrationDriver({
   String? responseFile,
   bool requireTests = true,
   bool progressEveryPoll = false,
+  Future<void> Function(FlutterDriver driver)? onConnect,
+  Duration closeTimeout = const Duration(seconds: 30),
 }) async {
   final env = Platform.environment;
   final driver = await FlutterDriver.connect();
+  await onConnect?.call(driver);
   final poller = driver is WebFlutterDriver
       ? _ConsolePoller(
           driver,
@@ -101,7 +108,14 @@ Future<Never> webIntegrationDriver({
       );
     }
   }
-  await driver.close();
+  try {
+    await driver.close().timeout(closeTimeout);
+  } on TimeoutException {
+    stdout.writeln(
+      'Closing the browser session took more than '
+      '${closeTimeout.inSeconds} s; going on.',
+    );
+  }
 
   File(
       responseFile ??
