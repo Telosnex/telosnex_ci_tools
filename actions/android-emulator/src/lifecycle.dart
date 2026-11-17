@@ -417,13 +417,14 @@ Future<void> _waitReady(
 Future<String> _useTcp(Host host, String console) async {
   const serial = '127.0.0.1:$kTcpPort';
   var answers = '';
+  final redirect = await host.device(console, [
+    'emu',
+    'redir',
+    'add',
+    'tcp:$kTcpPort:5555',
+  ]);
+  var restarted = false;
   for (var attempt = 1; attempt <= host.tcpTries; attempt++) {
-    final redirect = await host.device(console, [
-      'emu',
-      'redir',
-      'add',
-      'tcp:$kTcpPort:5555',
-    ]);
     final connect = await host.adbCommand(['connect', serial]);
     final state = await host.device(serial, ['get-state']);
     if (state.line == 'device') {
@@ -435,6 +436,15 @@ Future<String> _useTcp(Host host, String console) async {
         'state: ${_short(state)}';
     // A transport that stays offline is not replaced by a new connect.
     await host.adbCommand(['disconnect', serial]);
+    if (!restarted && attempt >= 2) {
+      // Guest adbd does not always listen on tcp:5555 after boot. tcpip
+      // restarts it with that port; the console transport comes back.
+      restarted = true;
+      await host.device(console, ['tcpip', '5555']);
+      await host.device(console, [
+        'wait-for-device',
+      ], timeout: const Duration(seconds: 60));
+    }
     await Future<void>.delayed(host.tcpPause);
   }
   stdout.writeln(

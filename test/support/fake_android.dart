@@ -52,10 +52,15 @@ case "$1" in
         if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
           echo "error: device '$serial' not found" >&2; exit 1
         fi ;;
+      127.0.0.1:*)
+        if [ -f "$FAKE/tcp-needs-tcpip" ] || [ -f "$FAKE/tcp-never" ]; then
+          echo "error: device offline" >&2; exit 1
+        fi ;;
     esac
     cat "$FAKE/state" 2>/dev/null || echo device ;;
   wait-for-device) exit 0 ;;
-  connect|disconnect) exit 0 ;;
+  connect|disconnect) echo "$1 $2" >> "$FAKE/calls"; exit 0 ;;
+  tcpip) echo "tcpip $2" >> "$FAKE/calls"; rm -f "$FAKE/tcp-needs-tcpip"; exit 0 ;;
   devices) printf 'List of devices attached\n%s device\n' "$serial" ;;
   emu) exit 0 ;;
   logcat)

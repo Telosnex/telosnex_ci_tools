@@ -130,6 +130,34 @@ void main() {
       },
     );
 
+    test('guest adbd that is not on tcp:5555 gets adb tcpip once', () async {
+      await prepare(
+        fake.host(),
+        fake.session,
+        const PrepareInputs(switches: Switches(gdb: false, tcp: true)),
+      );
+      File('${fake.root.path}/tcp-needs-tcpip').writeAsStringSync('');
+      final session = await boot(fake.host(), fake.session, tool: fake.tool);
+      expect(session.serial, '127.0.0.1:5600');
+      expect(
+        'tcpip 5555'.allMatches(fake.calls.readAsStringSync()),
+        hasLength(1),
+      );
+      await stop(fake.host(), fake.session);
+    });
+
+    test('without TCP, the console serial', () async {
+      await prepare(
+        fake.host(),
+        fake.session,
+        const PrepareInputs(switches: Switches(gdb: false, tcp: true)),
+      );
+      File('${fake.root.path}/tcp-never').writeAsStringSync('');
+      final session = await boot(fake.host(), fake.session, tool: fake.tool);
+      expect(session.serial, session.consoleSerial);
+      await stop(fake.host(), fake.session);
+    });
+
     test('two boot --fresh in a row leave one emulator, and an emulator '
         'that the session did not start stays', () async {
       await prepared();

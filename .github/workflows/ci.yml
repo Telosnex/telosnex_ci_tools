@@ -140,6 +140,17 @@ jobs:
           dart "$TOOL" stop --session "$SESSION"
           dart "$TOOL" stop --session "$SESSION"
           [[ "$(pgrep -c -f emulator/qemu/ || true)" == 0 ]]
+      # This repository's CI has no secrets: the raw logs can be uploaded.
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-emulator-session
+          path: |
+            ${{ steps.emulator.outputs.session }}
+            !${{ steps.emulator.outputs.session }}/avd
+            ${{ runner.temp }}/run
+          if-no-files-found: ignore
+          retention-days: 7
 
   # actions/android-test-apks and actions/android-arm64-container together:
   # a new Flutter app with the fixture test files, built on x64 and run on
