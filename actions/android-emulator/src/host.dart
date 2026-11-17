@@ -32,7 +32,8 @@ final class Host {
     this.startupTimeout = const Duration(minutes: 2),
     this.terminationGrace = const Duration(seconds: 10),
     this.retryWindow = const Duration(seconds: 900),
-    this.tcpTries = 20,
+    // A transport that fails keeps failing; each try can take 13 s.
+    this.tcpTries = 6,
     this.tcpPause = const Duration(seconds: 3),
     this.installPause = const Duration(seconds: 30),
     this.diagnosticsTimeout = const Duration(seconds: 90),

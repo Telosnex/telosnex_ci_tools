@@ -97,7 +97,8 @@ jobs:
           SERIAL: ${{ steps.emulator.outputs.serial }}
           LOGCAT: ${{ steps.emulator.outputs.logcat }}
         run: |
-          [[ "$SERIAL" == 127.0.0.1:5600 ]]
+          # TCP is best effort: some emulators close every TCP connection.
+          [[ "$SERIAL" == 127.0.0.1:5600 || "$SERIAL" == emulator-5554 ]]
           [[ "$(adb -s "$SERIAL" shell getprop ro.product.cpu.abi | tr -d '\r')" == x86_64 ]]
           sleep 2
           [[ -s "$LOGCAT" ]]
@@ -105,6 +106,7 @@ jobs:
         env:
           TOOL: ${{ steps.emulator.outputs.tool }}
           SESSION: ${{ steps.emulator.outputs.session }}
+          SERIAL: ${{ steps.emulator.outputs.serial }}
         run: |
           run_dir="$RUNNER_TEMP/run"
           start='{"type":"testStart","test":{"id":1,"name":"t"}}'
@@ -119,11 +121,16 @@ jobs:
           }
           echo "A passing command"
           expect 0 1 bash -c "adb -s \"\$ANDROID_SERIAL\" shell echo ok | grep -q ok && echo '$start'"
+          # adb disconnect needs a TCP serial.
+          if [[ "$SERIAL" == emulator-* ]]; then
+            echo "::notice::No adb over TCP in this boot; the adb disconnect runs are skipped."
+          else
           echo "adb lost before the first test: one retry, and attempt 2 passes"
           expect 0 2 bash -c "if [ \"\$ANDROID_ATTEMPT\" = 1 ]; then adb disconnect \"\$ANDROID_SERIAL\"; sleep 120; fi; echo '$start'"
           jq -e '.attempts[0].markers == ["android-adb-disconnect"]' "$run_dir/result.json"
           echo "adb lost after the first test: no retry"
           expect 125 1 bash -c "echo '$start'; adb disconnect \"\$ANDROID_SERIAL\"; sleep 120"
+          fi
           echo "The emulator stops: no retry"
           # [q]: the pattern must not match this command line.
           expect 125 1 bash -c "pkill -9 -f 'emulator/[q]emu/'; sleep 120"
