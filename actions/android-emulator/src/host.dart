@@ -36,6 +36,7 @@ final class Host {
     this.tcpPause = const Duration(seconds: 3),
     this.installPause = const Duration(seconds: 30),
     this.diagnosticsTimeout = const Duration(seconds: 90),
+    this.exitWait = const Duration(seconds: 15),
   });
 
   /// The real host, or with TELOSNEX_ANDROID_TOOL_TEST=1 the short timings
@@ -67,6 +68,7 @@ final class Host {
       tcpPause: short,
       installPause: short,
       diagnosticsTimeout: const Duration(seconds: 5),
+      exitWait: const Duration(seconds: 1),
     );
   }
 
@@ -85,6 +87,10 @@ final class Host {
   final Duration tcpPause;
   final Duration installPause;
   final Duration diagnosticsTimeout;
+
+  /// After adb loses the device: how long to wait for the exit file of an
+  /// emulator that stopped. GDB writes it after the backtrace.
+  final Duration exitWait;
 
   String get sdk {
     final sdk = environment['ANDROID_HOME'] ?? environment['ANDROID_SDK_ROOT'];

@@ -268,7 +268,22 @@ Future<Outcome> superviseAttempt(
     await out.close();
     await err.close();
   }
+  // When QEMU stops, adb loses the device before GDB has printed the
+  // backtrace and the daemon has written the exit file.
+  if (markers.contains(Marker.adbDisconnect) &&
+      !markers.contains(Marker.emulatorExit)) {
+    final until = DateTime.now().add(host.exitWait);
+    while (!session.emulatorExit.existsSync() &&
+        DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+  }
   final emulatorStopped = session.emulatorExit.existsSync();
+  if (emulatorStopped && !markers.contains(Marker.emulatorExit)) {
+    markers.add(Marker.emulatorExit);
+    _say(Marker.emulatorExit.line('the emulator stopped'));
+    if (code == 0) code = kExitInfrastructure;
+  }
   retryable &= !emulatorStopped && markers.length == 1;
   return Outcome(
     exitCode: retryable ? kExitRetryable : code,

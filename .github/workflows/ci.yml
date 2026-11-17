@@ -127,7 +127,8 @@ jobs:
           echo "The emulator stops: no retry"
           # [q]: the pattern must not match this command line.
           expect 125 1 bash -c "pkill -9 -f 'emulator/[q]emu/'; sleep 120"
-          jq -e '.attempts[0].markers == ["android-emulator-exit"]' "$run_dir/result.json"
+          # adb can lose the device first; the emulator exit must be there too.
+          jq -e '.attempts[0].markers | index("android-emulator-exit")' "$run_dir/result.json"
           [[ "$(pgrep -c -f emulator/qemu/ || true)" == 0 ]]
       - name: Two fresh boots leave one emulator
         env:

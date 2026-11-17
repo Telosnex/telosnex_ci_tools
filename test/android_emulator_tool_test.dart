@@ -410,6 +410,20 @@ void main() {
       );
     });
 
+    test('a disconnect from an emulator that stops is an emulator exit, '
+        'not retried', () async {
+      final (code, result) = await run(
+        'kill -9 \$(cat "\$FAKE"/emulators/* | head -1); drop; sleep 30',
+      );
+      expect(code, kExitInfrastructure);
+      expect(result.attempts, hasLength(1));
+      expect(result.attempts.single.markers, [
+        Marker.adbDisconnect.label,
+        Marker.emulatorExit.label,
+      ]);
+      expect(result.attempts.single.emulatorStopped, isTrue);
+    });
+
     test('an emulator exit after a pass still fails', () async {
       final (code, result) = await run(
         'kill -9 \$(cat "\$FAKE"/emulators/* | head -1); sleep 0.5; exit 0',
