@@ -44,6 +44,9 @@ const responseFileEnvironment = 'TELOSNEX_WEB_TEST_RESPONSE';
 ///   installWebTestSupport. It never prints the rest of the report data;
 /// - with [requireTests], fails when the counts show no test that passed or
 ///   failed: a run that ran nothing does not pass;
+/// - with [showConsoleLine] false, the progress line has the running test
+///   and the line count, not the newest console line: for an app whose
+///   console can hold data that must stay out of the job log;
 /// - calls [onConnect] with the connected driver before it waits for the
 ///   results, e.g. to give the page data that must not be compiled in;
 /// - gives closing the browser session [closeTimeout]. flutter drive on the
@@ -62,6 +65,7 @@ Future<Never> webIntegrationDriver({
   bool requireTests = true,
   bool progressEveryPoll = false,
   Future<void> Function(FlutterDriver driver)? onConnect,
+  bool showConsoleLine = true,
   Duration closeTimeout = const Duration(seconds: 30),
 }) async {
   final env = Platform.environment;
@@ -70,6 +74,7 @@ Future<Never> webIntegrationDriver({
   final poller = driver is WebFlutterDriver
       ? _ConsolePoller(
           driver,
+          showConsoleLine: showConsoleLine,
           ConsoleTail(
             File(
               consoleLog ??
@@ -152,10 +157,11 @@ Future<Never> webIntegrationDriver({
 
 /// Polls one at a time: a poll that comes while one runs waits for it.
 final class _ConsolePoller {
-  _ConsolePoller(this.driver, this.tail);
+  _ConsolePoller(this.driver, this.tail, {this.showConsoleLine = true});
 
   final WebFlutterDriver driver;
   final ConsoleTail tail;
+  final bool showConsoleLine;
   Future<String>? _running;
 
   Future<String> poll() async {
@@ -188,6 +194,7 @@ final class _ConsolePoller {
       return 'the page has no console capture (installWebTestSupport)';
     }
     return 'test ${tail.test.isEmpty ? '(none yet)' : tail.test}, '
-        '${tail.total} console lines; last: ${tail.last}';
+        '${tail.total} console lines'
+        '${showConsoleLine ? '; last: ${tail.last}' : ''}';
   }
 }

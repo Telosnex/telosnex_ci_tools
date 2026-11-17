@@ -93,6 +93,9 @@ the response data:
   tests failed.". It never prints the rest of the report data.
 - Fails a run in which no test passed or failed (`requireTests`), and warns
   when the app did not call `installWebTestSupport`.
+- `showConsoleLine: false` leaves the newest console line out of the
+  progress line, for an app whose console can hold data that must stay out
+  of the job log.
 - Calls `onConnect` with the connected driver first, for example to give the
   page test secrets that must not be compiled in.
 - Gives closing the browser session 30 s (`closeTimeout`). flutter drive on
