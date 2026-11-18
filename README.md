@@ -177,6 +177,16 @@ page, enable publishing from the repository with the tag pattern and the
 `pub.dev` environment. A dry run from a branch: `dry-run: true` and
 `tag: <the tag>`.
 
+Push each release tag with a separate `git push`. If one push has more
+than three tags, GitHub does not start a workflow for any of them
+([GitHub docs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)).
+To recover, delete each tag from the remote, then push it again alone.
+
+When a package needs a new version of a package in the same repository,
+publish the dependency first. Wait until pub.dev shows its new version.
+Then push the tags of the packages that need it. The publish job resolves
+dependencies from pub.dev, not from the repository.
+
 ### Upstream watch
 
 A package that pins code from another project (a library, an SDK, a
