@@ -32,6 +32,11 @@ import 'package:telosnex_ci_tools/src/repo_settings.dart';
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addFlag('dry-run', negatable: false)
+    ..addFlag(
+      'pr',
+      negatable: false,
+      help: 'Open pin PRs instead of pushing to default branches.',
+    )
     ..addOption('only', help: 'Comma-separated repository names.')
     ..addOption('org', defaultsTo: 'Telosnex')
     ..addOption('jobs', defaultsTo: '6', help: 'Repositories at a time.')
@@ -69,7 +74,15 @@ Future<void> main(List<String> arguments) async {
       final (name, branch) = queue.removeAt(0);
       String result;
       try {
-        result = await _update(org, name, branch, sha, tag, dryRun: dryRun);
+        result = await _update(
+          org,
+          name,
+          branch,
+          sha,
+          tag,
+          dryRun: dryRun,
+          pr: args.flag('pr'),
+        );
       } on Object catch (e) {
         result = 'FAILED: $e';
       }
@@ -186,6 +199,7 @@ Future<String> _update(
   String sha,
   String tag, {
   required bool dryRun,
+  required bool pr,
 }) async {
   final dir = Directory.systemTemp.createTempSync('release_$name');
   try {
@@ -250,16 +264,33 @@ Future<String> _update(
     if (dryRun) return 'would update ($stat)';
 
     await _git(repo, ['commit', '-qam', 'ci: $selfRepository $tag']);
-    final push = await Process.run('git', [
-      'push',
-      '-q',
-      'origin',
-      'HEAD:$branch',
-    ], workingDirectory: repo);
-    if (push.exitCode == 0) return 'pushed ($stat)';
-
+    if (!pr) {
+      final push = await Process.run('git', [
+        'push',
+        '-q',
+        'origin',
+        'HEAD:$branch',
+      ], workingDirectory: repo);
+      if (push.exitCode == 0) return 'pushed ($stat)';
+    }
     final head = 'ci/telosnex-ci-tools-$tag';
-    await _git(repo, ['push', '-q', '-f', 'origin', 'HEAD:refs/heads/$head']);
+    final existing = await _run('gh', [
+      'pr',
+      'list',
+      '-R',
+      '$org/$name',
+      '--base',
+      branch,
+      '--head',
+      head,
+      '--json',
+      'url',
+      '--jq',
+      '.[0].url // empty',
+    ]);
+    if (existing.isNotEmpty) return 'pull request $existing (existing)';
+    // Never overwrite a branch that may now contain compatibility fixes.
+    await _git(repo, ['push', '-q', 'origin', 'HEAD:refs/heads/$head']);
     final url = await _run('gh', [
       'pr',
       'create',
@@ -272,9 +303,7 @@ Future<String> _update(
       '--title',
       'ci: $selfRepository $tag',
       '--body',
-      'Pins $selfRepository to $tag. Opened by '
-          '`dart run telosnex_ci_tools:release $tag`: a direct push to '
-          '$branch was refused.',
+      'Pins $selfRepository to $tag. Merge after the package CI passes.',
     ]);
     return 'pull request $url';
   } finally {
