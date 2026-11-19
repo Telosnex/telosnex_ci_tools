@@ -40,6 +40,7 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [super_native_extensions](https://github.com/Telosnex/super_native_extensions) | ✅ | ✅ |
 | [super_sliver_list](https://github.com/Telosnex/super_sliver_list) | — | ✅ |
 | [telosnex_audio](https://github.com/Telosnex/telosnex_audio) | ✅ | ✅ |
+| [telosnex_excel](https://github.com/Telosnex/telosnex_excel) | — | ✅ |
 | [telosnex_inappwebview](https://github.com/Telosnex/telosnex_inappwebview) | — | ✅ |
 | [webcrypto.dart](https://github.com/Telosnex/webcrypto.dart) | ✅ | ✅ |
 | [zxing_dart](https://github.com/Telosnex/zxing_dart) | ✅ | ✅ |
