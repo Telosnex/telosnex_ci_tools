@@ -590,10 +590,10 @@ packages:
       expect(
         mono[0],
         endsWith(
-          '| [![mono_a](https://img.shields.io/pub/v/mono_a?label=mono_a)]'
-          '(https://pub.dev/packages/mono_a) '
-          '[![pub points](https://img.shields.io/pub/points/mono_a)]'
-          '(https://pub.dev/packages/mono_a/score) | 3d | ✅ same |',
+          '| [![pub points](https://img.shields.io/pub/points/mono_a)]'
+          '(https://pub.dev/packages/mono_a/score) '
+          '[![mono_a](https://img.shields.io/pub/v/mono_a?label=mono_a)]'
+          '(https://pub.dev/packages/mono_a) | 3d | ✅ same |',
         ),
       );
       expect(

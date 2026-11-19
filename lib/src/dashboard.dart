@@ -625,13 +625,12 @@ void _pubSection(
   }
 }
 
-/// shields.io badges: the version, labelled with the package's name, and
-/// pana's points, each linked to its pub.dev page.
+/// Link to the score first, then the package's published version.
 String _pubBadges(String name) =>
-    '[![$name](https://img.shields.io/pub/v/$name?label=$name)]'
-    '(https://pub.dev/packages/$name) '
     '[![pub points](https://img.shields.io/pub/points/$name)]'
-    '(https://pub.dev/packages/$name/score)';
+    '(https://pub.dev/packages/$name/score) '
+    '[![$name](https://img.shields.io/pub/v/$name?label=$name)]'
+    '(https://pub.dev/packages/$name)';
 
 String _driftCell(PubPackage pub, String repo) {
   final drift = pub.drift;

@@ -39,6 +39,9 @@ packages:
     checks: [kiln_check.yml, check_and_lint.yml]
   - repo: Telosnex/webcrypto.dart
   # Forks the app depends on, with telosnex_ci_tools workflows (no Kiln).
+  - repo: Telosnex/telosnex_excel
+    checks: []
+    releases: [pub_publish.yml]
   - repo: Telosnex/monet_ui
     checks: []
     releases: []
