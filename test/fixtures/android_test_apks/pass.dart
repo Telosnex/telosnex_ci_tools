@@ -11,6 +11,21 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('a tap counts', (tester) async {
+    // Android can deliver the first window metrics after the test starts.
+    // Wait for the real view; taps and screenshots need a live surface.
+    for (
+      var attempt = 0;
+      attempt < 100 && tester.view.physicalSize.isEmpty;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      tester.view.physicalSize.isEmpty,
+      isFalse,
+      reason: 'Android did not report a non-empty view size',
+    );
+
     var count = 0;
     await tester.pumpWidget(
       MaterialApp(
@@ -25,8 +40,6 @@ void main() {
         ),
       ),
     );
-    // The container's screen is on and unlocked: the view has its size.
-    expect(tester.view.physicalSize.isEmpty, isFalse);
     await tester.tap(find.byIcon(Icons.add));
     await tester.pumpAndSettle();
     expect(find.text('count 1'), findsOneWidget);
