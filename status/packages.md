@@ -35,7 +35,6 @@ The Telosnex repositories that use Kiln or telosnex_ci_tools on their default br
 | [receive_sharing_intent](https://github.com/Telosnex/receive_sharing_intent) | — | ✅ |
 | [riverpod](https://github.com/Telosnex/riverpod) | — | ✅ |
 | [sandbox_runtime_dart](https://github.com/Telosnex/sandbox_runtime_dart) | — | ✅ |
-| [shine_dart](https://github.com/Telosnex/shine_dart) | — | ✅ |
 | [supabase-flutter](https://github.com/Telosnex/supabase-flutter) | — | ✅ |
 | [super_native_extensions](https://github.com/Telosnex/super_native_extensions) | ✅ | ✅ |
 | [super_sliver_list](https://github.com/Telosnex/super_sliver_list) | — | ✅ |
