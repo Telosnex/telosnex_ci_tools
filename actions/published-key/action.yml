@@ -2,7 +2,8 @@ name: Published source key
 description: >-
   Checks that a Kiln package, as pub publishes it, computes the source key
   of its prebuilt files, with published_key of this commit of
-  telosnex_ci_tools. A package without native_artifacts/ passes.
+  telosnex_ci_tools. A package without native_artifacts/ passes, and so
+  does a repository without .github/workflows/pub_publish.yml.
 
 # Needs Dart on the PATH, and pub get in the package: run
 # actions/setup-flutter and pub get first.
@@ -36,6 +37,13 @@ runs:
         dir=$(cd "$PACKAGE_DIR" && pwd)
         if [[ ! -d "$dir/native_artifacts" ]]; then
           echo "No native_artifacts/: not a Kiln package."
+          exit 0
+        fi
+        # A package that apps use only as a git dependency (webcrypto.dart):
+        # git has every tracked file, so the key of the checkout is right.
+        root=$(git -C "$dir" rev-parse --show-toplevel)
+        if [[ ! -f "$root/.github/workflows/pub_publish.yml" ]]; then
+          echo "No .github/workflows/pub_publish.yml: the package is not published."
           exit 0
         fi
         cd "$GITHUB_ACTION_PATH/../.."
