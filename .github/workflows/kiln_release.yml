@@ -112,7 +112,30 @@ env:
   WEB_RUNNER: ubuntu-24.04
 
 jobs:
+  # Before any build: the release is named after the source key of the
+  # checkout, and an app computes the key from the published files. If they
+  # differ (a tracked file that pub leaves out), the release is of no use.
+  published-key:
+    name: Published source key
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
+      - run: flutter pub get --no-example
+        working-directory: ${{ inputs.working-directory }}
+      - uses: Telosnex/telosnex_ci_tools/actions/published-key@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
+        with:
+          against: checkout
+          package: ${{ inputs.package }}
+          working-directory: ${{ inputs.working-directory }}
+
   build:
+    needs: published-key
     name: ${{ matrix.target }}
     # Linux builds use Ubuntu 22.04 for its older glibc.
     runs-on: >-
@@ -161,7 +184,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
 
       # Files go to $RUNNER_TEMP: untracked files in the checkout count in
       # the source key.
@@ -194,7 +217,7 @@ jobs:
           name: ${{ inputs.input-artifact }}
           path: ${{ runner.temp }}/kiln/${{ inputs.input-artifact }}
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
 
       - name: Source key
         run: |
@@ -202,7 +225,7 @@ jobs:
           dart run "$PACKAGE:key" --list > "$OUT/key/$TARGET.txt"
           tail -1 "$OUT/key/$TARGET.txt"
 
-      - uses: Telosnex/telosnex_ci_tools/actions/kiln-build@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/kiln-build@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
         with:
           package: ${{ inputs.package }}
           target: ${{ matrix.target }}
@@ -215,7 +238,7 @@ jobs:
         run: |
           if [[ -f tool/kiln/test_build.dart ]]; then dart tool/kiln/test_build.dart; fi
 
-      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
 
       # The unstripped libraries. The kiln-* artifact has only the stripped
       # release copies.
@@ -236,6 +259,7 @@ jobs:
           retention-days: 90
 
   web:
+    needs: published-key
     runs-on: ubuntu-24.04
     container:
       image: ${{ inputs.web-container }}
@@ -260,13 +284,13 @@ jobs:
           echo "built=$built" >> "$GITHUB_OUTPUT"
           echo "Web files: $built"
       - if: steps.find.outputs.built == 'true'
-        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - if: steps.find.outputs.built == 'true'
         run: flutter pub get --no-example
       - name: Set paths
         run: echo "OUT=$RUNNER_TEMP/kiln" >> "$GITHUB_ENV"
       - if: steps.find.outputs.built == 'true'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - name: Source key
         if: steps.find.outputs.built == 'true'
         run: |
@@ -290,7 +314,7 @@ jobs:
           fi
           cat "$OUT/web-meta/toolchain.txt"
       - if: steps.find.outputs.built == 'true'
-        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/check-clean-tree@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - if: steps.find.outputs.built == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -321,7 +345,7 @@ jobs:
             echo "::warning::The web files have no test: add tool/kiln/test_web.dart."
           fi
       - if: steps.find.outputs.found == 'true'
-        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - if: steps.find.outputs.found == 'true'
         run: flutter pub get --no-example
       - name: Cache the test files
@@ -366,7 +390,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - run: flutter pub get --no-example
       - run: echo "ARTIFACTS=$RUNNER_TEMP/artifacts" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

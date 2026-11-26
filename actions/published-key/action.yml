@@ -1,0 +1,44 @@
+name: Published source key
+description: >-
+  Checks that a Kiln package, as pub publishes it, computes the source key
+  of its prebuilt files, with published_key of this commit of
+  telosnex_ci_tools. A package without native_artifacts/ passes.
+
+# Needs Dart on the PATH, and pub get in the package: run
+# actions/setup-flutter and pub get first.
+
+inputs:
+  against:
+    description: >-
+      manifest: the key in native_artifacts/prebuilt.json. checkout: the key
+      of the checkout, before a release, when the manifest is old.
+    required: false
+    default: manifest
+  package:
+    description: The Dart package of kiln. native_prebuilt before its rename.
+    required: false
+    default: kiln
+  working-directory:
+    description: The directory of the package in the repository.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Published source key
+      shell: bash
+      env:
+        AGAINST: ${{ inputs.against }}
+        KILN_PACKAGE: ${{ inputs.package }}
+        PACKAGE_DIR: ${{ inputs.working-directory }}
+      run: |
+        dir=$(cd "$PACKAGE_DIR" && pwd)
+        if [[ ! -d "$dir/native_artifacts" ]]; then
+          echo "No native_artifacts/: not a Kiln package."
+          exit 0
+        fi
+        cd "$GITHUB_ACTION_PATH/../.."
+        dart pub get > /dev/null
+        dart run telosnex_ci_tools:published_key --against "$AGAINST" \
+          --kiln-package "$KILN_PACKAGE" "$dir"

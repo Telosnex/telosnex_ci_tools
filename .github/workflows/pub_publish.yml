@@ -5,7 +5,8 @@
 #    branch: the renamed packages' repository URL points there (pub.dev
 #    checks that it has a pubspec with the published name).
 # 2. Unit on the renamed package: analyze, then the test command.
-# 3. The pana gate: at most max-lost-points below pub.dev's maximum.
+# 3. The pana gate: at most max-lost-points below pub.dev's maximum. A Kiln
+#    package: the files pub uploads compute the manifest's source key.
 # 4. Publishes through pub.dev's GitHub trust (OIDC): no stored secret.
 #    The OIDC token is requested just before the upload: it expires in
 #    minutes, and Unit plus pana can take longer. On pub.dev, the package's
@@ -70,9 +71,9 @@ jobs:
       # Also registers PUB_TOKEN as the pub.dev credential. Its token can
       # expire before the upload: Publish requests a new one.
       - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
-      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
       - id: rename
-        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        uses: Telosnex/telosnex_ci_tools/actions/publish-rename@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
         with:
           tag: ${{ inputs.tag || github.ref_name }}
           repository: ${{ github.server_url }}/${{ github.repository }}
@@ -126,6 +127,11 @@ jobs:
           mkdir -p "$(dirname "$copy")"
           cp -R . "$copy"
           dart pub global run pana --no-warning --exit-code-threshold "$MAX_LOST" "$copy"
+      # A Kiln package: the files that pub uploads must compute the key of
+      # the manifest, or every app's kiln:check rejects this version.
+      - uses: Telosnex/telosnex_ci_tools/actions/published-key@6aa0bb47914b8fdc5e80f0452b274d3d9e4ac260 # self
+        with:
+          working-directory: ${{ steps.rename.outputs.package }}
       - name: Publish
         if: ${{ !inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}

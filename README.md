@@ -27,9 +27,9 @@ The shared GitHub Actions workflows, composite actions and CI conventions of the
 | `.github/workflows/kiln_release.yml` | Reusable workflow | Builds, tests and publishes the prebuilt native and web files of a kiln package. |
 | `.github/workflows/pub_publish.yml` | Reusable workflow | Publishes a package to pub.dev from a release tag, renamed to its published names. |
 | `bin/release.dart` | Tool | Tags a release and pins every package to it, in one command (see Change this repository). |
-| `bin/published_key.dart` | Tool | Before publishing a Kiln package: checks that the files pub uploads compute the manifest's source key (else every build compiles from source). |
+| `actions/published-key`, `bin/published_key.dart` | Composite action, tool | Checks that the files pub uploads of a Kiln package compute its source key: pub leaves out a tracked file that a `.gitignore` or `.pubignore` ignores, and an app then rejects the package. It names the files. `kiln_check.yml` and `pub_publish.yml` compare with the manifest; `kiln_release.yml` compares with the checkout before it builds. |
 | `actions/publish-rename` | Composite action | Renames a checkout to its published names (`tool/publish_names.yaml`). |
-| `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`. |
+| `.github/workflows/kiln_check.yml` | Reusable workflow | Runs `<package>:check`, then `actions/published-key`. |
 | `.github/workflows/upstream_watch.yml`, `actions/upstream-watch`, `bin/upstream_watch.dart` | Reusable workflow, composite action, tool | Daily check for updates to the code that a package pins from other projects (see Upstream watch). |
 | `bin/lint.dart` | Dart CLI | Checks the workflow files of a repository against the conventions. |
 | `bin/pin_self.dart` | Dart CLI | Pins the references from the workflows to the actions of this repository. |
