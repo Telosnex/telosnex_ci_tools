@@ -112,7 +112,30 @@ env:
   WEB_RUNNER: ubuntu-24.04
 
 jobs:
+  # Before any build: the release is named after the source key of the
+  # checkout, and an app computes the key from the published files. If they
+  # differ (a tracked file that pub leaves out), the release is of no use.
+  published-key:
+    name: Published source key
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: Telosnex/telosnex_ci_tools/actions/setup-flutter@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+      - run: flutter pub get --no-example
+        working-directory: ${{ inputs.working-directory }}
+      - uses: Telosnex/telosnex_ci_tools/actions/published-key@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        with:
+          against: checkout
+          package: ${{ inputs.package }}
+          working-directory: ${{ inputs.working-directory }}
+
   build:
+    needs: published-key
     name: ${{ matrix.target }}
     # Linux builds use Ubuntu 22.04 for its older glibc.
     runs-on: >-
@@ -236,6 +259,7 @@ jobs:
           retention-days: 90
 
   web:
+    needs: published-key
     runs-on: ubuntu-24.04
     container:
       image: ${{ inputs.web-container }}

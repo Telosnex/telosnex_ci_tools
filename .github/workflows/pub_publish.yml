@@ -5,7 +5,8 @@
 #    branch: the renamed packages' repository URL points there (pub.dev
 #    checks that it has a pubspec with the published name).
 # 2. Unit on the renamed package: analyze, then the test command.
-# 3. The pana gate: at most max-lost-points below pub.dev's maximum.
+# 3. The pana gate: at most max-lost-points below pub.dev's maximum. A Kiln
+#    package: the files pub uploads compute the manifest's source key.
 # 4. Publishes through pub.dev's GitHub trust (OIDC): no stored secret.
 #    The OIDC token is requested just before the upload: it expires in
 #    minutes, and Unit plus pana can take longer. On pub.dev, the package's
@@ -126,6 +127,11 @@ jobs:
           mkdir -p "$(dirname "$copy")"
           cp -R . "$copy"
           dart pub global run pana --no-warning --exit-code-threshold "$MAX_LOST" "$copy"
+      # A Kiln package: the files that pub uploads must compute the key of
+      # the manifest, or every app's kiln:check rejects this version.
+      - uses: Telosnex/telosnex_ci_tools/actions/published-key@3b66a2d628a2a5789a3935b670afb5f4f699eba8 # self
+        with:
+          working-directory: ${{ steps.rename.outputs.package }}
       - name: Publish
         if: ${{ !inputs.dry-run }}
         working-directory: ${{ steps.rename.outputs.package }}
